@@ -1,0 +1,2 @@
+# Disk Alert
+0 10 * * *	root	/opt/sysadmws-utils/disk_alert/disk_alert.sh
