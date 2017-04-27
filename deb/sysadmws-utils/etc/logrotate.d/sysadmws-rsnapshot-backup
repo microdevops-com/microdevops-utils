@@ -1,0 +1,10 @@
+/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log {
+	daily
+	missingok
+	rotate 7
+	compress
+	delaycompress
+	notifempty
+	create 644 root root
+	sharedscripts
+}

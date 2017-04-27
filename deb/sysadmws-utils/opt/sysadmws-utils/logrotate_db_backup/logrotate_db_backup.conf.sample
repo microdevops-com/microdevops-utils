@@ -1,0 +1,58 @@
+# This is a comment
+  # This is also a comment
+# Target name - any text without spaces
+# You can have as many targets as you want
+# logrotate_db_backup.sh target_name - runs only specific target
+# logrotate_db_backup.sh - runs all targets
+target_1:
+  # Target options are prepended with <space><space>
+  # Only mysql is supported for now
+  # dump_type option is mandatory
+  dump_type: mysql
+  # db option is mandatory
+  # * - all databases
+  # db1 db2 ... - db list is separated with spaces
+  db: pass
+  # dst_* - one local path is mandatory
+  # You can use any text after _
+  # Local destination: local file path
+  # Remote destination: user@host:path or user@host:port:path
+  # Local destination is copied using scp to remote destinations
+  # You can have many remote destinations
+  dst_1: /var/backups/logrotate_db_backup/pass.sql
+  dst_2: root@server1.example.com:/var/backups/logrotate_db_backup/pass.sql
+  # Run dump with nice level, optional
+  nice: 10
+  # Optional options for runnning dump (anything you want)
+  dump_opts: --force --opt --single-transaction --quick --lock-tables=false
+  # Mandatory part for auth
+  auth: --defaults-file=/etc/mysql/debian.cnf
+  # Optionally, if dumping only one db, you can specify tables separated by space
+  tables: tmpass_categories 1tmpass_keys 1tmpass_items
+  # Mandatory, how many copies to keep
+  copies_quantity: 144
+  # Optionally, compress rotated dumps
+  compress: yes
+
+target_2:
+  dump_type: mysql
+  db: *
+  dst_1: /var/backups/logrotate_db_backup/all.sql
+  dst_2: root@server1.example.com:/var/backups/logrotate_db_backup/all.sql
+  dst_3: root@server2.example.com:/var/backups/logrotate_db_backup/all.sql
+  dump_opts: --force --opt --single-transaction --quick --lock-tables=false
+  auth: --defaults-file=/etc/mysql/debian.cnf
+  tables: *
+  copies_quantity: 10
+  compress: no
+
+# test
+target_3:
+  dump_type: mysql
+  db: mysql pass
+  dst_1: /var/backups/logrotate_db_backup/2.sql
+  dst_2: root@server1.example.com:/var/backups/logrotate_db_backup/2-1.sql
+  dst_3: root@server2.example.com:22:/var/backups/logrotate_db_backup/2-2.sql
+  dump_opts: --force --opt --single-transaction --quick --lock-tables=false
+  auth: --defaults-file=/etc/mysql/debian.cnf
+  copies_quantity: 20
