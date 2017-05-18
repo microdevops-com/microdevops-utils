@@ -249,6 +249,7 @@ function print_timestamp() {
 		chmod_part = "chmod 644 /tmp/rsnapshot_backup_postgresql_query1.sql";
                 lock_part = "{ while [ -d /var/backups/postgresql/dump.lock ]; do sleep 5; done } && mkdir /var/backups/postgresql/dump.lock && trap \"rm -rf /var/backups/postgresql/dump.lock\" 0";
                 find_part = "cd /var/backups/postgresql && find /var/backups/postgresql/ -type f -name \"*.gz\" -mmin +720 -delete";
+		globals_part = "su - postgres -c \"pg_dumpall --clean --globals-only --verbose 2>/dev/null\" | gzip > /var/backups/postgresql/globals.gz";
                 if (match(backup_src, /ALL\^/)) {
                         split(substr(backup_src, 5), db_excludes, ",");
                         grep_part = "grep -v ";
@@ -261,9 +262,9 @@ function print_timestamp() {
                         dblist_part = "su - postgres -c \"cat /tmp/rsnapshot_backup_postgresql_query1.sql | psql --no-align -t template1\" > /var/backups/postgresql/db_list.txt";
                 }
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --clean --create --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --clean --create --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --clean --create --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --clean --create --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
