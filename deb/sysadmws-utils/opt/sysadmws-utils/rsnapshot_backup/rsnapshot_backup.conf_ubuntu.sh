@@ -4,7 +4,6 @@ export HN=`hostname`
 chmod 600 /root/.ssh/authorized_keys
 ssh -oStrictHostKeyChecking=no localhost exit
 ssh -oStrictHostKeyChecking=no $HN exit
-cp /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf /opt/sysadmws-utils/utils/rsnapshot_backup/rsnapshot_backup.conf.old
 sed "s/HOSTNAME/$HN/g" /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf.localhost | grep UBUNTU > /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf
 cp /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_daily.cron /etc/cron.d/sysadmws-rsnapshot-backup
 chmod 600 /etc/cron.d/sysadmws-rsnapshot-backup
