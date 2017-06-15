@@ -1,10 +1,10 @@
 BEGIN {
 	# Check rsnapshot type
-	if ((rsnapshot_type != "sync") && (rsnapshot_type != "daily") && (rsnapshot_type != "weekly") && (rsnapshot_type != "monthly")) {
+	if ((rsnapshot_type != "sync") && (rsnapshot_type != "hourly") && (rsnapshot_type != "daily") && (rsnapshot_type != "weekly") && (rsnapshot_type != "monthly")) {
 		print_timestamp(); print("ERROR: Unknown rsnapshot type: " rsnapshot_type);
 		exit;
 	}
-	if ((rsnapshot_type == "daily") || (rsnapshot_type == "weekly") || (rsnapshot_type == "monthly")) {
+	if ((rsnapshot_type == "hourly") || (rsnapshot_type == "daily") || (rsnapshot_type == "weekly") || (rsnapshot_type == "monthly")) {
 		if (config_line != "") {
 			print_timestamp(); print("ERROR: LINE can only be used with sync TYPE");
 			exit;
@@ -90,9 +90,20 @@ function print_timestamp() {
 	if ((dwm_number == "") || (dwm_number == "-")) {
 		dwm_number = "743";
 	}
-	dwm_d = substr(dwm_number, 1, 1);
-	dwm_w = substr(dwm_number, 2, 1);
-	dwm_m = substr(dwm_number, 3, 1);
+	# Detect HDWM instead of DWM
+	if (length(dwm_number) == 4) {
+		dwm_h = substr(dwm_number, 1, 1);
+		dwm_d = substr(dwm_number, 2, 1);
+		dwm_w = substr(dwm_number, 3, 1);
+		dwm_m = substr(dwm_number, 4, 1);
+		h_comment = "";
+	} else {
+		dwm_h = "NONE";
+		dwm_d = substr(dwm_number, 1, 1);
+		dwm_w = substr(dwm_number, 2, 1);
+		dwm_m = substr(dwm_number, 3, 1);
+		h_comment = "#";
+	}
 
 	# Default user
 	if (connect_user == "") {
@@ -124,8 +135,8 @@ function print_timestamp() {
 		verbosity_args = " --human-readable --progress ";
 	}
 
-	# Process daily, weekly, monthly rotations
-	if ((rsnapshot_type == "daily") || (rsnapshot_type == "weekly") || (rsnapshot_type == "monthly")) {
+	# Process hourly, daily, weekly, monthly rotations
+	if ((rsnapshot_type == "hourly") || (rsnapshot_type == "daily") || (rsnapshot_type == "weekly") || (rsnapshot_type == "monthly")) {
 		# Process each backup_dst only once
 		if (backup_dst == backup_dst_save) {
 			next;
@@ -133,6 +144,8 @@ function print_timestamp() {
 		backup_dst_save = backup_dst;
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_ROTATE.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
@@ -195,6 +208,8 @@ function print_timestamp() {
 		# Prepare config and run
 		system(template_file " | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
@@ -248,7 +263,12 @@ function print_timestamp() {
 		mkdir_part = "mkdir -p /var/backups/postgresql";
 		chmod_part = "chmod 644 /tmp/rsnapshot_backup_postgresql_query1.sql";
                 lock_part = "{ while [ -d /var/backups/postgresql/dump.lock ]; do sleep 5; done } && mkdir /var/backups/postgresql/dump.lock && trap \"rm -rf /var/backups/postgresql/dump.lock\" 0";
-                find_part = "cd /var/backups/postgresql && find /var/backups/postgresql/ -type f -name \"*.gz\" -mmin +720 -delete";
+		# If hourly retains are used keep dumps only for 59 minutes
+		if (dwm_h != "NONE") {
+			find_part = "cd /var/backups/postgresql && find /var/backups/postgresql/ -type f -name \"*.gz\" -mmin +59 -delete";
+		} else {
+			find_part = "cd /var/backups/postgresql && find /var/backups/postgresql/ -type f -name \"*.gz\" -mmin +720 -delete";
+		}
 		globals_part = "su - postgres -c \"pg_dumpall --clean --globals-only --verbose 2>/dev/null\" | gzip > /var/backups/postgresql/globals.gz";
                 if (match(backup_src, /ALL\^/)) {
                         split(substr(backup_src, 5), db_excludes, ",");
@@ -279,6 +299,8 @@ function print_timestamp() {
 		# Prepare config and run
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
@@ -324,7 +346,12 @@ function print_timestamp() {
 		#
 		mkdir_part = "mkdir -p /var/backups/mysql";
 		lock_part = "{ while [ -d /var/backups/mysql/dump.lock ]; do sleep 5; done } && mkdir /var/backups/mysql/dump.lock && trap \"rm -rf /var/backups/mysql/dump.lock\" 0";
-		find_part = "cd /var/backups/mysql && find /var/backups/mysql/ -type f -name \"*.gz\" -mmin +720 -delete";
+		# If hourly retains are used keep dumps only for 59 minutes
+		if (dwm_h != "NONE") {
+			find_part = "cd /var/backups/mysql && find /var/backups/mysql/ -type f -name \"*.gz\" -mmin +59 -delete";
+		} else {
+			find_part = "cd /var/backups/mysql && find /var/backups/mysql/ -type f -name \"*.gz\" -mmin +720 -delete";
+		}
 		if (match(backup_src, /ALL\^/)) {
 			split(substr(backup_src, 5), db_excludes, ",");
 			grep_part = "grep -v ";
@@ -354,6 +381,8 @@ function print_timestamp() {
 		# Prepare config and run
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
@@ -405,6 +434,8 @@ function print_timestamp() {
 		system("echo '" connect_passwd "' > /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.passwd");
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
@@ -429,6 +460,8 @@ function print_timestamp() {
 		}
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" dwm_h "#g' \
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \

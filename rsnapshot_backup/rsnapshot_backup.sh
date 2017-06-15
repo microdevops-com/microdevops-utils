@@ -11,7 +11,7 @@ fi
 if [ "$1" = "" ]; then
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "ERROR: Use rsnapshot_backup.sh TYPE [LINE] [VERBOSITY]"
-	echo -e >&2 "ERROR: TYPE = sync, daily, weekly, monthly (sync_first enabled)"
+	echo -e >&2 "ERROR: TYPE = sync, hourly, daily, weekly, monthly (sync_first enabled)"
 	echo -e >&2 "ERROR: LINE = run sync only for config file line number LINE (including comments)"
 	echo -e >&2 "ERROR: If LINE is empty - run all lines"
 	echo -e >&2 "ERROR: If VERBOSITY = 1 - show progress of rsync, if empty or other - do not show"

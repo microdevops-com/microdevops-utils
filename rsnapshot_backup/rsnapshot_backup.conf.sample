@@ -1,14 +1,14 @@
 #
 # *			*		*			*	
-# SRC_HOST		BACKUP_TYPE	SRC			DST						DWM					ARGS			USER			PASSWORD
+# SRC_HOST		BACKUP_TYPE	SRC			DST						DWM or HDWM				ARGS			USER			PASSWORD
 # ^			^		^			^						^					^			^			^
 # source host		FS_RSYNC_SSH	source path or db	rsnapshot root					retain					rsync args		connect user		connect password
-#			FS_RSYNC_NATIVE										D daily					blank by default	root by default		blank by default
-#			POSTGRESQL										W weekly				depends on backup type
-#			MYSQL											M monthly				no spaces allowed
-#			FS_RSYNC_NATIVE_TXT_CHECK - check for .backup_check before doing backup			743 by default				- = blank
-#			LOCAL_PREEXEC - exec SRC_HOST locallly and use local SRC				- = default				
-#			FS_RSYNC_NATIVE_TO_10H - use timeout and kill if longer 10h
+#			FS_RSYNC_NATIVE										H hourly				blank by default	root by default		blank by default
+#			POSTGRESQL										D daily					depends on backup type
+#			MYSQL											W weekly				no spaces allowed
+#			FS_RSYNC_NATIVE_TXT_CHECK - check for .backup_check before doing backup			M monthly				- = blank
+#			LOCAL_PREEXEC - exec SRC_HOST locallly and use local SRC				743 by default
+#			FS_RSYNC_NATIVE_TO_10H - use timeout and kill if longer 10h				- = default
 # *      = mandatory field											
 # ---	 = take data from previous line										
 # ALL	 = all databases

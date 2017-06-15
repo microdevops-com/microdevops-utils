@@ -66,7 +66,8 @@ cp ../rsnapshot_backup/rsnapshot_backup.awk \
 	../rsnapshot_backup/rsnapshot_conf_template_ROTATE.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf \
-	../rsnapshot_backup/rsnapshot_backup.cron \
+	../rsnapshot_backup/rsnapshot_backup_daily.cron \
+	../rsnapshot_backup/rsnapshot_backup_hourly.cron \
 	../rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql \
 	sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/*
