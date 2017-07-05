@@ -97,6 +97,13 @@ cp ../backup_check/backup_check.sh \
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/backup_check/*.awk
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/backup_check/*.sh
 
+# misc
+cp ../misc/mysql_dump_all_dbs_to_files.sh \
+	../misc/postgresql_dump_all_dbs_to_files.sh \
+	sysadmws-utils/opt/sysadmws-utils/misc
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/misc/*.sh
+
+
 # Chown to root
 sudo chown -R root:root sysadmws-utils
 
