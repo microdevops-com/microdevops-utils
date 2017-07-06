@@ -27,7 +27,7 @@ else
 fi
 
 if [ -s ${RESULT_FILE} ] ; then 
-	echo -e "Finish! Table \"$TABLE_NAME\" extracted to $RESULT_FILE"
+	echo -e "Success! Table \"$TABLE_NAME\" extracted to $RESULT_FILE"
 else
 	echo -e "Dump \"$DB_DUMP\" does not contain a table \"$TABLE_NAME\""
 	rm -f ${RESULT_FILE}
