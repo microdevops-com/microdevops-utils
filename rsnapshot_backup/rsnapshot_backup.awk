@@ -269,7 +269,7 @@ function print_timestamp() {
 		} else {
 			find_part = "cd /var/backups/postgresql && find /var/backups/postgresql/ -type f -name \"*.gz\" -mmin +720 -delete";
 		}
-		globals_part = "su - postgres -c \"pg_dumpall --clean --globals-only --verbose 2>/dev/null\" | gzip > /var/backups/postgresql/globals.gz";
+		globals_part = "su - postgres -c \"pg_dumpall --clean --schema-only --verbose 2>/dev/null\" | gzip > /var/backups/postgresql/globals.gz";
                 if (match(backup_src, /ALL\^/)) {
                         split(substr(backup_src, 5), db_excludes, ",");
                         grep_part = "grep -v ";
