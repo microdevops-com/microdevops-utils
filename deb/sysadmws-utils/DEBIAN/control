@@ -4,6 +4,6 @@ Section: misc
 Installed-Size: 100
 Maintainer: Sysadmin Workshop Admin <admin@sysadm.ws>
 Architecture: all
-Version: 0:0.28
+Version: 0:0.29
 Depends: gawk, ethtool, iotop, screen, build-essential, memtester, bonnie++, htop, mc, ethtool, postfix | default-mta | exim4 | exim4-daemon-heavy | exim4-daemon-light, heirloom-mailx, fail2ban, rsnapshot, byobu, bc, python-boto, python-setuptools, ncftp, smartmontools, s3cmd, psmisc, telnet, dnsutils, aptitude, bash-completion, ufw, wget, stress, man, ncdu, ccze, pv, tree, lsof, curl, tmux
 Description: Sysadmin Workshop Utilities - a set of useful utils for system administration.
