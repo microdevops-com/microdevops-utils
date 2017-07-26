@@ -40,8 +40,17 @@ cp ../salt/grains.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
 cp ../salt/grains.ubuntu.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
+cp ../salt/grains.postgresql.template \
+	sysadmws-utils/opt/sysadmws-utils/salt
+cp ../salt/grains.mysql.template \
+	sysadmws-utils/opt/sysadmws-utils/salt
+cp ../salt/grains.path.template \
+	sysadmws-utils/opt/sysadmws-utils/salt
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.template
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.ubuntu.template
+sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.postgresql.template
+sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.mysql.template
+sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.path.template
 
 # logrotate_db_backup
 cp ../logrotate_db_backup/logrotate_db_backup.awk \
@@ -72,11 +81,17 @@ cp ../rsnapshot_backup/rsnapshot_backup.awk \
 	../rsnapshot_backup/rsnapshot_backup_daily.cron \
 	../rsnapshot_backup/rsnapshot_backup_hourly.cron \
 	../rsnapshot_backup/rsnapshot_backup.conf_ubuntu.sh \
+	../rsnapshot_backup/rsnapshot_backup.conf_postgresql.sh \
+	../rsnapshot_backup/rsnapshot_backup.conf_mysql.sh \
+	../rsnapshot_backup/rsnapshot_backup.conf_path.sh \
 	../rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql \
 	sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/*
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_ubuntu.sh
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_postgresql.sh
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_mysql.sh
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_path.sh
 cp ../rsnapshot_backup/rsnapshot_backup.logrotate \
 	sysadmws-utils/etc/logrotate.d/sysadmws-rsnapshot-backup
 sudo chmod 600 sysadmws-utils/etc/logrotate.d/sysadmws-rsnapshot-backup

@@ -1,0 +1,8 @@
+  PATH:
+    backup_hosts:
+      HOSTNAME:
+        backup_path: /var/backups/HOSTNAME/.sync/rsnapshot
+        backup_path_type: Relative
+        backup_checks:
+          check_file:
+            backup_check_type: Check File

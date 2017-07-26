@@ -1,0 +1,11 @@
+  POSTGRESQL_ALL:
+    backup_empty_db:
+      - postgres
+      - template0
+      - template1
+    backup_hosts:
+      HOSTNAME:
+        backup_path: /var/backups/HOSTNAME/.sync/rsnapshot/var/backups/postgresql
+        backup_checks:
+          postgresql:
+            backup_check_type: Postgresql
