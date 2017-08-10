@@ -16,5 +16,5 @@ fi
 
 if find /opt/sysadmws-utils/rsnapshot_backup -name 'no-compress_*' | grep -q no-compress; then
 	date '+%F %T ' | tr -d '\n'
-	echo -e >&2 "WARNING: Both skip file $SKIP_FILE and config file $CONF_FILE exist on backup server and config file contains non comment lines"
+	echo -e >&2 "WARNING: rsnapshot_backup/no-compress_ files found, consider adding --no-compress param to specific rsnapshot_backup.conf lines and clean those files out"
 fi 
