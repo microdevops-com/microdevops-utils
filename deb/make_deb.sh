@@ -108,6 +108,7 @@ cp ../backup_check/backup_check.sh \
 	../backup_check/by_postgresql.sh \
 	../backup_check/compare_rsnapshot_backup_with_backup_check.awk \
 	../backup_check/compare_rsnapshot_backup_with_backup_check.sh \
+	../backup_check/check_rsnapshot_backup_no_compress_files.sh \
 	sysadmws-utils/opt/sysadmws-utils/backup_check
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/backup_check/*.awk
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/backup_check/*.sh

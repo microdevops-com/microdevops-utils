@@ -153,9 +153,9 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			print_timestamp(); print("ERROR: Backup failed on line " FNR);
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 		next;
 	}
@@ -205,6 +205,12 @@ function print_timestamp() {
 		} else {
 			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf";
 		}
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+		if (checknc == 0) {
+			run_args = run_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" FNR " file detected, adding --no-compress to rsync args");
+		}
 		# Prepare config and run
 		system(template_file " | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -220,11 +226,36 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
+		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " FNR);
+				system(template_file " | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" dwm_h "#g' \
+					-e 's#__D__#" dwm_d "#g' \
+					-e 's#__W__#" dwm_w "#g' \
+					-e 's#__M__#" dwm_m "#g' \
+					-e 's#__USER__#" connect_user "#g' \
+					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " FNR);
+				} else {
+					system("touch /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+					print_timestamp(); print("NOTICE: no-compress_" FNR " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
+				}
+			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 	} else if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCHECK")) {
 		# Default ssh and rsync args
@@ -257,7 +288,7 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: Remote temp file creation failed on line " FNR ", skipping to next line");
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote temp file creation finished on line " FNR );
+			print_timestamp(); print("NOTICE: Remote temp file creation finished on line " FNR);
 		}
 		#
 		mkdir_part = "mkdir -p /var/backups/postgresql";
@@ -292,10 +323,16 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: Remote dump failed on line " FNR ", skipping to next line");
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote dump finished on line " FNR );
+			print_timestamp(); print("NOTICE: Remote dump finished on line " FNR);
 		}
 		# Remove partially downloaded dumps
                 system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/postgresql/.*.gz.*");
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+		if (checknc == 0) {
+			run_args = run_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" FNR " file detected, adding --no-compress to rsync args");
+		}
 		# Prepare config and run
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -311,11 +348,36 @@ function print_timestamp() {
 			-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
+		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " FNR);
+				system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" dwm_h "#g' \
+					-e 's#__D__#" dwm_d "#g' \
+					-e 's#__W__#" dwm_w "#g' \
+					-e 's#__M__#" dwm_m "#g' \
+					-e 's#__USER__#" connect_user "#g' \
+					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__SRC__#" "/var/backups/postgresql/#g' \
+					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " FNR);
+				} else {
+					system("touch /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+					print_timestamp(); print("NOTICE: no-compress_" FNR " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
+				}
+			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 	} else if ((backup_type == "MYSQL") || (backup_type == "MYSQL_NOEVENTS") || (backup_type == "MYSQL_NOEVENTS_NOCHECK") || (backup_type == "MYSQL_NOCHECK")) {
 		# Default ssh and rsync args
@@ -374,10 +436,16 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: Remote dump failed on line " FNR ", skipping to next line");
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote dump finished on line " FNR );
+			print_timestamp(); print("NOTICE: Remote dump finished on line " FNR);
 		}
 		# Remove partially downloaded dumps
                 system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/mysql/.*.gz.*");
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+		if (checknc == 0) {
+			run_args = run_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" FNR " file detected, adding --no-compress to rsync args");
+		}
 		# Prepare config and run
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -393,11 +461,36 @@ function print_timestamp() {
 			-e 's#__SRC__#" "/var/backups/mysql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
+		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " FNR);
+				system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" dwm_h "#g' \
+					-e 's#__D__#" dwm_d "#g' \
+					-e 's#__W__#" dwm_w "#g' \
+					-e 's#__M__#" dwm_m "#g' \
+					-e 's#__USER__#" connect_user "#g' \
+					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__SRC__#" "/var/backups/mysql/#g' \
+					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " FNR);
+				} else {
+					system("touch /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+					print_timestamp(); print("NOTICE: no-compress_" FNR " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
+				}
+			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 	} else if ((backup_type == "FS_RSYNC_NATIVE") || (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") || (backup_type == "FS_RSYNC_NATIVE_TO_10H")) {
 		# Default ssh and rsync args
@@ -428,6 +521,12 @@ function print_timestamp() {
 		} else {
 			timeout_prefix = "";
 		}
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+		if (checknc == 0) {
+			run_args = run_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" FNR " file detected, adding --no-compress to rsync args");
+		}
 		# Prepare config and run
 		system("touch /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.passwd");
 		system("chmod 600 /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.passwd");
@@ -445,11 +544,35 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system(timeout_prefix "rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
+		err = system(timeout_prefix "rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " FNR);
+				system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" dwm_h "#g' \
+					-e 's#__D__#" dwm_d "#g' \
+					-e 's#__W__#" dwm_w "#g' \
+					-e 's#__M__#" dwm_m "#g' \
+					-e 's#__USER__#" connect_user "#g' \
+					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system(timeout_prefix "rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " FNR);
+				} else {
+					system("touch /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+					print_timestamp(); print("NOTICE: no-compress_" FNR " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
+				}
+			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 		system("rm -f /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.passwd");
 	} else if (backup_type == "LOCAL_PREEXEC") {
@@ -458,6 +581,13 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: Preexec failed on line " FNR ", skipping to next line");
 			next;
 		}
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+		if (checknc == 0) {
+			run_args = run_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" FNR " file detected, adding --no-compress to rsync args");
+		}
+		# Prepare config and run
 		system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 			-e 's/#_h_#/" h_comment "/g' \
@@ -469,11 +599,34 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
+		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " FNR );
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " FNR);
+				system("cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" dwm_h "#g' \
+					-e 's#__D__#" dwm_d "#g' \
+					-e 's#__W__#" dwm_w "#g' \
+					-e 's#__M__#" dwm_m "#g' \
+					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " FNR);
+				} else {
+					system("touch /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
+					print_timestamp(); print("NOTICE: no-compress_" FNR " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
+				}
+			}
+			print_timestamp(); print("ERROR: Backup failed on line " FNR);
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR );
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
 	} else {
 		print_timestamp(); print("ERROR: unknown backup type: " backup_type);
