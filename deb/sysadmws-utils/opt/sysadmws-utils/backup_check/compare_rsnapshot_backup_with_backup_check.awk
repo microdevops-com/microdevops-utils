@@ -293,7 +293,7 @@ function print_timestamp() {
 			}
 		}
 	}
-	if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCHECK")) {
+	if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCLEAN") || (backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
 		for (i = 1; i <= pg_file_array_size; i++) {
 			if ((pg_file_array[i, 1] == host_name) || (pg_file_array[i, 5] == host_name)) {
 				if ((pg_file_array[i, 2] == backup_src) || ((pg_file_array[i, 2] == "POSTGRESQL_ALL") && (backup_src == "ALL"))) {

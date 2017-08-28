@@ -257,7 +257,7 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " FNR);
 		}
-	} else if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCREATE") || (backup_type == "POSTGRESQL_NOCREATE_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
+	} else if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCLEAN") || (backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
 		# Default ssh and rsync args
 		if (run_args == "-") {
 			run_args = "";
@@ -269,7 +269,7 @@ function print_timestamp() {
 			scp_args = "-o BatchMode=yes -P " host_port;
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, FNR);
-		} else if ((backup_type == "POSTGRESQL_NOCREATE_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
+		} else if ((backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
 			ssh_args = "-o BatchMode=yes -p 22"
 			scp_args = "-o BatchMode=yes -P 22"
 			# Check batch ssh login only
@@ -281,10 +281,10 @@ function print_timestamp() {
 			check_ssh(connect_user, host_name, FNR);
 		}
 		#
-		if ((backup_type == "POSTGRESQL_NOCREATE") || (backup_type == "POSTGRESQL_NOCREATE_NOCHECK")) {
-			create_part = "";
+		if ((backup_type == "POSTGRESQL_NOCLEAN") || (backup_type == "POSTGRESQL_NOCLEAN_NOCHECK")) {
+			clean_part = "";
 		} else {
-			create_part = "--create";
+			clean_part = "--clean";
 		}
 		#
 		make_tmp_file_cmd = "scp " scp_args " /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" host_name ":/tmp/";
@@ -319,9 +319,9 @@ function print_timestamp() {
                         dblist_part = "su - postgres -c \"cat /tmp/rsnapshot_backup_postgresql_query1.sql | psql --no-align -t template1\" > /var/backups/postgresql/db_list.txt";
                 }
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --clean " create_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --clean " create_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
