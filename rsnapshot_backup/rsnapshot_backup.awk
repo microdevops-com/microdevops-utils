@@ -226,7 +226,7 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+		err = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
@@ -245,7 +245,7 @@ function print_timestamp() {
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				err2 = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " FNR);
 				} else {
@@ -348,7 +348,7 @@ function print_timestamp() {
 			-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+		err = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
@@ -367,7 +367,7 @@ function print_timestamp() {
 					-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				err2 = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " FNR);
 				} else {
@@ -461,7 +461,7 @@ function print_timestamp() {
 			-e 's#__SRC__#" "/var/backups/mysql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+		err = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
@@ -480,7 +480,7 @@ function print_timestamp() {
 					-e 's#__SRC__#" "/var/backups/mysql/#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				err2 = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " FNR);
 				} else {
@@ -517,9 +517,11 @@ function print_timestamp() {
 			system("rm -f /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.passwd");
 		}
 		if (backup_type == "FS_RSYNC_NATIVE_TO_10H") {
-			timeout_prefix = "timeout -k 60 10h ";
+			timeout_prefix = "timeout --preserve-status -k 60 10h bash -c '";
+			timeout_suffix = "'";
 		} else {
 			timeout_prefix = "";
+			timeout_suffix = "";
 		}
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws-utils/rsnapshot_backup/no-compress_" FNR);
@@ -544,7 +546,7 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system(timeout_prefix "rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+		err = system(timeout_prefix "! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log" timeout_suffix);
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
@@ -562,7 +564,7 @@ function print_timestamp() {
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system(timeout_prefix "rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				err2 = system(timeout_prefix "! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log" timeout_suffix);
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " FNR);
 				} else {
@@ -599,7 +601,7 @@ function print_timestamp() {
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+		err = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
@@ -615,7 +617,7 @@ function print_timestamp() {
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
+				err2 = system("! rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_last_out.log");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " FNR);
 				} else {
