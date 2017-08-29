@@ -35,8 +35,6 @@ netstat -i 2>&1
 echo "###"
 netstat -nr 2>&1
 echo "###"
-mysqladmin --defaults-file=/etc/mysql/debian.cnf processlist 2>&1
-echo "###"
 w 2>&1
 echo "###"
 df -h 2>&1
