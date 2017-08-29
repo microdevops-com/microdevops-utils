@@ -31,12 +31,12 @@ sudo chmod 600 sysadmws-utils/etc/logrotate.d/sysadmws-bulk-log
 cp ../mysql_queries_log/mysql_queries_log.sh \
 	sysadmws-utils/opt/sysadmws-utils/mysql_queries_log
 cp ../mysql_queries_log/mysql_queries_log.cron \
-	sysadmws-utils/etc/cron.d/sysadmws-bulk-log
+	sysadmws-utils/etc/cron.d/sysadmws-mysql-queries-log
 cp ../mysql_queries_log/mysql_queries_log.logrotate \
-	sysadmws-utils/etc/logrotate.d/sysadmws-bulk-log
+	sysadmws-utils/etc/logrotate.d/sysadmws-mysql-queries-log
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.sh
-sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-bulk-log
-sudo chmod 600 sysadmws-utils/etc/logrotate.d/sysadmws-bulk-log
+sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-mysql-queries-log
+sudo chmod 600 sysadmws-utils/etc/logrotate.d/sysadmws-mysql-queries-log
 
 # disk_alert
 cp ../disk_alert/disk_alert.sh \
