@@ -1,0 +1,10 @@
+/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.log {
+	daily
+	missingok
+	rotate 52
+	compress
+	delaycompress
+	notifempty
+	create 640 root root
+	sharedscripts
+}
