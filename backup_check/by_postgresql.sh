@@ -16,7 +16,7 @@ if [ "$1" != "0" ] && [ "$1" != "1" ] && [ "$1" != "2" ]; then
         exit 1
 fi
 
-if [ "$1" -ge "1" ]; then
+if [ "$1" == "1" ]; then
 	date '+%F %T ' | tr -d '\n'
 	echo -n "NOTICE: Hostname: "
 	salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'
@@ -32,14 +32,14 @@ if [ -f $SKIP_FILE ]; then
                         echo -e >&2 "WARNING: Both skip file $SKIP_FILE and config file $CONF_FILE exist on backup server and config file contains non comment lines"
                         exit 1
                 else
-                        if [ "$1" -ge "1" ]; then
+                        if [ "$1" == "1" ]; then
                                 date '+%F %T ' | tr -d '\n'
                                 echo -e "NOTICE: Checking skipped as $SKIP_FILE skip file exists on backup server"
                         fi
                         exit 0
                 fi
         else
-                if [ "$1" -ge "1" ]; then
+                if [ "$1" == "1" ]; then
                         date '+%F %T ' | tr -d '\n'
                         echo -e "NOTICE: Checking skipped as $SKIP_FILE skip file exists on backup server"
                 fi

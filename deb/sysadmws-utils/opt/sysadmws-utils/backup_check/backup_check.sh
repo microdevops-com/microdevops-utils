@@ -28,7 +28,7 @@ echo "0" > $ERRORS_COUNT_FILE
 /opt/sysadmws-utils/backup_check/by_postgresql.sh $1 $2
 /opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh $1 $2
 
-if [ "$1" -ge "1" ]; then
+if [ "$1" == "1" ]; then
 	date '+%F %T ' | tr -d '\n'
 	echo -e "NOTICE: Script finished"
 fi
