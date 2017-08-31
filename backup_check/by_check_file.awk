@@ -166,7 +166,7 @@ function print_timestamp() {
 			}
 		}
 		# So if it is ok
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Check file OK: '" check_file "' on line " FNR);
 		}
 		total_ok = total_ok + 1;
@@ -186,7 +186,7 @@ END {
 	system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Backup server " checked_host_name " check file backups checked OK: " total_ok);
 		}
 	} else {
