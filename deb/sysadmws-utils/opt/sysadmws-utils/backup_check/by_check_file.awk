@@ -71,9 +71,25 @@ function print_timestamp() {
 		# Construct path
 		if (backup_dst_type == "Absolute") {
 			check_file = backup_dst "/.backup_check";
+			check_dir = backup_dst;
 		} else if (backup_dst_type == "Relative") {
 			check_file = backup_dst "/" host_path "/.backup_check";
+			check_dir = backup_dst "/" host_path;
 		}
+
+		# Print some stats
+		if (show_notices >= 1) {
+			print_timestamp();
+			printf("NOTICE: Dir stats: " host_name host_path " ");
+			system("du -sh " gensub("/.sync/", "/daily.1/", "g", check_dir) " | awk '{print $1}' | tr -d '\n'");
+			printf("/");
+			system("find " gensub("/.sync/", "/daily.1/", "g", check_dir) " -type f | wc -l | tr -d '\n'");
+			printf(" -> ");
+			system("du -sh " check_dir " | awk '{print $1}' | tr -d '\n'");
+			printf("/");
+			system("find " check_dir " -type f | wc -l");
+		}
+
 		# Check check file existance
 		if (system("test ! -e " check_file) == 0) {
 			print_timestamp(); print("ERROR: Check file missing: '" check_file "' on line " FNR);
