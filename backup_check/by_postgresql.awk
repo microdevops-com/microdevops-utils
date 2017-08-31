@@ -44,17 +44,17 @@ function print_timestamp() {
 
 	# Check dump dir or file existance
 	if (system("test -d " dump_file) == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Dump dir found: '" dump_file "' on line " FNR);
 		}
 		if (system("test -f " dump_file "/" db_sub_name) == 0) {
 			dump_file = dump_file "/" db_sub_name;
-			if (show_notices) {
+			if (show_notices == 1) {
 				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " FNR);
 			}
 		} else if (system("test -f " dump_file "/" db_sub_name ".gz") == 0) {
 			dump_file = dump_file "/" db_sub_name ".gz";
-			if (show_notices) {
+			if (show_notices == 1) {
 				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " FNR);
 			}
 		} else {
@@ -63,7 +63,7 @@ function print_timestamp() {
 			next;
 		}
 	} else if (system("test -f " dump_file) == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Dump file found: '" dump_file "' on line " FNR);
 		}
 	} else {
@@ -73,7 +73,7 @@ function print_timestamp() {
 	}
 
         # Print some stats
-	if (show_stats == "stats") {
+	if (show_notices >= 1) {
 		print_timestamp();
 		printf("NOTICE: Dump file stats: " host_name "/" db_sub_name " ");
 		system("ls -h -s " gensub("/.sync/", "/daily.1/", "g", dump_file) " | awk '{print $1}' | tr -d '\n'");
@@ -130,7 +130,7 @@ function print_timestamp() {
 		print_timestamp(); print("ERROR: Dump file contains < 1 INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " FNR);
 		total_errors = total_errors + 1;
 	} else {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Dump contains " dump_file_analyze[dump_file, "databases"][db_sub_name] " INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " FNR);
 		}
 		total_ok = total_ok + 1;
@@ -140,7 +140,7 @@ function print_timestamp() {
 		print_timestamp(); print("ERROR: Dump file date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " FNR);
 		total_errors = total_errors + 1;
 	} else {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Dump file date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " FNR);
 		}
 		total_ok = total_ok + 1;
@@ -160,7 +160,7 @@ END {
         system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Backup server " checked_host_name " postgresql backups checked OK: " total_ok);
 		}
 	} else {
