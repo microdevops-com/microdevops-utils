@@ -72,6 +72,15 @@ function print_timestamp() {
 		next;
 	}
 
+        # Print some stats
+	if (show_stats == "stats") {
+		print_timestamp();
+		printf("NOTICE: Dump file stats: " host_name "/" db_sub_name " ");
+		system("ls -h -s " gensub("/.sync/", "/daily.1/", "g", dump_file) " | awk '{print $1}' | tr -d '\n'");
+		printf(" -> ");
+		system("ls -h -s " dump_file " | awk '{print $1}'");
+	}
+
 	# Analyze dump file
 	if (!dump_file_analyze[dump_file, "analyzed"]) {
 		if ((dump_file != "") && (system("test -e " dump_file) == 0)) {
