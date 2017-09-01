@@ -69,7 +69,7 @@ function print_timestamp() {
 		print_timestamp(); print("ERROR: Found only " i " files instead of " backup_files_total ", path: '" backup_dst_full "' on line " FNR);
 		total_errors = total_errors + 1;
 	} else {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Files qty OK: " i ", path: '" backup_dst_full "' on line " FNR);
 		}
 		total_ok = total_ok + 1;
@@ -96,7 +96,7 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: File size: " size_file " < " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on line " FNR);
 			total_errors = total_errors + 1;
 		} else {
-			if (show_notices) {
+			if (show_notices == 1) {
 				print_timestamp(); print("NOTICE: File size OK: " size_file " >= " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on line " FNR);
 			}
 			total_ok = total_ok + 1;
@@ -109,7 +109,7 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: File type mismatch: '" file_file "' != '" backup_file_type "', file: '" find_files[cur_file] "' on line " FNR);
 			total_errors = total_errors + 1;
 		} else {
-			if (show_notices) {
+			if (show_notices == 1) {
 				print_timestamp(); print("NOTICE: File type OK: '" file_file "' == '" backup_file_type "', file: '" find_files[cur_file] "' on line " FNR);
 			}
 			total_ok = total_ok + 1;
@@ -127,7 +127,7 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: Freshest file is older than " backup_last_file_freshness " day(s): '" secs_readable "', file: '" max_secs_file "' on line " FNR);
 			total_errors = total_errors + 1;
 		} else {
-			if (show_notices) {
+			if (show_notices == 1) {
 				print_timestamp(); print("NOTICE: Freshest file age (" backup_last_file_freshness " day(s)) OK: '" secs_readable "', file: '" max_secs_file "' on line " FNR);
 			}
 			total_ok = total_ok + 1;
@@ -151,7 +151,7 @@ END {
         system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Backup server " checked_host_name " fresh files backups checked OK: " total_ok);
 		}
 	} else {

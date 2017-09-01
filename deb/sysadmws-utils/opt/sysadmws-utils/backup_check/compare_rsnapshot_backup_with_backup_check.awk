@@ -221,7 +221,7 @@ function print_timestamp() {
 				if ((check_file_array[i, 1] == host_name) || (check_file_array[i, 5] == host_name)) {
 					if ((check_file_array[i, 2] == backup_src_arr[ii]) || (check_file_array[i, 6] == backup_src_arr[ii])) {
 						if (index(check_file_array[i, 3], backup_dst) != 0) {
-							if (show_notices) {
+							if (show_notices == 1) {
 								print_timestamp(); print("NOTICE: rsnapshot_backup found in by_check_file.txt: " host_name "	" backup_type "	" backup_src_arr[ii] "	" backup_dst " on line " FNR);
 							}
 							total_ok = total_ok + 1;
@@ -234,7 +234,7 @@ function print_timestamp() {
 				if ((fresh_file_array[i, 1] == host_name) || (fresh_file_array[i, 10] == host_name)) {
 					if ((fresh_file_array[i, 2] == backup_src_arr[ii]) || (fresh_file_array[i, 11] == backup_src_arr[ii])) {
 						if (index(fresh_file_array[i, 3], backup_dst) != 0) {
-							if (show_notices) {
+							if (show_notices == 1) {
 								print_timestamp(); print("NOTICE: rsnapshot_backup found in by_fresh_files.txt: " host_name "	" backup_type "	" backup_src_arr[ii] "	" backup_dst " on line " FNR);
 							}
 							total_ok = total_ok + 1;
@@ -255,7 +255,7 @@ function print_timestamp() {
 			if (check_file_array[i, 1] == checked_host_name) {
 				if ((check_file_array[i, 2] == backup_src) || (check_file_array[i, 6] == backup_src)) {
 					if (index(check_file_array[i, 3], backup_dst) != 0) {
-						if (show_notices) {
+						if (show_notices == 1) {
 							print_timestamp(); print("NOTICE: rsnapshot_backup found in by_check_file.txt: " host_name "	" backup_type "	" backup_src "	" backup_dst " on line " FNR);
 						}
 						total_ok = total_ok + 1;
@@ -268,7 +268,7 @@ function print_timestamp() {
 			if (fresh_file_array[i, 1] == checked_host_name) {
 				if (fresh_file_array[i, 2] == backup_src) {
 					if (index(fresh_file_array[i, 3], backup_dst) != 0) {
-						if (show_notices) {
+						if (show_notices == 1) {
 							print_timestamp(); print("NOTICE: rsnapshot_backup found in by_fresh_files.txt: " host_name "	" backup_type "	" backup_src "	" backup_dst " on line " FNR);
 						}
 						total_ok = total_ok + 1;
@@ -283,7 +283,7 @@ function print_timestamp() {
 			if ((mysql_file_array[i, 1] == host_name) || (mysql_file_array[i, 5] == host_name)) {
 				if ((mysql_file_array[i, 2] == backup_src) || ((mysql_file_array[i, 2] == "MYSQL_ALL") && (backup_src == "ALL"))) {
 					if (index(mysql_file_array[i, 4], backup_dst) != 0) {
-						if (show_notices) {
+						if (show_notices == 1) {
 							print_timestamp(); print("NOTICE: rsnapshot_backup found in by_mysql.txt: " host_name "	" backup_type "	" backup_src "	" backup_dst " on line " FNR);
 						}
 						total_ok = total_ok + 1;
@@ -298,7 +298,7 @@ function print_timestamp() {
 			if ((pg_file_array[i, 1] == host_name) || (pg_file_array[i, 5] == host_name)) {
 				if ((pg_file_array[i, 2] == backup_src) || ((pg_file_array[i, 2] == "POSTGRESQL_ALL") && (backup_src == "ALL"))) {
 					if (index(pg_file_array[i, 4], backup_dst) != 0) {
-						if (show_notices) {
+						if (show_notices == 1) {
 							print_timestamp(); print("NOTICE: rsnapshot_backup found in by_postgresql.txt: " host_name "	" backup_type "	" backup_src "	" backup_dst " on line " FNR);
 						}
 						total_ok = total_ok + 1;
@@ -319,7 +319,7 @@ END {
         system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
-		if (show_notices) {
+		if (show_notices == 1) {
 			print_timestamp(); print("NOTICE: Backup server " checked_host_name " rsnapshot_backup and backup_check configs compared OK: " total_ok);
 		}
 	} else {

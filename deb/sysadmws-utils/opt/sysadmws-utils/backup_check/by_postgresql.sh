@@ -8,10 +8,10 @@ if [ `awk --version | head -1 | sed -e 's/GNU Awk //' -e 's/\..*//'` -lt 4 ]; th
 fi
 
 # Check run syntax
-if [ "$1" != "0" ] && [ "$1" != "1" ]; then
+if [ "$1" != "0" ] && [ "$1" != "1" ] && [ "$1" != "2" ]; then
 	date '+%F %T ' | tr -d '\n'
-	echo -e >&2 "ERROR: Use $0 0|1 [HOSTNAME]"
-	echo -e >&2 "ERROR: 1 to show NOTICE lines or 0 to skip them"
+	echo -e >&2 "ERROR: Use $0 0|1|2 [HOSTNAME]"
+	echo -e >&2 "ERROR: 0 to show only basic notices, 1 to show all notices and stats, 2 to show basic notices and stats"
 	echo -e >&2 "ERROR: HOSTNAME is optional to check specific host backups only"
         exit 1
 fi
