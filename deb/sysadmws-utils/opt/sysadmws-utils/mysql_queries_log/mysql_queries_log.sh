@@ -3,6 +3,16 @@
 ###     Define PATH
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+###     Try too find mysql service
+MY_CHECK=$(service --status-all 2>&1 | grep "\+" | grep mysql)
+
+if [ ! -z "${MY_CHECK}" ] ; then
+        continue
+else
+        exit 0
+fi
+
+
 ###     Set some variables
 MY_CLIENT=$(which mysql)
 MY_CRED="--defaults-file=/etc/mysql/debian.cnf"
