@@ -132,7 +132,11 @@ function print_timestamp() {
 
 	# Progress bar on verbosity
 	if (verbosity == "1") {
+		verb_level = "5"
 		verbosity_args = " --human-readable --progress ";
+	} else {
+		verb_level = "2"
+		verbosity_args = " ";
 	}
 
 	# Process hourly, daily, weekly, monthly rotations
@@ -223,6 +227,7 @@ function print_timestamp() {
 			-e 's#__HOST_NAME__#" host_name "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
@@ -242,6 +247,7 @@ function print_timestamp() {
 					-e 's#__HOST_NAME__#" host_name "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
@@ -350,6 +356,7 @@ function print_timestamp() {
 			-e 's#__USER__#" connect_user "#g' \
 			-e 's#__HOST_NAME__#" host_name "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
@@ -369,6 +376,7 @@ function print_timestamp() {
 					-e 's#__USER__#" connect_user "#g' \
 					-e 's#__HOST_NAME__#" host_name "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
@@ -463,6 +471,7 @@ function print_timestamp() {
 			-e 's#__USER__#" connect_user "#g' \
 			-e 's#__HOST_NAME__#" host_name "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			-e 's#__SRC__#" "/var/backups/mysql/#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
@@ -482,6 +491,7 @@ function print_timestamp() {
 					-e 's#__USER__#" connect_user "#g' \
 					-e 's#__HOST_NAME__#" host_name "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					-e 's#__SRC__#" "/var/backups/mysql/#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
@@ -547,6 +557,7 @@ function print_timestamp() {
 			-e 's#__USER__#" connect_user "#g' \
 			-e 's#__HOST_NAME__#" host_name "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
@@ -565,6 +576,7 @@ function print_timestamp() {
 					-e 's#__USER__#" connect_user "#g' \
 					-e 's#__HOST_NAME__#" host_name "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
@@ -602,6 +614,7 @@ function print_timestamp() {
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
@@ -618,6 +631,7 @@ function print_timestamp() {
 					-e 's#__W__#" dwm_w "#g' \
 					-e 's#__M__#" dwm_m "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
 					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
 					> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);

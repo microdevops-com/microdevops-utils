@@ -94,9 +94,9 @@ for LOGIN in "${LOGINS[@]}"; do
 			date '+%F %T ' | tr -d '\n' >>$OUTLOG
 			echo >&2 "NOTICE: Starting backup: Name: $BNAME, User: $BUSER, Host: $BHOST, Port: $BPORT" >>$OUTLOG
 			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh	$SSHBATCH -p $BPORT -i $ID $BUSER@$BHOST  "/export compact file=${BNAME}" && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; } 2>&1 >>$OUTLOG
+			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; } >>$OUTLOG 2>&1
 			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh		  -p $BPORT -i $ID $BUSER@$BHOST  "/system backup save name=${BNAME}" && sleep 2 && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; } 2>&1 >>$OUTLOG
+			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; } >>$OUTLOG 2>&1
 		fi
 	fi
 done
