@@ -153,6 +153,7 @@ function print_timestamp() {
 			-e 's#__D__#" dwm_d "#g' \
 			-e 's#__W__#" dwm_w "#g' \
 			-e 's#__M__#" dwm_m "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
 			> /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system("rsnapshot -c /opt/sysadmws-utils/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);

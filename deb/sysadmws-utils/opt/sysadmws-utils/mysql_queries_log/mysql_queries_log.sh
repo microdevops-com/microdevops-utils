@@ -4,11 +4,10 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 ###     Try too find mysql service
-MY_CHECK=$(service --status-all 2>&1 | grep "\+" | grep mysql)
+MY_CHECK_SYSVINIT=$(service --status-all 2>&1 | grep "\+" | grep mysql)
+MY_CHECK_UPSTART=$(initctl list | grep mysql | grep running)
 
-if [ ! -z "${MY_CHECK}" ] ; then
-        continue
-else
+if [ -z "${MY_CHECK_SYSVINIT}" ] && [ -z "${MY_CHECK_UPSTART}" ] ; then
         exit 0
 fi
 
