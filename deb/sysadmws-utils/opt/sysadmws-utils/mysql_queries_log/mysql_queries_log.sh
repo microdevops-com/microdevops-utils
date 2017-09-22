@@ -34,6 +34,18 @@ MPL_TOTAL_COUNT=$(echo "$MPL_SNAP" | grep -c "Command:")
 ###     Print start line
 echo -e "$CUR_DATE_TIME START#\n"
 
+# Exit if lock exists (prevent multiple execution)
+LOCK_DIR=/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.lock
+
+if mkdir "$LOCK_DIR"
+then
+        echo -e >&2 "NOTICE: Successfully acquired lock on $LOCK_DIR"
+        trap 'rm -rf "$LOCK_DIR"' 0
+else
+        echo -e >&2 "ERROR: Cannot acquire lock, giving up on $LOCK_DIR"
+        exit 0
+fi
+
 ###     Print "real" queries if they are present
 if [ ! -z "${MPL_REALQ}" ] ; then
         echo -e "Real queries: $MPL_REALQ\n\n"
