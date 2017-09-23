@@ -3,14 +3,13 @@
 ###     Define PATH
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-###     Try too find mysql service
-MY_CHECK_SYSVINIT=$(service --status-all 2>&1 | grep "\+" | grep mysql)
-MY_CHECK_UPSTART=$(initctl list | grep mysql | grep running)
+###     Detect is mysql service alive
+MY_ADMIN=$(which mysqladmin)
+MY_CHECK=$("$MY_ADMIN" ping 2>/dev/null | grep alive)
 
-if [ -z "${MY_CHECK_SYSVINIT}" ] && [ -z "${MY_CHECK_UPSTART}" ] ; then
-        exit 0
+if [ "z$MY_CHECK" = "z"] ; then
+	exit 0
 fi
-
 
 ###     Set some variables
 MY_CLIENT=$(which mysql)
