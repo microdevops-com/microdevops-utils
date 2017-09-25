@@ -3,19 +3,19 @@
 ###     Define PATH
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-###     Detect is mysql service alive
-MY_ADMIN=$(which mysqladmin)
-MY_CHECK=$("$MY_ADMIN" ping 2>/dev/null | grep alive)
-
-if [ "z$MY_CHECK" = "z" ] ; then
-	exit 0
-fi
-
 ###     Set some variables
+MY_ADMIN=$(which mysqladmin)
 MY_CLIENT=$(which mysql)
 MY_CRED="--defaults-file=/etc/mysql/debian.cnf"
 MY_QUERY="show full processlist\G"
 CUR_DATE_TIME=$(date +"%F %T")
+
+###     Detect is mysql service alive
+MY_CHECK=$("$MY_ADMIN" "$MY_CRED" ping 2>/dev/null | grep alive)
+
+if [ "z$MY_CHECK" = "z" ] ; then
+	exit 0
+fi
 
 ###     Get full processlist snapshot to the variable
 MPL_SNAP=$("$MY_CLIENT" "$MY_CRED" -e "$MY_QUERY")
