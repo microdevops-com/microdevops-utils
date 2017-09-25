@@ -7,7 +7,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 MY_ADMIN=$(which mysqladmin)
 MY_CHECK=$("$MY_ADMIN" ping 2>/dev/null | grep alive)
 
-if [ "z$MY_CHECK" = "z"] ; then
+if [ "z$MY_CHECK" = "z" ] ; then
 	exit 0
 fi
 
