@@ -1,0 +1,22 @@
+###     Telegram credentials
+TOKEN="{{ token }}"
+ALERT_CHAT_ID="{{ alert_chat_id }}"
+### CONST
+URL="https://api.telegram.org/bot$TOKEN/sendMessage"
+PARSE_MODE="HTML"
+
+
+
+###     You can override this settings here, or defaults will be applied
+
+#       Behind master threshold sec
+BEHIND_MASTER_THR=""    #"300" sec
+
+#       Override hostname if needed
+HOST=""                 #$(hostname)
+
+#       Override default mysql settings
+MY_CLIENT=""            #$(which mysql)
+MY_CRED=""              #"--defaults-file=/etc/mysql/debian.cnf"
+MY_QUERY=""             #"show slave status\G"
+
