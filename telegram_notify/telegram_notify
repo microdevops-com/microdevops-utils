@@ -4,6 +4,8 @@
 #TG_ALERT_CHAT_ID, TG_URL, TG_PARSE_MODE
 # we mighl start script from different locations
 # +so use absolute path to config
+cyan='\e[36m';green='\e[32m';red='\e[91m';reset='\e[0m'
+
 CRED="$(dirname "$0")/credentials"
 if [[ -s $CRED ]]; then
   . "$CRED"
@@ -13,19 +15,26 @@ else
 fi
 
 show_help () {
-cat << EOF
-Usage: STDOUT | $0 [-sdlcv]
-  -s 	Silent mode, no notification on message in telegram
-  -d	Markdown parse mode, for using *bold* or _italic_
-  -l    HTML parse mode, <b>bold</b> or <i>italic</i>
-  -c	Send input as preformatted code block
-  -v	Print curl output, e.g. telegram server response
-Default parse mode: $TG_PARSE_MODE
-
-Example: 
-  ls -1 | $0 -sc
-  df -h | grep sda | $0
+doc_help=$(cat <<-EOF
+${cyan}Usage: STDOUT | $0 [-sdlcv] ${reset}
+	  -s 	Silent mode, no notification on message in telegram
+	  -d	Markdown parse mode, for using *bold* or _italic_
+	  -l    HTML parse mode, <b>bold</b> or <i>italic</i>
+	  -c	Send input as preformatted code block
+	  -v	Print curl output, e.g. telegram server response
+	Default parse mode: $TG_PARSE_MODE
+	${green}
+	Example: 
+	  ls -1 | $0 -sc
+	  df -h | grep sda | $0
+	${red}
+	WARNING: avoid competitive params ${reset}
+	  case echo -e  '<b>bold</b>' | telegram_notify -dc
+	                    ${red} use -c option only with -d  ^ ${reset}
+	  can't send  echo -e '<b>bold</b>' | ./telegram_notify -lc
 EOF
+)
+echo -e "$doc_help"
 }
 
 
