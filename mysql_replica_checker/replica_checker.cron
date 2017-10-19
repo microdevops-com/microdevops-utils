@@ -1,2 +1,2 @@
 # Watch MYSQL replication
-*/30 * * * *	root	/opt/sysadmws-utils/watchog/replica/replica_checker.sh >> /opt/sysadmws-utils/watchog/replica/replica_checker.dummy_log 2>&1 
+*/30 * * * *	root	/opt/sysadmws-utils/mysql_replica_checker/replica_checker |  /opt/sysadmws-utils/telegram_notify/telegram_notify 
