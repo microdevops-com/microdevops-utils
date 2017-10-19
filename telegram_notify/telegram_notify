@@ -16,8 +16,8 @@ show_help () {
 cat << EOF
 Usage: STDOUT | $0 [-sdlcv]
   -s 	Silent mode, no notification on message in telegram
-  -d	Markdown parse mode, for using *bold* or _italics_
-  -l    HTML parse mode, <b>bold</b> or <i>italics</i>
+  -d	Markdown parse mode, for using *bold* or _italic_
+  -l    HTML parse mode, <b>bold</b> or <i>italic</i>
   -c	Send input as preformatted code block
   -v	Print curl output, e.g. telegram server response
 Default parse mode: $TG_PARSE_MODE
@@ -73,4 +73,3 @@ if [[  -t 0  ]]; then
 else
   tg_send "$(cat)"
 fi
-
