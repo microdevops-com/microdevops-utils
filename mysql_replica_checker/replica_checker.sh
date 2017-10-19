@@ -7,7 +7,7 @@ if ! type mysqld || ! type mysql ; then exit 0; fi &> /dev/null
 
 	
 ###   Try to load config file OR DIE
-CONFIG="replica_checker.conf"
+CONFIG="$(dirname "$0")/replica_checker.conf"
 if [[ -f "$CONFIG" ]]; then
   . "$CONFIG"
 else
