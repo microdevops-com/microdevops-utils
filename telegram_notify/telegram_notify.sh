@@ -75,10 +75,15 @@ tg_send () {
     -d disable_notification=${silent:="false"}	\
     --silent --output "${output:="/dev/null"}"
 }
-# if piped send message with text from stdin, else print usage note
 
+# if piped, send nonempty message with text from stdin, else print usage note
 if [[  -t 0  ]]; then 
   show_help
 else
-  tg_send "$(cat)"
+  msg="$(cat)"
+  if [[ ! -z ${msg//' '} ]]; then
+    tg_send "$msg"
+  else 
+    exit 0
+  fi
 fi
