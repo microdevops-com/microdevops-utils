@@ -147,6 +147,7 @@ sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/backup_check/*.sh
 cp ../misc/mysql_dump_all_dbs_to_files.sh \
 	../misc/postgresql_dump_all_dbs_to_files.sh \
 	../misc/mysql_table_extractor.sh \
+	../misc/mysql_create_new_database.sh \
 	sysadmws-utils/opt/sysadmws-utils/misc
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/misc/*.sh
 
