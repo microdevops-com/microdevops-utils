@@ -193,7 +193,7 @@ function processArgs()
 
 function createMysqlDbUser()
 {
-    SQL1="CREATE DATABASE IF NOT EXISTS ${DB_NAME} /*\!40100 DEFAULT CHARACTER SET utf8 */;"
+    SQL1="CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;;"
     SQL2="GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
     SQL3="FLUSH PRIVILEGES;"
 
