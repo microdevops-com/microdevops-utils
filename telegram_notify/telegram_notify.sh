@@ -6,7 +6,7 @@
 # +so use absolute path to config
 cyan='\e[36m';green='\e[32m';red='\e[91m';reset='\e[0m'
 
-CRED="$(dirname "$0")/credentials"
+CRED="$(dirname "$0")/telegram_notify.conf"
 if [[ -s $CRED ]]; then
   . "$CRED"
 else 
