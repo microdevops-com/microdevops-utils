@@ -10,7 +10,6 @@ CRED="$(dirname "$0")/telegram_notify.conf"
 if [[ -s $CRED ]]; then
   . "$CRED"
 else 
-  echo "No credentials found at $CRED"
   exit 2
 fi
 
