@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-## Get const from file
-#TG_ALERT_CHAT_ID, TG_URL, TG_PARSE_MODE
-# we mighl start script from different locations
+# Get constants from file
+# TG_ALERT_CHAT_ID, TG_URL, TG_PARSE_MODE
+# we might start script from different locations
 # +so use absolute path to config
 cyan='\e[36m';green='\e[32m';red='\e[91m';reset='\e[0m'
 
-CRED="$(dirname "$0")/telegram_notify.conf"
+CRED="$(dirname "$0")/notify_telegram.conf"
 if [[ -s $CRED ]]; then
   . "$CRED"
 else 
@@ -14,6 +14,7 @@ else
   exit 2
 fi
 
+# show help
 show_help () {
 doc_help=$(cat <<-EOF
 ${cyan}Usage: STDOUT | $0 [-sdlcv] ${reset}
@@ -29,16 +30,15 @@ ${cyan}Usage: STDOUT | $0 [-sdlcv] ${reset}
 	  df -h | grep sda | $0
 	${red}
 	WARNING: avoid competitive params ${reset}
-	  case echo -e  '<b>bold</b>' | telegram_notify -dc
+	  case echo -e  '<b>bold</b>' | notify_telegram -dc
 	                    ${red} use -c option only with -d  ^ ${reset}
-	  can't send  echo -e '<b>bold</b>' | ./telegram_notify -lc
+	  can't send  echo -e '<b>bold</b>' | ./notify_telegram -lc
 EOF
 )
 echo -e "$doc_help"
 }
 
-
-
+# main
 OPTIND=1
 while getopts "hsdlcv" opt; do
     case "$opt" in
@@ -52,8 +52,6 @@ while getopts "hsdlcv" opt; do
     esac
 done
 shift "$((OPTIND-1))" 
-
-
 
 # just sent text to TG
 tg_send () {

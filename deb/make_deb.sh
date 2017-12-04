@@ -49,13 +49,13 @@ sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_rep
 sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-mysql-replica-checker
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 
-# telegram_notify
-cp ../telegram_notify/telegram_notify.sh \
-	sysadmws-utils/opt/sysadmws-utils/telegram_notify
-cp ../telegram_notify/telegram_notify.conf.sample \
-	sysadmws-utils/opt/sysadmws-utils/telegram_notify
-sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/telegram_notify/telegram_notify.sh
-sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/telegram_notify/telegram_notify.conf.sample
+# notify_telegram
+cp ../notify_telegram/notify_telegram.sh \
+	sysadmws-utils/opt/sysadmws-utils/notify_telegram
+cp ../notify_telegram/notify_telegram.conf.sample \
+	sysadmws-utils/opt/sysadmws-utils/notify_telegram
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_telegram/notify_telegram.sh
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_telegram/notify_telegram.conf.sample
 
 # disk_alert
 cp ../disk_alert/disk_alert.sh \
