@@ -49,21 +49,27 @@ sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_rep
 sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-mysql-replica-checker
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 
-# notify_telegram
-cp ../notify_telegram/notify_telegram.sh \
-	sysadmws-utils/opt/sysadmws-utils/notify_telegram
-cp ../notify_telegram/notify_telegram.conf.sample \
-	sysadmws-utils/opt/sysadmws-utils/notify_telegram
-sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_telegram/notify_telegram.sh
-sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_telegram/notify_telegram.conf.sample
+# notify_devilry
+cp ../notify_devilry/notify_devilry.py \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry.yaml.jinja.example \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.py
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
 
 # disk_alert
 cp ../disk_alert/disk_alert.sh \
 	sysadmws-utils/opt/sysadmws-utils/disk_alert
 cp ../disk_alert/disk_alert.cron \
 	sysadmws-utils/etc/cron.d/sysadmws-disk-alert
+cp ../disk_alert/disk_alert.conf \
+	sysadmws-utils/opt/sysadmws-utils/disk_alert
+cp ../disk_alert/lr.awk \
+	sysadmws-utils/opt/sysadmws-utils/disk_alert
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.sh
 sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-disk-alert
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.conf
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/lr.awk
 
 # salt
 cp ../salt/grains.template \

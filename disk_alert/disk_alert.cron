@@ -1,2 +1,2 @@
 # Disk Alert
-0 10 * * *	root	/opt/sysadmws-utils/disk_alert/disk_alert.sh | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+*/5 * * * *	root	/opt/sysadmws-utils/disk_alert/disk_alert.sh

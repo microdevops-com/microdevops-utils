@@ -1,0 +1,20 @@
+notify_devilry:
+  enabled: True # should be set to True on config setup
+  telegram:
+    'Chat Alias 1':
+      token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+      chat_id: '-xxxxxxxxx'
+    'Chat Alias 2':
+      token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+      chat_id: '-xxxxxxxxx'
+  notify:
+    - match: # notify rule #1
+        type: 'disk alert' # multiple keys allowed, message is sent only if every kv pair == the same in message
+      telegram:
+        - 'Chat Alias 1' # list of chats to send
+{# Working Hours #}
+{# jinja code allows to render rules by conditions #}
+{% if ((100000 < current_time) and (current_time < 190000)) %}
+    - telegram: # notify rule #2
+        - 'Chat Alias 2'
+{% endif %}
