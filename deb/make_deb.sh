@@ -5,7 +5,7 @@ if [ `dirname $0` != "." ]; then
 fi
 
 # Increase a version of the package
-perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+:\d+)\.(\d+)$/' sysadmws-utils/DEBIAN/control
+perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+)\.(\d+)$/' sysadmws-utils/DEBIAN/control
 
 # Remove all files in sub modules
 find sysadmws-utils/opt -type f -delete
@@ -157,6 +157,10 @@ cp ../misc/mysql_dump_all_dbs_to_files.sh \
 	sysadmws-utils/opt/sysadmws-utils/misc
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/misc/*.sh
 
+# Make md5sums
+cd sysadmws-utils && \
+( find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums ) && \
+cd ..
 
 # Chown to root
 sudo chown -R root:root sysadmws-utils
