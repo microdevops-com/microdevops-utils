@@ -25,7 +25,7 @@ e5445e4a83e69251786cbda89b160f20  opt/sysadmws-utils/backup_check/by_mysql.sh
 11001e189e81ac7712ce2b2eccded8ad  opt/sysadmws-utils/backup_check/by_postgresql.awk
 76973a920186424e265bafe585173afb  opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh
 86be5d1ba0a4cfcac30941c63d665f0c  opt/sysadmws-utils/backup_check/by_check_file.awk
-4342e3732e7ca8d6e28bd7f42f68f507  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
+d1eb7eadf39542dd1a599e5b6324a67c  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
 2a9cdbbcb6c2d3c7e24f84143ddedc4c  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 d08b07bae53d0ca9880fea38e073be1c  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.sh
 5e3568ac486dea3ee8422a5681aef602  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf.sample

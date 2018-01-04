@@ -31,7 +31,7 @@ function report {
   if [[ -n ${message} ]]; then
     rsp+="\"message\":\"${message}\","
   fi
-  rsp+="\"free space\":\"${free_space}\","
+  rsp+="\"relay log free space\":\"${free_space}\","
   rsp+="\"log size\":\"${relay_log_size}\""
   rsp+='}'
 
