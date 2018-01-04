@@ -1,10 +1,9 @@
-###     You can override this settings here, or defaults will be applied
+# You can override this settings here, or defaults will be applied
 
-#       Behind master threshold sec
-BEHIND_MASTER_THR=""    #"300" sec
+# Behind master threshold sec
+BEHIND_MASTER_THR=""	# 300 sec
 
-
-#       Override default mysql settings
-MY_CLIENT=""            #$(which mysql)
-MY_CRED=""              #"--defaults-file=/etc/mysql/debian.cnf"
-MY_QUERY=""             #"show slave status\G"
+# Override default mysql settings
+MY_CLIENT=""		# $(which mysql)
+MY_CRED=""		# --defaults-file=/etc/mysql/debian.cnf
+MY_QUERY=""		# show slave status\G

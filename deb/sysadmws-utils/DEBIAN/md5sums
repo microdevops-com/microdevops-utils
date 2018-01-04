@@ -1,4 +1,4 @@
-384b6b1146880654b2040f100684c3af  etc/cron.d/sysadmws-mysql-replica-checker
+aeee226d61233d770445d89e7e4914bb  etc/cron.d/sysadmws-mysql-replica-checker
 903a73ed7f063b74d7545fd2eda705cd  etc/cron.d/sysadmws-bulk-log
 8e45f02d6c1899026891ada9c892e0bb  etc/cron.d/sysadmws-mysql-queries-log
 88ce82478d6905308b3dcdbb3670d5b9  etc/cron.d/sysadmws-disk-alert
@@ -26,7 +26,7 @@ e5445e4a83e69251786cbda89b160f20  opt/sysadmws-utils/backup_check/by_mysql.sh
 76973a920186424e265bafe585173afb  opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh
 86be5d1ba0a4cfcac30941c63d665f0c  opt/sysadmws-utils/backup_check/by_check_file.awk
 1d45f557602d6b752efc8c2af2d87de2  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
-2a9cdbbcb6c2d3c7e24f84143ddedc4c  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
+8003a85a6126cfc4d1285d84619f8bff  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 d08b07bae53d0ca9880fea38e073be1c  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.sh
 5e3568ac486dea3ee8422a5681aef602  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf.sample
 d44bae37824c91b4ec7276d40d8060cc  opt/sysadmws-utils/misc/mysql_create_new_database.sh
