@@ -3,8 +3,6 @@
 #       Behind master threshold sec
 BEHIND_MASTER_THR=""    #"300" sec
 
-#       Override hostname if needed
-HOST=""                 #$(hostname)
 
 #       Override default mysql settings
 MY_CLIENT=""            #$(which mysql)
