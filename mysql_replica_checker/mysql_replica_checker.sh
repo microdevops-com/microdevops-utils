@@ -133,4 +133,8 @@ if [[ "${last_sql_err}" ]]; then
   err_msg+="\"last sql error: ${last_sql_err}\","
 fi
 
-report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"
+## Send notify only if err_msg
+if [[ "${err_msg}" ]]; then
+  report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"
+fi
+
