@@ -52,9 +52,12 @@ sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_rep
 # notify_devilry
 cp ../notify_devilry/notify_devilry.py \
 	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry_test.sh \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
 cp ../notify_devilry/notify_devilry.yaml.jinja.example \
 	sysadmws-utils/opt/sysadmws-utils/notify_devilry
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.py
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry_test.sh
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
 
 # disk_alert

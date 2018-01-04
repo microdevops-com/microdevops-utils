@@ -27,7 +27,7 @@ function report {
   rsp+="\"from\":\"mysql replica checker\"," 
   rsp+="\"type\":\"mysql replica status\","
   rsp+="\"status\":\"WARNING\"," 
-  rsp+="\"date\":\"$(date +'%F %T')\","
+  rsp+="\"date time\":\"$(date +'%F %T')\","
   rsp+=${master:+"\"master\":\"${master}\","}
   if [[ -n ${data} ]]; then
     rsp+="${data}"
@@ -133,4 +133,8 @@ if [[ "${last_sql_err}" ]]; then
   err_msg+="\"last sql error: ${last_sql_err}\","
 fi
 
-report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"
+## Send notify only if err_msg
+if [[ "${err_msg}" ]]; then
+  report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"
+fi
+

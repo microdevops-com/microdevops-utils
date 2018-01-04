@@ -25,7 +25,7 @@ e5445e4a83e69251786cbda89b160f20  opt/sysadmws-utils/backup_check/by_mysql.sh
 11001e189e81ac7712ce2b2eccded8ad  opt/sysadmws-utils/backup_check/by_postgresql.awk
 76973a920186424e265bafe585173afb  opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh
 86be5d1ba0a4cfcac30941c63d665f0c  opt/sysadmws-utils/backup_check/by_check_file.awk
-0cb725b89476e05172358c7f4c5bafac  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
+67ed7d58f302f202be853bee1f8832b7  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
 2a9cdbbcb6c2d3c7e24f84143ddedc4c  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 d08b07bae53d0ca9880fea38e073be1c  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.sh
 5e3568ac486dea3ee8422a5681aef602  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf.sample
@@ -34,6 +34,7 @@ d44bae37824c91b4ec7276d40d8060cc  opt/sysadmws-utils/misc/mysql_create_new_datab
 af09351a667487df4b1e1f7115359b98  opt/sysadmws-utils/misc/postgresql_dump_all_dbs_to_files.sh
 fd43340a6211418126171679e53a4817  opt/sysadmws-utils/misc/mysql_dump_all_dbs_to_files.sh
 bbb2dac36ef7350caaca206137ca3ce9  opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
+4343bcc8e058a7594289514a257a6a49  opt/sysadmws-utils/notify_devilry/notify_devilry_test.sh
 4aa0e7464c8bd57a9567c4f8f89409ba  opt/sysadmws-utils/notify_devilry/notify_devilry.py
 9e8d20087b81720a87887e391bd86c36  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf
 8a2477fafa905f5695c47858ee5897f5  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_hourly.cron
@@ -53,9 +54,9 @@ e28fd80c42b3a66daf3a6684b6db3dae  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_
 0f947283f0e67844725cc6b601355699  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf
 96bd2d6af24c516134628cd52558f926  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.awk
 32717af0bc492291da8aab2f6ec4b365  opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.sh
-db013947cc3b9949144d8e46191a9143  opt/sysadmws-utils/disk_alert/disk_alert.conf
+0a6de6641b2b08dfdc2c4c3b194ac424  opt/sysadmws-utils/disk_alert/disk_alert.conf
 aa5708e2cf76c0e31186c5ac257d579a  opt/sysadmws-utils/disk_alert/lr.awk
-8951201562d9df02c9183582f146a9ea  opt/sysadmws-utils/disk_alert/disk_alert.sh
+42b6c3f1974467fc2fc3fd038e1dff2b  opt/sysadmws-utils/disk_alert/disk_alert.sh
 96a7400be38cebb3cd322dd715f4cb15  opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.sh
 7dd1d3d73a3c7b7c73b1db241a63096d  opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.conf.sample
 cbf7a4aa923b5f81bbb9ff98c4440661  opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.awk

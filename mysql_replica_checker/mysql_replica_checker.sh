@@ -27,7 +27,7 @@ function report {
   rsp+="\"from\":\"mysql replica checker\"," 
   rsp+="\"type\":\"mysql replica status\","
   rsp+="\"status\":\"WARNING\"," 
-  rsp+="\"date\":\"$(date +'%F %T')\","
+  rsp+="\"date time\":\"$(date +'%F %T')\","
   rsp+=${master:+"\"master\":\"${master}\","}
   if [[ -n ${data} ]]; then
     rsp+="${data}"
