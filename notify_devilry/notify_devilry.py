@@ -14,8 +14,9 @@ from collections import OrderedDict
 
 # Constants
 CONFIG_FILE = "notify_devilry.yaml.jinja"
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Log functions
+# Log methods
 def log_notice(msg):
     now = datetime.datetime.now()
     print(now.strftime("%F %T ") + "NOTICE: " + msg, file = sys.stdout)
@@ -23,7 +24,7 @@ def log_error(msg):
     now = datetime.datetime.now()
     print(now.strftime("%F %T ") + "ERROR: " + msg, file = sys.stderr)
 
-# Send functions
+# Send methods
 def send_telegram(token, chat_id, msg):
     log_notice("Sending to TG API result: " + urllib2.urlopen("https://api.telegram.org/bot" + token + "/sendMessage", urllib.urlencode({"parse_mode": "HTML", "chat_id": chat_id, "text": msg })).read())
 
@@ -51,8 +52,6 @@ if __name__ == "__main__":
             exit_code = 1
             raise Exception("Reading JSON message from stdin failed, exiting")
 
-        # Enter config dir
-        THIS_DIR = os.path.dirname(os.path.abspath(__file__))
         try:
             j2_env = Environment(loader = FileSystemLoader(THIS_DIR),trim_blocks = True)
         except Exception as e:

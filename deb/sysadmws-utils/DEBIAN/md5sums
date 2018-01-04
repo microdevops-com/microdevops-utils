@@ -1,4 +1,4 @@
-0b6b8fbbed1d4540c8f57cbbedc72bf4  etc/cron.d/sysadmws-mysql-replica-checker
+384b6b1146880654b2040f100684c3af  etc/cron.d/sysadmws-mysql-replica-checker
 903a73ed7f063b74d7545fd2eda705cd  etc/cron.d/sysadmws-bulk-log
 8e45f02d6c1899026891ada9c892e0bb  etc/cron.d/sysadmws-mysql-queries-log
 88ce82478d6905308b3dcdbb3670d5b9  etc/cron.d/sysadmws-disk-alert
@@ -25,7 +25,7 @@ e5445e4a83e69251786cbda89b160f20  opt/sysadmws-utils/backup_check/by_mysql.sh
 11001e189e81ac7712ce2b2eccded8ad  opt/sysadmws-utils/backup_check/by_postgresql.awk
 76973a920186424e265bafe585173afb  opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh
 86be5d1ba0a4cfcac30941c63d665f0c  opt/sysadmws-utils/backup_check/by_check_file.awk
-67ed7d58f302f202be853bee1f8832b7  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
+1d45f557602d6b752efc8c2af2d87de2  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
 2a9cdbbcb6c2d3c7e24f84143ddedc4c  opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 d08b07bae53d0ca9880fea38e073be1c  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.sh
 5e3568ac486dea3ee8422a5681aef602  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf.sample
@@ -35,7 +35,7 @@ af09351a667487df4b1e1f7115359b98  opt/sysadmws-utils/misc/postgresql_dump_all_db
 fd43340a6211418126171679e53a4817  opt/sysadmws-utils/misc/mysql_dump_all_dbs_to_files.sh
 bbb2dac36ef7350caaca206137ca3ce9  opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
 4343bcc8e058a7594289514a257a6a49  opt/sysadmws-utils/notify_devilry/notify_devilry_test.sh
-4aa0e7464c8bd57a9567c4f8f89409ba  opt/sysadmws-utils/notify_devilry/notify_devilry.py
+e6e39cb2d3c784f78047e67a344fa01d  opt/sysadmws-utils/notify_devilry/notify_devilry.py
 9e8d20087b81720a87887e391bd86c36  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf
 8a2477fafa905f5695c47858ee5897f5  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_hourly.cron
 fc09012f69ba4f308d212b32a28d3212  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_daily.cron
