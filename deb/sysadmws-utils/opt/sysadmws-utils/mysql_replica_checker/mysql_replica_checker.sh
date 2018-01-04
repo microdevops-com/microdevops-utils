@@ -2,11 +2,10 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 function report {
-  local message=${1}
+  local data=${1}
   local master=${2}
   local relay_log=${3}	
   local relay_log_size=${4}
-  relay_log_size=$(bc <<<"scale=2; ${relay_log_size:=0} / 1024 / 1024 / 1024" )'G'
 
 
   ###try to get Master hostname, if ip given  
@@ -25,14 +24,16 @@ function report {
   local rsp
   rsp+='{'
   rsp+="\"host\":\"$(hostname -f)\"," 
+  rsp+="\"from\":\"mysql replica checker\"," 
+  rsp+="\"type\":\"mysql replica status\","
+  rsp+="\"status\":\"WARNING\"," 
   rsp+="\"date\":\"$(date +'%F %T')\","
-  rsp+="\"type\":\"replica alert\"," 
-  rsp+="\"master\":\"${master}\","
-  if [[ -n ${message} ]]; then
-    rsp+="\"message\":\"${message}\","
+  rsp+=${master:+"\"master\":\"${master}\","}
+  if [[ -n ${data} ]]; then
+    rsp+="${data}"
   fi
-  rsp+="\"relay log free space\":\"${free_space}\","
-  rsp+="\"log size\":\"${relay_log_size}\""
+  rsp+=${free_space:+"\"relay log free space\":\"${free_space}\","}
+  rsp+=${relay_log_size:+"\"log size\":\"$(bc <<<"scale=2; ${relay_log_size:=0} / 1024 / 1024" )Mb\""}
   rsp+='}'
 
   ### Send response
@@ -64,7 +65,7 @@ MY_QUERY=${MY_QUERY:="show variables like 'relay_log'; show slave status\G"}
 ###   Query MYSQL OR DIE with message
 sql_resp=$("$MY_CLIENT" "$MY_CRED" -Be "$MY_QUERY" 2>&1) && query_ok=1
 if [[ ${query_ok} -ne 1 ]]; then
-  report "It seems all OK but I can't query MYSQL"
+  report "\"error\":\"It seems all OK but I can not query MYSQL\""
 fi
 
 
@@ -95,37 +96,41 @@ last_sql_err=$(grep -oP "Last_SQL_Error:\s+\K(.+)" <<<"${sql_resp}")           #
 
 
 ###  Run Some Check
-err_msg+="\n"
   ##  Check For Last Error 
 if [[ "${last_errno}" != 0 ]]; then
-  err_msg+="Last_Errno: ${last_errno}\n"
+  err_msg+="\"last errno\":\"${last_errno}\","
 fi
 
   ##  Check if IO thread is running ##
 if [[ "${io_is_running}" != "Yes" ]]; then
-  err_msg+="Slave_IO_Running: ${io_is_running}\n"
+  err_msg+="\"slave io running\":\"${io_is_running}\","
 fi
 
   ##  Check for SQL thread ##
 if [[ "${sql_is_running}" != "Yes" ]]; then
-  err_msg+="Slave_SQL_Running: $sql_is_running\n"
+  err_msg+="\"slave sql running\":\"$sql_is_running\","
 fi
 
   ##  Check how slow the slave is (preset delay + sql_delay) ##
-if [[ -z "${sql_delay}" ]]; then sql_delay=0; fi
+if [[ -z "${sql_delay}" ]]; then sql_delay=0; fi #set 0 if var is ''
+    ### Handle  NULL
 if [[ "${seconds_behind}" == "NULL" ]]; then
-  err_msg+="Seconds_Behind_Master: ${seconds_behind}\n"
+  err_msg+="\"seconds behind master\":\"${seconds_behind}\","
+    ### Handle  threshold+delay 
 elif [[ "${seconds_behind}" -ge "$(( ${BEHIND_MASTER_THR} + ${sql_delay} ))" ]]; then
-  [[ "${sql_delay}" -gt 0 ]] && delay=" sql_delay: ${sql_delay}" || delay=''
-  err_msg+="Seconds_Behind_Master: ${seconds_behind} (thr: ${BEHIND_MASTER_THR}${delay})\n"
+  if [[ "${sql_delay}" -gt 0 ]]; then
+    err_msg="\"sql delay\":\"${sql_delay}\""
+  fi
+  err_msg+="\"threshold\":\"${BEHIND_MASTER_THR}\","
+  err_msg+="\"seconds behind master\":\"${seconds_behind}\"," 
 fi
 
   ##  Add last_err_msg to msg
 if [[ "${last_io_err}" ]]; then
-  err_msg+="Last_IO_Error: ${last_io_err}\n"
+  err_msg+="\"last io error\":\"${last_io_err}\","
 fi
 if [[ "${last_sql_err}" ]]; then
-  err_msg+="Last_SQL_Error: ${last_sql_err}\n"
+  err_msg+="\"last sql error: ${last_sql_err}\","
 fi
 
-report "${err_msg%%'\n'}" "${master}" "${relay_log}" "${relay_log_size}"
+report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"

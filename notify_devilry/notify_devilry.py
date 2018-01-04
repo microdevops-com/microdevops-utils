@@ -38,8 +38,10 @@ if __name__ == "__main__":
         # Read json message from stdin
         try:
             message = json.load(sys.stdin, object_pairs_hook=OrderedDict)
-            if not 'message' in message:
-                raise Exception("No 'message' key in message dict")
+            if not 'host' in message:
+                raise Exception("No 'host' key in message dict")
+            if not 'from' in message:
+                raise Exception("No 'from' key in message dict")
             # Format message as text
             message_as_text = ""
             for m_key, m_val in message.items():

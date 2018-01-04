@@ -29,7 +29,7 @@ fi
 mkdir -p "/opt/sysadmws-utils/disk_alert/history"
 
 # Check df space
-df -PH | grep -vE $FILTER | awk '{ print $5 " " $1 }' | while read output; do
+df -PH | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
 	USEP=$(echo $output | awk '{ print $1}' | cut -d'%' -f1  )
 	PARTITION=$(echo $output | awk '{ print $2 }' )
 	# Get thresholds
@@ -49,7 +49,7 @@ df -PH | grep -vE $FILTER | awk '{ print $5 " " $1 }' | while read output; do
 	fi
 	# Critical message
 	if [[ $USEP -ge $CRITICAL ]]; then
-		echo '{"host": "'$HOSTNAME'", "date": "'$DATE'", "type": "disk alert", "message": "disk free space critical", "partition": "'$PARTITION'", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+		echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk free space", "status": "CRITICAL", "date": "'$DATE'", "partition": "'$PARTITION'", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
 	fi
 	# Add partition usage history by seconds from unix epoch
 	PARTITION_FN=$(echo $PARTITION | sed -e 's#/#_#g')
@@ -78,7 +78,7 @@ df -PH | grep -vE $FILTER | awk '{ print $5 " " $1 }' | while read output; do
 	if [[ $PREDICT_SECONDS != "None" ]]; then
 		if [[ $PREDICT_SECONDS -lt $PREDICT_CRITICAL ]]; then
 			if [[ $PREDICT_SECONDS -gt 0 ]]; then
-				echo '{"host": "'$HOSTNAME'", "date": "'$DATE'", "type": "disk alert", "message": "disk free space prediction critical", "partition": "'$PARTITION'", "use": "'$USEP'%", "angle": "'$P_ANGLE'", "shift": "'$P_SHIFT'", "quality": "'$P_QUALITY'", "predict seconds": "'$PREDICT_SECONDS'", "predict hms": "'$P_HMS'", "prediction threshold": "'$PREDICT_CRITICAL'"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+				echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk free space prediction", "status": "CRITICAL", "date": "'$DATE'", "partition": "'$PARTITION'", "use": "'$USEP'%", "angle": "'$P_ANGLE'", "shift": "'$P_SHIFT'", "quality": "'$P_QUALITY'", "predict seconds": "'$PREDICT_SECONDS'", "predict hms": "'$P_HMS'", "prediction threshold": "'$PREDICT_CRITICAL'"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
 			fi
 		fi
 	fi
