@@ -6,7 +6,12 @@ import sys
 import datetime
 import yaml
 import urllib
-import urllib2
+try:
+    from urllib.parse import urlencode
+    from urllib.request import urlopen, Request
+except ImportError:
+    from urllib import urlencode
+    from urllib2 import urlopen, Request
 import logging
 from collections import OrderedDict
 try:
@@ -37,7 +42,7 @@ def load_json(f):
     except:
         try:
             message = json.load(f)
-	except:
+        except:
             try:
                 stdin_data = f.read()
                 message = json.loads(stdin_data)
@@ -79,8 +84,9 @@ def send_telegram(token, chat_id, msg):
     for m_key, m_val in msg.items():
         message_as_text = "{}{}: <b>{}</b>\n".format(message_as_text, m_key, m_val)
     url_url = "https://api.telegram.org/bot{}/sendMessage".format(token)
-    url_data = urllib.urlencode({"parse_mode": "HTML", "chat_id": chat_id, "text": message_as_text })
-    url_obj = urllib2.urlopen(url_url, url_data)
+    url_data = urlencode({"parse_mode": "HTML", "chat_id": chat_id, "text": message_as_text }).encode("utf-8")
+    url_req = Request(url_url)
+    url_obj = urlopen(url_req, url_data)
     url_result = url_obj.read()
     logging.info("Sending to TG API result: {}".format(url_result))
 
