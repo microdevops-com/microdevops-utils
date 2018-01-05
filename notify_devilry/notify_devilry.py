@@ -8,7 +8,7 @@ import datetime
 import yaml
 import urllib
 import urllib2
-import json
+import simplejson as json
 from jinja2 import Environment, FileSystemLoader, Template
 try:
     from collections import OrderedDict
