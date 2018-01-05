@@ -9,8 +9,11 @@ import yaml
 import urllib
 import urllib2
 import json
-import ordereddict
 from jinja2 import Environment, FileSystemLoader, Template
+try:
+    from collections import OrderedDict
+except ImportError:
+    OrderedDict = dict
 
 # Constants
 CONFIG_FILE = "notify_devilry.yaml.jinja"
