@@ -48,7 +48,7 @@ if __name__ == "__main__":
                     message = json.load(sys.stdin)
                 except Exception:
                     stdin_data = sys.stdin.read()
-                    message = json.loads(data)
+                    message = json.loads(stdin_data)
             if not 'host' in message:
                 raise Exception("No 'host' key in message dict")
             if not 'from' in message:
