@@ -13,7 +13,10 @@ except ImportError:
     from urllib import urlencode
     from urllib2 import urlopen, Request
 import logging
-from collections import OrderedDict
+try:
+    from collections import OrderedDict
+except:
+    pass
 try:
     import json
 except ImportError:
