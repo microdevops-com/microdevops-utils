@@ -8,14 +8,11 @@ import datetime
 import yaml
 import urllib
 import urllib2
+from collections import OrderedDict
 try:
     import json
 except ImportError:
     import simplejson as json
-try:
-    from collections import OrderedDict
-except ImportError:
-    OrderedDict = dict
 from jinja2 import Environment, FileSystemLoader, Template
 
 # Constants
@@ -47,7 +44,11 @@ if __name__ == "__main__":
             try:
                 message = json.load(sys.stdin, object_pairs_hook=OrderedDict)
             except Exception:
-                message = json.load(sys.stdin)
+                try:
+                    message = json.load(sys.stdin)
+                except Exception:
+                    stdin_data = sys.stdin.read()
+                    message = json.loads(data)
             if not 'host' in message:
                 raise Exception("No 'host' key in message dict")
             if not 'from' in message:
