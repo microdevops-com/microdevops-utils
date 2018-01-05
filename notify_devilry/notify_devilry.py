@@ -8,9 +8,9 @@ import datetime
 import yaml
 import urllib
 import urllib2
-import simplejson as json
+import json
+import ordereddict
 from jinja2 import Environment, FileSystemLoader, Template
-from collections import OrderedDict
 
 # Constants
 CONFIG_FILE = "notify_devilry.yaml.jinja"
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
         # Read json message from stdin
         try:
-            message = json.load(sys.stdin, object_pairs_hook=json.OrderedDict)
+            message = json.load(sys.stdin, object_pairs_hook=OrderedDict)
             if not 'host' in message:
                 raise Exception("No 'host' key in message dict")
             if not 'from' in message:
