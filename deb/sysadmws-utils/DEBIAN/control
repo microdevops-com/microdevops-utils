@@ -1,9 +1,0 @@
-Package: sysadmws-utils
-Priority: optional
-Section: misc
-Installed-Size: 100
-Maintainer: Sysadmin Workshop Admin <admin@sysadm.ws>
-Architecture: all
-Version: 0.82
-Depends: gawk
-Description: Sysadmin Workshop Utilities - a set of useful utils for system administration.

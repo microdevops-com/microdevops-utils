@@ -109,6 +109,6 @@ if __name__ == "__main__":
         log_error(e.message)
 
     finally:
-	# Clen tmps here, if any
+	# Clean tmps here, if any
         log_notice("Finished notify_devilry")
         sys.exit(exit_code)

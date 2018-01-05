@@ -1,5 +1,0 @@
-#
-HOSTNAME		FS_RSYNC_SSH		UBUNTU			/var/backups/HOSTNAME
----			---			/var/www		---
----			MYSQL			ALL			---
----			POSTGRESQL		ALL			---

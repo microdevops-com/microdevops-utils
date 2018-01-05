@@ -1,8 +1,0 @@
-# this example is for HDWM like 4xxx - sync and retail 4 hourly copies per day
-0  4  	* * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh sync >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1 && /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh hourly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-0  10  	* * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh sync >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1 && /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh hourly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-0  16  	* * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh sync >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1 && /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh hourly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-0  22  	* * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh sync >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1 && /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh hourly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-30 3  	* * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh daily >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-0  3  	* * 1		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh weekly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1
-30 2  	1 * *		root	/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh monthly >>/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log 2>&1

@@ -1,4 +1,3 @@
-### Vim ###
 # swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]
@@ -9,3 +8,6 @@ Session.vim
 # temporary
 .netrwhist
 *~
+# packages
+deb/sysadmws-utils
+deb/sysadmws-utils.deb
