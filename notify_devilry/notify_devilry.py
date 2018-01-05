@@ -28,7 +28,7 @@ WORK_DIR = "/opt/sysadmws-utils/notify_devilry"
 CONFIG_FILE = "notify_devilry.yaml.jinja"
 
 # Set logging format and show up to debug
-logging.basicConfig(format='{} %(levelname)s: %(message)s'.format(datetime.datetime.now().strftime("%F %T")),level=logging.DEBUG)
+logging.basicConfig(format='{0} %(levelname)s: %(message)s'.format(datetime.datetime.now().strftime("%F %T")),level=logging.DEBUG)
 
 # Custom Exceptions
 class LoadJsonError(Exception):
@@ -50,13 +50,13 @@ def load_json(f):
                 stdin_data = f.read()
                 message = json.loads(stdin_data)
             except:
-                raise LoadJsonError("Reading JSON message from file '{}' failed".format(f))
+                raise LoadJsonError("Reading JSON message from file '{0}' failed".format(f))
     return message
 
 # Check needed key in dict
 def check_json_key(key, msg):
     if not key in msg:
-        raise CheckJsonKeyError("No '{}' key in JSON message '{}'".format(key, msg))
+        raise CheckJsonKeyError("No '{}' key in JSON message '{0}'".format(key, msg))
 
 # Load YAML config
 def load_yaml_config(d, f):
@@ -71,8 +71,8 @@ def load_yaml_config(d, f):
     # Set vars inside config file and render
     current_date = datetime.datetime.now().strftime("%Y%m%d")
     current_time = datetime.datetime.now().strftime("%H%M%S")
-    logging.info("current_date = {}".format(current_date))
-    logging.info("current_time = {}".format(current_time))
+    logging.info("current_date = {0}".format(current_date))
+    logging.info("current_time = {0}".format(current_time))
     config_dict = yaml.load(template.render(
         current_date = int(current_date),
         current_time = int(current_time)
@@ -85,13 +85,13 @@ def send_telegram(token, chat_id, msg):
     # Format message as text
     message_as_text = ""
     for m_key, m_val in msg.items():
-        message_as_text = "{}{}: <b>{}</b>\n".format(message_as_text, m_key, m_val)
-    url_url = "https://api.telegram.org/bot{}/sendMessage".format(token)
+        message_as_text = "{0}{1}: <b>{2}</b>\n".format(message_as_text, m_key, m_val)
+    url_url = "https://api.telegram.org/bot{0}/sendMessage".format(token)
     url_data = urlencode({"parse_mode": "HTML", "chat_id": chat_id, "text": message_as_text }).encode("utf-8")
     url_req = Request(url_url)
     url_obj = urlopen(url_req, url_data)
     url_result = url_obj.read()
-    logging.info("Sending to TG API result: {}".format(url_result))
+    logging.info("Sending to TG API result: {0}".format(url_result))
 
 if __name__ == "__main__":
 
