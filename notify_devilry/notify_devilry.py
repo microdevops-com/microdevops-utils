@@ -8,7 +8,7 @@ import datetime
 import yaml
 import urllib
 import urllib2
-import json
+import simplejson as json
 from jinja2 import Environment, FileSystemLoader, Template
 from collections import OrderedDict
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
         # Read json message from stdin
         try:
-            message = json.load(sys.stdin, object_pairs_hook=OrderedDict)
+            message = json.load(sys.stdin, object_pairs_hook=json.OrderedDict)
             if not 'host' in message:
                 raise Exception("No 'host' key in message dict")
             if not 'from' in message:

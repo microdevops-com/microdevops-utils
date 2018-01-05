@@ -7,6 +7,6 @@ rm -rf sysadmws-utils
 cp -R ../deb/sysadmws-utils .
 rm -rf sysadmws-utils/DEBIAN
 sudo chown -R root:root sysadmws-utils
-sudo tar zcvf sysadmws-utils.tar.gz -C sysadmws-utils .
+sudo tar zcf sysadmws-utils.tar.gz -C sysadmws-utils .
 sudo chown -R `whoami`:`whoami` sysadmws-utils
 rm -rf sysadmws-utils
