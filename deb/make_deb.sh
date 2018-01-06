@@ -56,9 +56,12 @@ cp ../notify_devilry/notify_devilry_test.sh \
 	sysadmws-utils/opt/sysadmws-utils/notify_devilry
 cp ../notify_devilry/notify_devilry.yaml.jinja.example \
 	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry.yaml.jinja.shortex \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.py
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry_test.sh
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.shortex
 
 # disk_alert
 cp ../disk_alert/disk_alert.sh \
