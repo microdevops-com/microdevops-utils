@@ -24,7 +24,13 @@ try:
 except ImportError:
     import simplejson as json
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
-import argparse
+# No way to use that on 2.6
+try:
+    import argparse
+    ARGPARSE = True
+except:
+    ARGPARSE = False
+    pass
 
 # Constants
 WORK_DIR = "/opt/sysadmws-utils/notify_devilry"
@@ -179,11 +185,15 @@ if __name__ == "__main__":
     logger.addHandler(log_handler)
     logger.addHandler(console_handler)
 
-    # Set parset and parse
-    parser = argparse.ArgumentParser(description='Deliver JSON message from stdin by rules defined in YAML config.')
-    parser.add_argument("--debug", dest="debug", help="enable debug", action="store_true")
-    args = parser.parse_args()
-    if args.debug:
+    # Set parser
+    if ARGPARSE:
+        parser = argparse.ArgumentParser(description='Deliver JSON message from stdin by rules defined in YAML config.')
+        parser.add_argument("--debug", dest="debug", help="enable debug", action="store_true")
+        args = parser.parse_args()
+        if args.debug:
+            console_handler.setLevel(logging.DEBUG)
+    else:
+        # Always debug mode if no argparse
         console_handler.setLevel(logging.DEBUG)
 
     # Catch exception to logger
