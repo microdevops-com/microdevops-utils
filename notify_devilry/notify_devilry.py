@@ -208,6 +208,12 @@ if __name__ == "__main__":
         # Similiar messages not detected
         sim_messages_detected = False
         logging.info("Similiar messages not detected")
+    # But do not allow more than 24h between last_1 and now
+    if last_1_message_in_time is not None:
+        if int((ut_now() - last_1_message_in_time)/60) > 1440:
+            # Similiar messages not detected
+            sim_messages_detected = False
+            logging.info("There is more than 24 hours between last message and now, forcing similiar messages not detected")
 
     # Iterate over notify dict and send message for each
     for notify_item_name, notify_item in config_dict['notify_devilry']['notify'].items():
