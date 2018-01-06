@@ -28,9 +28,8 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 try:
     import argparse
     ARGPARSE = True
-except:
+except ImportError:
     ARGPARSE = False
-    pass
 
 # Constants
 WORK_DIR = "/opt/sysadmws-utils/notify_devilry"
