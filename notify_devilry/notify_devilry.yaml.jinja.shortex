@@ -10,5 +10,5 @@ notify_devilry:
         - 'Chat Alias 1'
       rate_limit:
         - 60
-        - 360
-        - 720
+        - 240
+        - 480

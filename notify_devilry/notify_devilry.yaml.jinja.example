@@ -19,6 +19,6 @@ notify_devilry:
         - 'Chat Alias 2'
       rate_limit: # limit sending similiar messages based on sending history, 1+ rule needed
         - 60 # second message only if 60+ minutes passed from last sending and 1 message sent
-        - 360 # third if 360+ minutes and 2 messages sent
-        - 720 # fourth and further if 720+ minutes and 3+ messages sent
+        - 240 # third if 360+ minutes and 2 messages sent
+        - 480 # fourth and further if 720+ minutes and 3+ messages sent
 {% endif %}
