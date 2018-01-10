@@ -57,12 +57,16 @@ BEHIND_MASTER_THR=${BEHIND_MASTER_THR:="300"}
 MY_CLIENT=${MY_CLIENT:=$(which mysql)}
 MY_CRED=${MY_CRED:="--defaults-file=/etc/mysql/debian.cnf"}
 MY_QUERY=${MY_QUERY:="show variables like 'relay_log'; show slave status\G"}
+MY_ADMIN=${MY_ADMIN:=$(which mysqladmin)}
+
+# Detect is mysql service alive
+my_check=$("$MY_ADMIN" "$MY_CRED" ping 2>/dev/null | grep alive)
+if [ "z$my_check" = "z" ] ; then
+        exit 0
+fi
 
 # Query MYSQL OR DIE with message
-sql_resp=$("$MY_CLIENT" "$MY_CRED" -Be "$MY_QUERY" 2>&1) && query_ok=1
-if [[ ${query_ok} -ne 1 ]]; then
-	report "\"error\":\"It seems all OK but I can not query MYSQL\""
-fi
+sql_resp=$("$MY_CLIENT" "$MY_CRED" -Be "$MY_QUERY" 2>&1)
 
 # If MYSQL is not SLAVE then DIE 
 if [[ ! ${sql_resp} =~ "Slave" ]]; then
