@@ -5,7 +5,7 @@ if [ `dirname $0` != "." ]; then
 fi
 
 # Increase a version of the package
-perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+:\d+)\.(\d+)$/' sysadmws-utils/DEBIAN/control
+perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+)\.(\d+)$/' sysadmws-utils/DEBIAN/control
 
 # Remove all files in sub modules
 find sysadmws-utils/opt -type f -delete
@@ -49,21 +49,33 @@ sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_rep
 sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-mysql-replica-checker
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.conf.sample
 
-# telegram_notify
-cp ../telegram_notify/telegram_notify.sh \
-	sysadmws-utils/opt/sysadmws-utils/telegram_notify
-cp ../telegram_notify/telegram_notify.conf.sample \
-	sysadmws-utils/opt/sysadmws-utils/telegram_notify
-sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/telegram_notify/telegram_notify.sh
-sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/telegram_notify/telegram_notify.conf.sample
+# notify_devilry
+cp ../notify_devilry/notify_devilry.py \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry_test.sh \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry.yaml.jinja.example \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+cp ../notify_devilry/notify_devilry.yaml.jinja.shortex \
+	sysadmws-utils/opt/sysadmws-utils/notify_devilry
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.py
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry_test.sh
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.example
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/notify_devilry/notify_devilry.yaml.jinja.shortex
 
 # disk_alert
 cp ../disk_alert/disk_alert.sh \
 	sysadmws-utils/opt/sysadmws-utils/disk_alert
 cp ../disk_alert/disk_alert.cron \
 	sysadmws-utils/etc/cron.d/sysadmws-disk-alert
+cp ../disk_alert/disk_alert.conf \
+	sysadmws-utils/opt/sysadmws-utils/disk_alert
+cp ../disk_alert/lr.awk \
+	sysadmws-utils/opt/sysadmws-utils/disk_alert
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.sh
 sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-disk-alert
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.conf
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/lr.awk
 
 # salt
 cp ../salt/grains.template \
@@ -147,9 +159,14 @@ sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/backup_check/*.sh
 cp ../misc/mysql_dump_all_dbs_to_files.sh \
 	../misc/postgresql_dump_all_dbs_to_files.sh \
 	../misc/mysql_table_extractor.sh \
+	../misc/mysql_create_new_database.sh \
 	sysadmws-utils/opt/sysadmws-utils/misc
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/misc/*.sh
 
+# Make md5sums
+cd sysadmws-utils && \
+( find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums ) && \
+cd ..
 
 # Chown to root
 sudo chown -R root:root sysadmws-utils

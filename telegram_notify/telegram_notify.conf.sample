@@ -1,6 +1,0 @@
-###     Telegram credentials
-TG_TOKEN="{{ token }}"
-TG_ALERT_CHAT_ID="{{ alert_chat_id }}"
-### CONST
-TG_URL="https://api.telegram.org/bot$TG_TOKEN/sendMessage"
-TG_PARSE_MODE="HTML"
