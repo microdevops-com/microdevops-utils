@@ -191,7 +191,7 @@ if __name__ == "__main__":
     logger.addHandler(log_handler)
     logger.addHandler(console_handler)
 
-    # Set parser
+    # Set parser and parse args
     if ARGPARSE:
         
         parser = argparse.ArgumentParser(description='Deliver JSON message from stdin by rules defined in YAML config.')
@@ -199,12 +199,20 @@ if __name__ == "__main__":
         parser.add_argument("--force-send", dest="force_send", help="force sending message", action="store_true")
         args = parser.parse_args()
         
+        # Enable debug
         if args.debug:
             console_handler.setLevel(logging.DEBUG)
+        
+        # Set force_send
+        force_send = args.force_send
     
     else:
+        
         # Always debug mode if no argparse
         console_handler.setLevel(logging.DEBUG)
+        
+        # No force_send without argparse available
+        force_send = False
 
     # Catch exception to logger
     try:
@@ -278,7 +286,7 @@ if __name__ == "__main__":
                 logger.info("There is more than 24 hours between last message and now, forcing similiar messages not detected")
 
         # But if force_send == True - send anyway
-        if args.force_send:
+        if force_send:
                 
             sim_messages_detected = False
             logger.info("--force-send forcing similiar messages not detected")
