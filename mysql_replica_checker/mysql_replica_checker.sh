@@ -40,7 +40,8 @@ function report {
 	exit 0
 }
 
-# Check if mysqld and mysql available in path OR DIE
+# Check if mysqld and mysql available in path or exit silently
+# We exit silently to suppress error messages from cron on servers without mysql
 if ! type mysqld &> /dev/null || ! type mysql &> /dev/null; then 
 	exit 0
 fi 
@@ -59,16 +60,16 @@ MY_CRED=${MY_CRED:="--defaults-file=/etc/mysql/debian.cnf"}
 MY_QUERY=${MY_QUERY:="show variables like 'relay_log'; show slave status\G"}
 MY_ADMIN=${MY_ADMIN:=$(which mysqladmin)}
 
-# Detect is mysql service alive
+# Detect if MYSQL service is alive or exit
 my_check=$("$MY_ADMIN" "$MY_CRED" ping 2>/dev/null | grep alive)
 if [ "z$my_check" = "z" ] ; then
         exit 0
 fi
 
-# Query MYSQL OR DIE with message
+# Query MYSQL
 sql_resp=$("$MY_CLIENT" "$MY_CRED" -Be "$MY_QUERY" 2>&1)
 
-# If MYSQL is not SLAVE then DIE 
+# Exit if not slave
 if [[ ! ${sql_resp} =~ "Slave" ]]; then
 	exit 0
 fi
