@@ -51,14 +51,14 @@ class LoadJsonError(Exception):
 # Load JSON from stdin
 def load_json(f):
     try:
-        message = json.load(f, object_pairs_hook=OrderedDict, encoding="utf-8")
+        message = json.load(f, object_pairs_hook=OrderedDict)
     except:
         try:
-            message = json.load(f, encoding="utf-8")
+            message = json.load(f)
         except:
             try:
                 stdin_data = f.read()
-                message = json.loads(stdin_data, encoding="utf-8")
+                message = json.loads(stdin_data)
             except:
                 raise LoadJsonError("Reading JSON message from file '{0}' failed".format(f))
     return message
@@ -120,7 +120,7 @@ def history_load_message_in(f, key):
     # Read JSON from file
     try:
         f.seek(0)
-        history_dict = json.load(f, encoding="utf-8")
+        history_dict = json.load(f)
         return history_dict[key]
     # On any kind of error just return None
     except:
@@ -132,14 +132,14 @@ def history_save_message_in(f, last_2, last_1):
     # Compose dict
     history_dict = {"last_2": last_2, "last_1": last_1}
     # Save dict as JSON
-    json.dump(history_dict, f, encoding="utf-8")
+    json.dump(history_dict, f)
     f.truncate()
 
 def history_load_message_out(f, key):
     # Read JSON from file
     try:
         f.seek(0)
-        history_dict = json.load(f, encoding="utf-8")
+        history_dict = json.load(f)
         return history_dict[key]
     except:
         if key == "count":
@@ -153,7 +153,7 @@ def history_save_message_out(f, last, count):
     # Compose dict
     history_dict = {"last": last, "count": count}
     # Save dict as JSON
-    json.dump(history_dict, f, encoding="utf-8")
+    json.dump(history_dict, f)
     f.truncate()
 
 # History file methods
@@ -171,9 +171,10 @@ def open_history_message_file(d, f):
 
 if __name__ == "__main__":
 
-    # Set default encoding
-    reload(sys)
-    sys.setdefaultencoding("utf-8")
+    # Set default encoding for python 2.x (no need in python 3.x)
+    if sys.version_info[0] < 3:
+        reload(sys)
+        sys.setdefaultencoding("utf-8")
 
     # Set logger
     logger = logging.getLogger(__name__)
