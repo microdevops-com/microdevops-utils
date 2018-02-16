@@ -81,7 +81,7 @@ def load_yaml_config(d, f):
     # Set vars inside config file and render
     current_date = datetime.datetime.now().strftime("%Y%m%d")
     current_time = datetime.datetime.now().strftime("%H%M%S")
-    logger.info("Loading JSON config {0}/{1}".format(d, f))
+    logger.info("Loading YAML config {0}/{1}".format(d, f))
     logger.info("current_date = {0}".format(current_date))
     logger.info("current_time = {0}".format(current_time))
     config_dict = yaml.load(template.render(
