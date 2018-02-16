@@ -48,7 +48,7 @@ LOGO="✉ ➔ ✂ ➔ ❓ ➔ ✌"
 class LoadJsonError(Exception):
     pass
 
-# Load JSON from stdin
+# Load JSON from file
 def load_json(f):
     try:
         message = json.load(f, object_pairs_hook=OrderedDict)
@@ -57,8 +57,8 @@ def load_json(f):
             message = json.load(f)
         except:
             try:
-                stdin_data = f.read()
-                message = json.loads(stdin_data)
+                file_data = f.read()
+                message = json.loads(file_data)
             except:
                 raise LoadJsonError("Reading JSON message from file '{0}' failed".format(f))
     return message
