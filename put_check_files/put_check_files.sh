@@ -54,12 +54,12 @@ if [ -f $CONF_FILE ]; then
 				# On the first occurance BACKUPS_PER_PATH value by path key is empty, do some work on the first occurance
 				if [[ _${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} = "_" ]]; then
 					echo "$LOCAL_SUBPATH_LINE/.backup_check REMOVED"
-					rm -f $LOCAL_SUBPATH_LINE/.backup_check
+					rm -f "$LOCAL_SUBPATH_LINE/.backup_check"
 					BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]=1
 					echo "BACKUPS_PER_PATH: ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]}"
-					echo -e "Host: $HOSTNAME\nPath: $LOCAL_SUBPATH_LINE \nDate: $DATE" >> $LOCAL_SUBPATH_LINE/.backup_check
+					echo -e "Host: $HOSTNAME\nPath: $LOCAL_SUBPATH_LINE \nDate: $DATE" >> "$LOCAL_SUBPATH_LINE/.backup_check"
 				fi
-				echo -e "Backup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Host: $BACKUP_SERVER\nBackup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Path: $BACKUP_DST\nBackup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Path Type: $BACKUP_DST_TYPE" >> $LOCAL_SUBPATH_LINE/.backup_check
+				echo -e "Backup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Host: $BACKUP_SERVER\nBackup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Path: $BACKUP_DST\nBackup ${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]} Path Type: $BACKUP_DST_TYPE" >> "$LOCAL_SUBPATH_LINE/.backup_check"
 				let "BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]=${BACKUPS_PER_PATH["$LOCAL_SUBPATH_LINE"]}+1"
 			done
 		fi
