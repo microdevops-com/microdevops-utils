@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import os
 import shutil
@@ -41,12 +42,13 @@ HISTORY_MESSAGE_IN_PREFIX = "in"
 HISTORY_MESSAGE_OUT_PREFIX = "out"
 HISTORY_MESSAGE_SUFFIX = "json"
 SENDING_METHODS = ['telegram']
+LOGO="✉ ➔ ✂ ➔ ❓ ➔ ✌"
 
 # Custom Exceptions
 class LoadJsonError(Exception):
     pass
 
-# Load JSON from stdin
+# Load JSON from file
 def load_json(f):
     try:
         message = json.load(f, object_pairs_hook=OrderedDict)
@@ -55,8 +57,8 @@ def load_json(f):
             message = json.load(f)
         except:
             try:
-                stdin_data = f.read()
-                message = json.loads(stdin_data)
+                file_data = f.read()
+                message = json.loads(file_data)
             except:
                 raise LoadJsonError("Reading JSON message from file '{0}' failed".format(f))
     return message
@@ -70,7 +72,7 @@ def check_json_key(key, msg):
 def load_yaml_config(d, f):
     # Get in the env
     j2_env = Environment(loader=FileSystemLoader(d), trim_blocks=True)
-    # our config is a template
+    # Our config is a template
     try:
         template = j2_env.get_template(f)
     except TemplateNotFound:
@@ -79,7 +81,7 @@ def load_yaml_config(d, f):
     # Set vars inside config file and render
     current_date = datetime.datetime.now().strftime("%Y%m%d")
     current_time = datetime.datetime.now().strftime("%H%M%S")
-    logger.info("Loading JSON config {0}/{1}".format(d, f))
+    logger.info("Loading YAML config {0}/{1}".format(d, f))
     logger.info("current_date = {0}".format(current_date))
     logger.info("current_time = {0}".format(current_time))
     config_dict = yaml.load(template.render(
@@ -169,34 +171,54 @@ def open_history_message_file(d, f):
 
 if __name__ == "__main__":
 
+    # Set default encoding for python 2.x (no need in python 3.x)
+    if sys.version_info[0] < 3:
+        reload(sys)
+        sys.setdefaultencoding("utf-8")
+
     # Set logger
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     if not os.path.isdir(LOG_DIR):
         os.mkdir(LOG_DIR, 0o755)
-    log_handler = RotatingFileHandler("{0}/{1}".format(LOG_DIR, LOG_FILE), maxBytes=10485760, backupCount=10)
+    log_handler = RotatingFileHandler("{0}/{1}".format(LOG_DIR, LOG_FILE), maxBytes=10485760, backupCount=10, encoding="utf-8")
+    os.chmod("{0}/{1}".format(LOG_DIR, LOG_FILE), 0o600)
     log_handler.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.ERROR)
-    formatter = logging.Formatter('{0} %(name)s %(levelname)s: %(message)s'.format(datetime.datetime.now().strftime("%F %T")))
+    formatter = logging.Formatter('{0} %(name)s %(process)d/%(threadName)s %(levelname)s: %(message)s'.format(datetime.datetime.now().strftime("%F %T")))
     log_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
     logger.addHandler(log_handler)
     logger.addHandler(console_handler)
 
-    # Set parser
+    # Set parser and parse args
     if ARGPARSE:
+        
         parser = argparse.ArgumentParser(description='Deliver JSON message from stdin by rules defined in YAML config.')
         parser.add_argument("--debug", dest="debug", help="enable debug", action="store_true")
+        parser.add_argument("--force-send", dest="force_send", help="force sending message", action="store_true")
         args = parser.parse_args()
+        
+        # Enable debug
         if args.debug:
             console_handler.setLevel(logging.DEBUG)
+        
+        # Set force_send
+        force_send = args.force_send
+    
     else:
+        
         # Always debug mode if no argparse
         console_handler.setLevel(logging.DEBUG)
+        
+        # No force_send without argparse available
+        force_send = False
 
     # Catch exception to logger
     try:
+        logger.info(LOGO)
+
         # Load YAML config
         config_dict = load_yaml_config(WORK_DIR, CONFIG_FILE)
         # If config is None just exit silently
@@ -205,9 +227,12 @@ if __name__ == "__main__":
 
         # Read json message from stdin
         message = load_json(sys.stdin)
+        
         # Check needed keys
         check_json_key("host", message)
         check_json_key("from", message)
+        check_json_key("type", message)
+        check_json_key("status", message)
 
         # Check if enabled in config
         if not config_dict['notify_devilry']['enabled']:
@@ -215,85 +240,127 @@ if __name__ == "__main__":
             sys.exit(1)
 
         logger.info("Starting notify_devilry")
+        logger.info("Message keys: '{0}', '{1}', '{2}', '{3}'".format(message['host'], message['from'], message['type'], message['status']))
 
         # Use some key combination to detect similiar messages and rate limit them
         key_combo = "{0}_{1}_{2}_{3}".format(message['host'].replace(" ", "_").replace(".", "_"), message['from'].replace(" ", "_"), message['type'].replace(" ", "_"), message['status'].replace(" ", "_"))
 
         # Open history message in file
         with open_history_message_file(HISTORY_DIR, "{0}_{1}.{2}".format(HISTORY_MESSAGE_IN_PREFIX, key_combo, HISTORY_MESSAGE_SUFFIX)) as history_in_file:
+            
             # Load last 2 messages in time, used to understrand that similiar messages stopped and we need to reset rate limit
             last_1_message_in_time = history_load_message_in(history_in_file, key="last_1")
             last_2_message_in_time = history_load_message_in(history_in_file, key="last_2")
             logger.info("Loaded last message times: {0}, {1}".format(last_2_message_in_time, last_1_message_in_time))
+            
             # Shift and save history for the next iteration
             history_save_message_in(history_in_file, last_2=last_1_message_in_time, last_1=ut_now())
 
         # Check times of similiar messages, allow drift in times up to 2 minutes
         if last_1_message_in_time is not None and last_2_message_in_time is not None:
+            
             if (int((ut_now() - last_1_message_in_time)/60) - int((last_1_message_in_time - last_2_message_in_time)/60)) <= 2:
+                
                 # Similiar messages detected
                 sim_messages_detected = True
                 logger.info("Similiar messages detected")
+            
             else:
+                
                 # Similiar messages not detected
                 sim_messages_detected = False
                 logger.info("Similiar messages not detected")
+        
         else:
+            
             # Similiar messages not detected
             sim_messages_detected = False
             logger.info("Similiar messages not detected")
+        
         # But do not allow more than 24h between last_1 and now
         if last_1_message_in_time is not None:
+            
             if int((ut_now() - last_1_message_in_time)/60) > 1440:
+                
                 # Similiar messages not detected
                 sim_messages_detected = False
                 logger.info("There is more than 24 hours between last message and now, forcing similiar messages not detected")
 
+        # But if force_send == True - send anyway
+        if force_send:
+                
+            sim_messages_detected = False
+            logger.info("--force-send forcing similiar messages not detected")
+
         # Iterate over notify dict and send message for each
         for notify_item_name, notify_item in config_dict['notify_devilry']['notify'].items():
+
+            logger.info("Notify item: '{0}'".format(notify_item_name))
+            
             # In case notify item has a match filter
             if 'match' in notify_item:
+                
                 logger.info("Match filter enabled")
                 should_continue = False
+                
                 # Check match filter and skip item if not matched
                 for match_item_key, match_item_val in notify_item['match'].items():
+                    
                     if message[match_item_key] != match_item_val:
+                        
                         should_continue = True
                         logger.info("Match filter matched all keys for notify item '{0}'".format(notify_item_name))
+                
                 if should_continue:
                     logger.info("Match filter didn't match all keys, skipping notify item '{0}'".format(notify_item_name))
                     continue
+            
             else:
                 logger.info("Match filter not enabled")
+
             # Iterate over available sending methods and check if every is enabled
             for sending_method in SENDING_METHODS:
+
                 # Check sending method is configured in config for notify item
                 if sending_method in notify_item:
-                    logger.info("Sending method '{0}' enabled for notify item {1}".format(sending_method, notify_item_name))
+
+                    logger.info("Sending method '{0}' enabled for notify item '{1}'".format(sending_method, notify_item_name))
                     # We can have many contact aliases listed in each sending method, iterate over them
                     for sending_method_item in notify_item[sending_method]:
+
                         logger.info("Contact alias '{0}' listed for current sending method".format(sending_method_item))
                         # Open history message in file
                         with open_history_message_file(HISTORY_DIR, "{0}_{1}_{2}_{3}_{4}.{5}".format(HISTORY_MESSAGE_OUT_PREFIX, key_combo, notify_item_name.replace(" ", "_"), sending_method.replace(" ", "_"), sending_method_item.replace(" ", "_"), HISTORY_MESSAGE_SUFFIX)) as history_out_file:
+
                             # If we are not under similiar messages condition we should clear out message out counter and time, because we have a new series of messages
                             if not sim_messages_detected:
+                                
                                 # Set out to initial values
                                 history_save_message_out(history_out_file, last=None, count=1)
                                 logger.info("Message out counter cleared out")
+
                             # Load history message out (disregard the rate_limit enabled or not, we may enable it in future)
                             last_message_out_time = history_load_message_out(history_out_file, key="last")
                             message_out_count = history_load_message_out(history_out_file, key="count")
                             logger.info("Last message time and message count for notify intem '{0}', sending method '{1}', contact alias '{2}': {3}, {4}".format(notify_item_name, sending_method, sending_method_item, last_message_out_time, message_out_count))
+
+                            # Check loaded values and set should_send value
                             if last_message_out_time is None or message_out_count == 0:
+                                
                                 logger.info("Last message time is None or messages count is 0, sending anyway")
                                 should_send = True
+                            
                             else:
+
                                 # Init value before checks
                                 should_send = False
+
                                 # Check if rate limit is set for this notify item (rate limits are set per notify item in yaml config, but saved/loaded/checked per sending method and contact alias)
                                 # And check if we are under similiar messages condition
                                 if "rate_limit" in notify_item and sim_messages_detected:
-                                    logger.info("Rate limit enabled for notify item '{0}' and similiar messages detected".format(notify_item_name))
+
+                                    logger.info("Rate limit configured for notify item '{0}' and similiar messages detected".format(notify_item_name))
+                                    
                                     # Decide which rate limit level to choose
                                     # If we have already sent more messages than items on rate limit, use the last one
                                     if message_out_count-2 >= len(notify_item['rate_limit']):
@@ -301,32 +368,47 @@ if __name__ == "__main__":
                                     # Else take the rate limit level according to the number of messages sent
                                     else:
                                         rate_limit_level = notify_item['rate_limit'][message_out_count-2]
+                                    
                                     # Decide if we have to send this message or pass to the next sending method
                                     # If time passed since last message in minutes more or equal our level
                                     time_from_last_message = (ut_now() - last_message_out_time)/60
                                     logger.info("Took rate limit: {0}, time from last message: {1}".format(rate_limit_level, time_from_last_message))
                                     if time_from_last_message >= rate_limit_level:
+                                        
                                         # Send the message with this sending method and alias
                                         should_send = True
                                         logger.info("Time from last message is bigger than rate limit, should send")
+                                
                                 # Else no rate limitng, always send
                                 else:
+                                    
                                     should_send = True
                                     logger.info("Rate limit not enabled for notify item '{0}' or similiar messages not detected".format(notify_item_name))
+                            
+                            # Check shoud_send and send
                             if should_send:
+                                
                                 # Get sending method settings per contact alias in yaml config
                                 sending_method_item_settings = config_dict['notify_devilry'][sending_method][sending_method_item]
-                                # Even if sending failed, catch and show exception and try send next items (contact aliases) and methods
+                                
+                                # Even if sending failed, catch and show exception and try sending next items (contact aliases) and methods
                                 try:
+                                    
                                     logger.info("Sending message for notify item '{0}' via '{1}' for contact alias '{2}'".format(notify_item_name, sending_method, sending_method_item))
                                     send_message(sending_method, sending_method_item_settings, message)
+                                    
                                     # Save successful message out per this notify item and sending method and contact alias in history
                                     history_save_message_out(history_out_file, last=ut_now(), count=message_out_count+1)
+                                
                                 except Exception as e:
                                     logger.warning("Caught exception on sending:")
                                     logger.exception(e)
+                            
+                            # Else just log
                             else:
                                 logger.info("Rate limit applied, message not sent for notify intem '{0}', sending method '{1}', contact alias '{2}'".format(notify_item_name, sending_method, sending_method_item))
+    
+    # Reroute catched exception to log
     except Exception as e:
         logger.exception(e)
 
