@@ -77,6 +77,17 @@ sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-disk-alert
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.conf
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/lr.awk
 
+# put_check_files
+cp ../put_check_files/put_check_files.sh \
+	sysadmws-utils/opt/sysadmws-utils/put_check_files
+cp ../put_check_files/put_check_files.cron \
+	sysadmws-utils/etc/cron.d/sysadmws-put-check-files
+cp ../put_check_files/put_check_files.conf.sample \
+	sysadmws-utils/opt/sysadmws-utils/put_check_files
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/put_check_files/put_check_files.sh
+sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-put-check-files
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/put_check_files/put_check_files.conf.sample
+
 # salt
 cp ../salt/grains.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
