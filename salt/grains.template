@@ -22,6 +22,8 @@ roles:
 # The sections with comments are the examples of other check types.
 data:
   UBUNTU:
+# DEBIAN:
+# CENTOS:
     backup_hosts:
       HOSTNAME:
         backup_path: /var/backups/HOSTNAME/.sync/rsnapshot
@@ -60,7 +62,7 @@ data:
           postgresql:
             backup_check_type: Postgresql
 #
-# Parts of UBUNTU or CENTOS macroses can be excluded
+# Parts of UBUNTU or DEBIAN or CENTOS macroses can be excluded
 #  UBUNTU:
 #    backup_hosts:
 #      HOSTNAME:
@@ -105,6 +107,6 @@ data:
 #    path: /var/www
 #  mysql_db:
 #    path: mysql
-# Data definition name could also be equal to the macros like UBUNTU, CENTOS, MYSQL_ALL, POSTGRESQL, ALL with special meaning and checks.
+# Data definition name could also be equal to the macros like UBUNTU, DEBIAN, CENTOS, MYSQL_ALL, POSTGRESQL, ALL with special meaning and checks.
 #
 # If rsnapshot_backups connects to IP or alternative hostname, it could be catched with backup_my_ext_fqdn and backup_my_ext_src

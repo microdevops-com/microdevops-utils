@@ -189,6 +189,8 @@ function print_timestamp() {
 		#
 		if (backup_src == "UBUNTU") {
 			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf";
+		} else if (backup_src == "DEBIAN") {
+			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf";
 		} else if (backup_src == "CENTOS") {
 			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_CENTOS.conf";
 		} else if (match(backup_src, /UBUNTU\^/)) {
@@ -199,6 +201,14 @@ function print_timestamp() {
 			}
 			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf" grep_part;
 			backup_src = "UBUNTU";
+		} else if (match(backup_src, /DEBIAN\^/)) {
+			split(substr(backup_src, 8), backup_excludes, ",");
+			grep_part = " | grep -v ";
+			for (backup_exclude in backup_excludes) {
+				grep_part = grep_part "-e \"^backup.*" backup_excludes[backup_exclude] "\" ";
+			}
+			template_file = "cat /opt/sysadmws-utils/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf" grep_part;
+			backup_src = "DEBIAN";
 		} else if (match(backup_src, /CENTOS\^/)) {
 			split(substr(backup_src, 8), backup_excludes, ",");
 			grep_part = " | grep -v ";

@@ -42,7 +42,8 @@ if [ -f $CONF_FILE ]; then
 				"/root"
 				"/var/log"
 				"/var/spool/cron"
-				"/usr/local")
+				"/usr/local"
+				"/opt/sysadmws-utils")
 			else
 				LOCAL_SUBPATHS=("$LOCAL_PATH")
 			fi

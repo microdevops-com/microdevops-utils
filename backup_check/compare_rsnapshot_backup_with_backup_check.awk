@@ -95,7 +95,16 @@ BEGIN {
 	ubuntu_backup_src_arr[5] = "/var/spool/cron";
 	ubuntu_backup_src_arr[6] = "/usr/local";
 	ubuntu_backup_src_arr[7] = "/lib/ufw";
-	ubuntu_backup_src_arr[7] = "/opt/sysadmws-utils";
+	ubuntu_backup_src_arr[8] = "/opt/sysadmws-utils";
+	#
+	debian_backup_src_arr[1] = "/etc";
+	debian_backup_src_arr[2] = "/home";
+	debian_backup_src_arr[3] = "/root";
+	debian_backup_src_arr[4] = "/var/log";
+	debian_backup_src_arr[5] = "/var/spool/cron";
+	debian_backup_src_arr[6] = "/usr/local";
+	debian_backup_src_arr[7] = "/lib/ufw";
+	debian_backup_src_arr[8] = "/opt/sysadmws-utils";
 	#
 	centos_backup_src_arr[1] = "/etc";
 	centos_backup_src_arr[2] = "/home";
@@ -103,6 +112,7 @@ BEGIN {
 	centos_backup_src_arr[4] = "/var/log";
 	centos_backup_src_arr[5] = "/var/spool/cron";
 	centos_backup_src_arr[6] = "/usr/local";
+	debian_backup_src_arr[7] = "/opt/sysadmws-utils";
 }
 
 # Func to print timestamp at the beginning of line
@@ -176,6 +186,10 @@ function print_timestamp() {
 		for (ii in ubuntu_backup_src_arr) {
 			backup_src_arr[ii] = ubuntu_backup_src_arr[ii];
 		}
+	} else if (backup_src == "DEBIAN") {
+		for (ii in debian_backup_src_arr) {
+			backup_src_arr[ii] = debian_backup_src_arr[ii];
+		}
 	} else if (backup_src == "CENTOS") {
 		for (ii in centos_backup_src_arr) {
 			backup_src_arr[ii] = centos_backup_src_arr[ii];
@@ -191,6 +205,19 @@ function print_timestamp() {
 			}
 			if (exclude_found != 1) {
 				backup_src_arr[ii] = ubuntu_backup_src_arr[ii];
+			}
+		}
+	} else if (match(backup_src, /DEBIAN\^/)) {
+		split(substr(backup_src, 8), backup_excludes, ",");
+		for (ii in debian_backup_src_arr) {
+			exclude_found = 0;
+			for (backup_exclude in backup_excludes) {
+				if (match(debian_backup_src_arr[ii], backup_excludes[backup_exclude])) {
+					exclude_found = 1;
+				}
+			}
+			if (exclude_found != 1) {
+				backup_src_arr[ii] = debian_backup_src_arr[ii];
 			}
 		}
 	} else if (match(backup_src, /CENTOS\^/)) {

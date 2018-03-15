@@ -13,10 +13,13 @@
 # ---	 = take data from previous line										
 # ALL	 = all databases
 # UBUNTU = /etc /home /root /var/log /var/spool/cron /usr/local /lib/ufw /opt/sysadmws-utils
-# CENTOS = /etc /home /root /var/log /var/spool/cron /usr/local
+# DEBIAN = /etc /home /root /var/log /var/spool/cron /usr/local /lib/ufw /opt/sysadmws-utils
+# CENTOS = /etc /home /root /var/log /var/spool/cron /usr/local /opt/sysadmws-utils
 # ARGS example to exclude some files: --exclude-from='exclude_file.txt'
 # Both FS_RSYNC_SSH and FS_RSYNC_NATIVE can use SRC_HOST with :CONNECT_PORT option
 #srv1.domain.com	FS_RSYNC_SSH	UBUNTU			/var/backups/domain/srv1.domain.com
+#srv1.domain.com	FS_RSYNC_SSH	DEBIAN			/var/backups/domain/srv1.domain.com
+#srv1.domain.com	FS_RSYNC_SSH	CENTOS			/var/backups/domain/srv1.domain.com
 #---			---		/var/www		---
 #---			POSTGRESQL	ALL			---
 #---			MYSQL		ALL			---

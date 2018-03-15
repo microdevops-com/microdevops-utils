@@ -1,5 +1,7 @@
 #
 HOSTNAME		FS_RSYNC_SSH		UBUNTU			/var/backups/HOSTNAME
+HOSTNAME		FS_RSYNC_SSH		DEBIAN			/var/backups/HOSTNAME
+HOSTNAME		FS_RSYNC_SSH		CENTOS			/var/backups/HOSTNAME
 ---			---			/var/www		---
 ---			MYSQL			ALL			---
 ---			POSTGRESQL		ALL			---
