@@ -3,6 +3,10 @@
 # 
 # Script to create MySQL db + user
 #
+# @author   Raj KB <magepsycho@gmail.com>
+# @website  http://www.magepsycho.com
+# @version  0.1.0
+#
 # Usage chmod +x ./mysql-create-db-user.sh
 # ./mysql-create-db-user.sh [--host=localhost] --database=test-db [--user=test-user]
 
@@ -193,8 +197,8 @@ function processArgs()
 
 function createMysqlDbUser()
 {
-    SQL1="CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;;"
-    SQL2="GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    SQL1="CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    SQL2="GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';"
     SQL3="FLUSH PRIVILEGES;"
 
     if [ -f /root/.my.cnf ]; then

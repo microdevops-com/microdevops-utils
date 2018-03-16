@@ -20,8 +20,16 @@ fi
 ###     Get full processlist snapshot to the variable
 MPL_SNAP=$("$MY_CLIENT" "$MY_CRED" -e "$MY_QUERY")
 
+MY_CHECK_VANILA=$(echo "MPL_SNAP" | grep -c "Rows_examined:")
+
+if [ "MY_CHECK_VANILA" != "0"] ; then
+	MPL_SED_PARSE="Rows_examined:"
+else
+	MPL_SED_PARSE="Info:"
+fi
+
 ###     Parse full processlist to some needed blocks or counters
-MPL_REALQ=$(echo "$MPL_SNAP" | sed -e '/Rows_examined:*/G' | sed -e '/./{H;$!d;}' -e 'x;/Sleep/d' | sed -e '/./{H;$!d;}' -e 'x;/Binlog/d' | sed -e '/./{H;$!d;}' -e 'x;/Info\:\ show\ full\ processlist/d')
+MPL_REALQ=$(echo "$MPL_SNAP" | sed -e "/$MPL_SED_PARSE*/G" | sed -e '/./{H;$!d;}' -e 'x;/Sleep/d' | sed -e '/./{H;$!d;}' -e 'x;/Binlog/d' | sed -e '/./{H;$!d;}' -e 'x;/Info\:\ show\ full\ processlist/d')
 
 ###     Calculate some counters for summary
 MPL_REALQ_COUNT=$(echo "$MPL_REALQ" | grep -c "Command:")
