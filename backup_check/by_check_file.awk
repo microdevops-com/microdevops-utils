@@ -53,7 +53,16 @@ function print_timestamp() {
 		host_path_arr[5] = "/var/spool/cron";
 		host_path_arr[6] = "/usr/local";
 		host_path_arr[7] = "/lib/ufw";
-		host_path_arr[7] = "/opt/sysadmws-utils";
+		host_path_arr[8] = "/opt/sysadmws-utils";
+	} else if (host_path == "DEBIAN") {
+		host_path_arr[1] = "/etc";
+		host_path_arr[2] = "/home";
+		host_path_arr[3] = "/root";
+		host_path_arr[4] = "/var/log";
+		host_path_arr[5] = "/var/spool/cron";
+		host_path_arr[6] = "/usr/local";
+		host_path_arr[7] = "/lib/ufw";
+		host_path_arr[8] = "/opt/sysadmws-utils";
 	} else if (host_path == "CENTOS") {
 		host_path_arr[1] = "/etc";
 		host_path_arr[2] = "/home";
@@ -61,6 +70,7 @@ function print_timestamp() {
 		host_path_arr[4] = "/var/log";
 		host_path_arr[5] = "/var/spool/cron";
 		host_path_arr[6] = "/usr/local";
+		host_path_arr[7] = "/opt/sysadmws-utils";
 	} else {
 		host_path_arr[1] = host_path;
 	}

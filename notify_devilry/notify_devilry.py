@@ -43,6 +43,7 @@ HISTORY_MESSAGE_OUT_PREFIX = "out"
 HISTORY_MESSAGE_SUFFIX = "json"
 SENDING_METHODS = ['telegram']
 LOGO="✉ ➔ ✂ ➔ ❓ ➔ ✌"
+UT_NOW = int(time.time())
 
 # Custom Exceptions
 class LoadJsonError(Exception):
@@ -89,10 +90,6 @@ def load_yaml_config(d, f):
         current_time = int(current_time)
     ))
     return config_dict
-
-# Alias for now unix timestamp
-def ut_now():
-    return int(time.time())
 
 # Send methods
 # Telegram
@@ -252,24 +249,46 @@ if __name__ == "__main__":
             last_1_message_in_time = history_load_message_in(history_in_file, key="last_1")
             last_2_message_in_time = history_load_message_in(history_in_file, key="last_2")
             logger.info("Loaded last message times: {0}, {1}".format(last_2_message_in_time, last_1_message_in_time))
+            logger.info("Current message time: {0}".format(UT_NOW))
             
             # Shift and save history for the next iteration
-            history_save_message_in(history_in_file, last_2=last_1_message_in_time, last_1=ut_now())
+            history_save_message_in(history_in_file, last_2=last_1_message_in_time, last_1=UT_NOW)
 
         # Check times of similiar messages, allow drift in times up to 2 minutes
         if last_1_message_in_time is not None and last_2_message_in_time is not None:
             
-            if (int((ut_now() - last_1_message_in_time)/60) - int((last_1_message_in_time - last_2_message_in_time)/60)) <= 2:
-                
-                # Similiar messages detected
+            # Minutes between current and last  = A
+            # Minutes between last and before-last = B
+            # Minutes between current and before-last  = C
+            # Diff between A and B = X
+            int_A = int((UT_NOW - last_1_message_in_time)/60)
+            int_B = int((last_1_message_in_time - last_2_message_in_time)/60)
+            int_C = int((UT_NOW - last_2_message_in_time)/60)
+            int_X = int_A - int_B
+
+            if int_C <= 7:
+
+                # Sim messages are not supposed to be sent more often than each 5 min
+                # So if we have 5 minutes plus 2 minutes on deviation = 7 minutes between current and before last message it could be sender bug and duplicatate
+                # So detect sim messages
                 sim_messages_detected = True
-                logger.info("Similiar messages detected")
-            
+                logger.info("Similiar messages detected because diff between current and before last message is less than 7 minutes")
+
             else:
+
+                if int_X <= 2:
+                    
+                    # X <= 2 means that A is not 2 minutes bigger than B, so similiar messages come regularly (with up to 2 minutes deviation)
+                    # Similiar messages detected
+                    sim_messages_detected = True
+                    logger.info("Similiar messages detected")
                 
-                # Similiar messages not detected
-                sim_messages_detected = False
-                logger.info("Similiar messages not detected")
+                else:
+                    
+                    # X > 2 means that messages are likely similiar, but came not regularly, so we think it is a new message and force sim messages not detected
+                    # Similiar messages not detected
+                    sim_messages_detected = False
+                    logger.info("Similiar messages not detected")
         
         else:
             
@@ -280,7 +299,7 @@ if __name__ == "__main__":
         # But do not allow more than 24h between last_1 and now
         if last_1_message_in_time is not None:
             
-            if int((ut_now() - last_1_message_in_time)/60) > 1440:
+            if int((UT_NOW - last_1_message_in_time)/60) > 1440:
                 
                 # Similiar messages not detected
                 sim_messages_detected = False
@@ -371,7 +390,7 @@ if __name__ == "__main__":
                                     
                                     # Decide if we have to send this message or pass to the next sending method
                                     # If time passed since last message in minutes more or equal our level
-                                    time_from_last_message = (ut_now() - last_message_out_time)/60
+                                    time_from_last_message = (UT_NOW - last_message_out_time)/60
                                     logger.info("Took rate limit: {0}, time from last message: {1}".format(rate_limit_level, time_from_last_message))
                                     if time_from_last_message >= rate_limit_level:
                                         
@@ -398,7 +417,7 @@ if __name__ == "__main__":
                                     send_message(sending_method, sending_method_item_settings, message)
                                     
                                     # Save successful message out per this notify item and sending method and contact alias in history
-                                    history_save_message_out(history_out_file, last=ut_now(), count=message_out_count+1)
+                                    history_save_message_out(history_out_file, last=UT_NOW, count=message_out_count+1)
                                 
                                 except Exception as e:
                                     logger.warning("Caught exception on sending:")

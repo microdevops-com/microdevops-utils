@@ -77,10 +77,25 @@ sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-disk-alert
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/disk_alert.conf
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/disk_alert/lr.awk
 
+# put_check_files
+cp ../put_check_files/put_check_files.sh \
+	sysadmws-utils/opt/sysadmws-utils/put_check_files
+cp ../put_check_files/put_check_files.cron \
+	sysadmws-utils/etc/cron.d/sysadmws-put-check-files
+cp ../put_check_files/put_check_files.conf.sample \
+	sysadmws-utils/opt/sysadmws-utils/put_check_files
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/put_check_files/put_check_files.sh
+sudo chmod 600 sysadmws-utils/etc/cron.d/sysadmws-put-check-files
+sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/put_check_files/put_check_files.conf.sample
+
 # salt
 cp ../salt/grains.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
 cp ../salt/grains.ubuntu.template \
+	sysadmws-utils/opt/sysadmws-utils/salt
+cp ../salt/grains.debian.template \
+	sysadmws-utils/opt/sysadmws-utils/salt
+cp ../salt/grains.centos.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
 cp ../salt/grains.postgresql.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
@@ -90,6 +105,8 @@ cp ../salt/grains.path.template \
 	sysadmws-utils/opt/sysadmws-utils/salt
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.template
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.ubuntu.template
+sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.debian.template
+sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.centos.template
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.postgresql.template
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.mysql.template
 sudo chmod 644 sysadmws-utils/opt/sysadmws-utils/salt/grains.path.template
@@ -116,6 +133,7 @@ cp ../rsnapshot_backup/rsnapshot_backup.awk \
 	../rsnapshot_backup/rsnapshot_backup.sh \
 	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf \
+	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_CENTOS.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_ROTATE.conf \
 	../rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf \
@@ -123,6 +141,8 @@ cp ../rsnapshot_backup/rsnapshot_backup.awk \
 	../rsnapshot_backup/rsnapshot_backup_daily.cron \
 	../rsnapshot_backup/rsnapshot_backup_hourly.cron \
 	../rsnapshot_backup/rsnapshot_backup.conf_ubuntu.sh \
+	../rsnapshot_backup/rsnapshot_backup.conf_debian.sh \
+	../rsnapshot_backup/rsnapshot_backup.conf_centos.sh \
 	../rsnapshot_backup/rsnapshot_backup.conf_postgresql.sh \
 	../rsnapshot_backup/rsnapshot_backup.conf_mysql.sh \
 	../rsnapshot_backup/rsnapshot_backup.conf_path.sh \
@@ -131,6 +151,8 @@ cp ../rsnapshot_backup/rsnapshot_backup.awk \
 sudo chmod 600 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/*
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.sh
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_ubuntu.sh
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_debian.sh
+sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_centos.sh
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_postgresql.sh
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_mysql.sh
 sudo chmod 700 sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_path.sh
