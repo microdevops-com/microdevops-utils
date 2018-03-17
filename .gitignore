@@ -11,3 +11,5 @@ Session.vim
 # packages
 deb/sysadmws-utils
 deb/sysadmws-utils.deb
+# PyCharm
+.idea/
