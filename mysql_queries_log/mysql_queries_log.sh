@@ -22,7 +22,7 @@ MPL_SNAP=$("$MY_CLIENT" "$MY_CRED" -e "$MY_QUERY")
 
 MY_CHECK_VANILA=$(echo "MPL_SNAP" | grep -c "Rows_examined:")
 
-if [ "MY_CHECK_VANILA" != "0"] ; then
+if [ "MY_CHECK_VANILA" != "0" ] ; then
 	MPL_SED_PARSE="Rows_examined:"
 else
 	MPL_SED_PARSE="Info:"
