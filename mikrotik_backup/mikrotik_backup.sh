@@ -31,8 +31,8 @@ fi
 
 # Some vars
 BACKUPDIR="/var/backups/mikrotik_backup"
-# Auto accept ssh fingerprints
-SSHBATCH="-o BatchMode=yes -o StrictHostKeyChecking=no"
+# Auto accept ssh fingerprints and mikrotik compatible security requirements
+SSHOPTS="-o BatchMode=yes -o StrictHostKeyChecking=no -o KexAlgorithms=diffie-hellman-group14-sha1 -o HostKeyAlgorithms=+ssh-dss"
 # Time to kill hanging scp or ssh
 TIME_TIMEOUT="300"
 # Path to key
@@ -85,18 +85,18 @@ for LOGIN in "${LOGINS[@]}"; do
 		then
 			date '+%F %T ' | tr -d '\n'
 			echo >&2 "NOTICE: Starting backup: Name: $BNAME, User: $BUSER, Host: $BHOST, Port: $BPORT"
-			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh -v	$SSHBATCH -p $BPORT -i $ID $BUSER@$BHOST  "/export compact file=${BNAME}" && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp -v		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; }
-			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh -v		  -p $BPORT -i $ID $BUSER@$BHOST  "/system backup save name=${BNAME}" && sleep 2 && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp -v		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; }
+			{	/usr/bin/timeout $TIME_TIMEOUT /usr/bin/ssh -v $SSHOPTS -p $BPORT -i $ID $BUSER@$BHOST  "/export compact file=${BNAME}" && \
+				/usr/bin/timeout $TIME_TIMEOUT /usr/bin/scp -v $SSHOPTS -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; }
+			{	/usr/bin/timeout $TIME_TIMEOUT /usr/bin/ssh -v $SSHOPTS -p $BPORT -i $ID $BUSER@$BHOST  "/system backup save name=${BNAME}" && sleep 2 && \
+				/usr/bin/timeout $TIME_TIMEOUT /usr/bin/scp -v $SSHOPTS -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; }
 		# Else redirect to file and more verbosity
 		else
 			date '+%F %T ' | tr -d '\n' >>$OUTLOG
 			echo >&2 "NOTICE: Starting backup: Name: $BNAME, User: $BUSER, Host: $BHOST, Port: $BPORT" >>$OUTLOG
-			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh	$SSHBATCH -p $BPORT -i $ID $BUSER@$BHOST  "/export compact file=${BNAME}" && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; } >>$OUTLOG 2>&1
-			{ /usr/bin/timeout $TIME_TIMEOUT	/usr/bin/ssh		  -p $BPORT -i $ID $BUSER@$BHOST  "/system backup save name=${BNAME}" && sleep 2 && \
-			/usr/bin/timeout $TIME_TIMEOUT	/usr/bin/scp		  -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; } >>$OUTLOG 2>&1
+			{	/usr/bin/timeout $TIME_TIMEOUT /usr/bin/ssh $SSHOPTS -p $BPORT -i $ID $BUSER@$BHOST  "/export compact file=${BNAME}" && \
+				/usr/bin/timeout $TIME_TIMEOUT /usr/bin/scp $SSHOPTS -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.rsc $BACKUPDIR ; } >>$OUTLOG 2>&1
+			{	/usr/bin/timeout $TIME_TIMEOUT /usr/bin/ssh $SSHOPTS -p $BPORT -i $ID $BUSER@$BHOST  "/system backup save name=${BNAME}" && sleep 2 && \
+				/usr/bin/timeout $TIME_TIMEOUT /usr/bin/scp $SSHOPTS -P $BPORT -i $ID $BUSER@$BHOST:/${BNAME}.backup $BACKUPDIR ; } >>$OUTLOG 2>&1
 		fi
 	fi
 done
