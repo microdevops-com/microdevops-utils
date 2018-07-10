@@ -71,7 +71,7 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	if [[ $USAGE_CHECK == "PERCENT" ]]; then
 		# Critical percent message
 		if [[ $USEP -ge $CRITICAL ]]; then
-			echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk used space percent", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+			echo '{"host": "'$HOSTNAME'", "from": "disk_alert.sh", "type": "disk used space percent", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
 		fi
 	elif [[ $USAGE_CHECK == "FREE_SPACE" ]]; then
 		# Critical free space message

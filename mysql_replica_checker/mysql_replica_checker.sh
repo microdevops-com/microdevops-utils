@@ -23,7 +23,7 @@ function report {
 	local rsp
 	rsp+='{'
 	rsp+="\"host\":\"$(hostname -f)\"," 
-	rsp+="\"from\":\"mysql replica checker\"," 
+	rsp+="\"from\":\"mysql_replica_checker.sh\"," 
 	rsp+="\"type\":\"mysql replica status\","
 	rsp+="\"status\":\"WARNING\"," 
 	rsp+="\"date time\":\"$(date +'%F %T')\","

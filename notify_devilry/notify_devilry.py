@@ -8,6 +8,7 @@ import time
 import datetime
 import yaml
 import urllib
+import socket
 try:
     from urllib.parse import urlencode
     from urllib.request import urlopen, Request
@@ -223,7 +224,10 @@ if __name__ == "__main__":
             sys.exit(1)
 
         # Read json message from stdin
-        message = load_json(sys.stdin)
+        try:
+            message = load_json(sys.stdin)
+        except:
+            message = {"host": socket.gethostname(), "from": "notify_devilry.py", "type": "message sending status", "status": "ERROR", "message": "some of your scripts tried to send the message, but load_json failed"}
         
         # Check needed keys
         check_json_key("host", message)
