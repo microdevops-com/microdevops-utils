@@ -132,7 +132,7 @@ if [[ "${last_io_err}" ]]; then
 	err_msg+="\"last io error\":\"${last_io_err}\","
 fi
 if [[ "${last_sql_err}" ]]; then
-	err_msg+="\"last sql error: ${last_sql_err}\","
+	err_msg+="\"last sql error\":\"${last_sql_err}\","
 fi
 
 # Send notify only if err_msg
