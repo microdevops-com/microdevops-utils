@@ -7,6 +7,22 @@ fi
 # Increase a version of the package
 perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+)\.(\d+)$/' sysadmws-utils/DEBIAN/control
 
+# Create dirs
+mkdir -p sysadmws-utils/etc/cron.d
+mkdir -p sysadmws-utils/etc/logrotate.d
+mkdir -p sysadmws-utils/opt/sysadmws-utils/bulk_log
+mkdir -p sysadmws-utils/opt/sysadmws-utils/mysql_queries_log
+mkdir -p sysadmws-utils/opt/sysadmws-utils/mysql_replica_checker
+mkdir -p sysadmws-utils/opt/sysadmws-utils/notify_devilry
+mkdir -p sysadmws-utils/opt/sysadmws-utils/disk_alert
+mkdir -p sysadmws-utils/opt/sysadmws-utils/put_check_files
+mkdir -p sysadmws-utils/opt/sysadmws-utils/salt
+mkdir -p sysadmws-utils/opt/sysadmws-utils/logrotate_db_backup
+mkdir -p sysadmws-utils/opt/sysadmws-utils/mikrotik_backup
+mkdir -p sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup
+mkdir -p sysadmws-utils/opt/sysadmws-utils/backup_check
+mkdir -p sysadmws-utils/opt/sysadmws-utils/misc
+
 # Remove all files in sub modules
 find sysadmws-utils/opt -type f -delete
 find sysadmws-utils/etc -type f -delete

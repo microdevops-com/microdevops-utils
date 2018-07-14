@@ -9,7 +9,8 @@ Session.vim
 .netrwhist
 *~
 # packages
-deb/sysadmws-utils
+deb/sysadmws-utils/etc
+deb/sysadmws-utils/opt
 deb/sysadmws-utils.deb
 # PyCharm
 .idea/
