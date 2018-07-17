@@ -23,7 +23,7 @@ function report {
 	local rsp
 	rsp+='{'
 	rsp+="\"host\":\"$(hostname -f)\"," 
-	rsp+="\"from\":\"mysql replica checker\"," 
+	rsp+="\"from\":\"mysql_replica_checker.sh\"," 
 	rsp+="\"type\":\"mysql replica status\","
 	rsp+="\"status\":\"WARNING\"," 
 	rsp+="\"date time\":\"$(date +'%F %T')\","
@@ -132,7 +132,7 @@ if [[ "${last_io_err}" ]]; then
 	err_msg+="\"last io error\":\"${last_io_err}\","
 fi
 if [[ "${last_sql_err}" ]]; then
-	err_msg+="\"last sql error: ${last_sql_err}\","
+	err_msg+="\"last sql error\":\"${last_sql_err}\","
 fi
 
 # Send notify only if err_msg

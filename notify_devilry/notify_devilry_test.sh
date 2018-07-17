@@ -7,4 +7,4 @@ HOSTNAME=$(hostname -f)
 DATE=$(date '+%F %T')
 
 # Send test
-echo '{"host": "'$HOSTNAME'", "from": "notify_devilry_test", "type": "notify devilry test", "status": "OK", "date time": "'$DATE'"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py --debug --force-send
+echo '{"host": "'$HOSTNAME'", "from": "notify_devilry_test.sh", "type": "notify devilry test", "status": "OK", "date time": "'$DATE'"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py --debug --force-send
