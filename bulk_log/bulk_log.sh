@@ -21,8 +21,6 @@ netstat -an 2>&1
 echo "###"
 ping -c 4 ${GW_IP_ADDRESS} 2>&1
 echo "###"
-iptables -L -n -v 2>&1
-echo "###"
 arp -an 2>&1
 echo "###"
 ifconfig 2>&1
