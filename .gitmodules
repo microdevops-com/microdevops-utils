@@ -1,4 +1,0 @@
-[submodule "shyaml"]
-	path = shyaml
-	url = https://github.com/sysadmws/shyaml.git
-	branch = master

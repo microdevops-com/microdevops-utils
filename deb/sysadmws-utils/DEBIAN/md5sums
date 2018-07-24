@@ -54,7 +54,7 @@ e940d74432e3d90c0675dc5d85e61ffe  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_
 e28fd80c42b3a66daf3a6684b6db3dae  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_path.sh
 8a2477fafa905f5695c47858ee5897f5  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup_hourly.cron
 67a390f77e01414ac62fbcba65328024  opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf_postgresql.sh
-283ed44135f14016be12255ea976c678  opt/sysadmws-utils/bulk_log/bulk_log.sh
+68024c736dfa80e4a1667ad5b6e8c82f  opt/sysadmws-utils/bulk_log/bulk_log.sh
 5e3568ac486dea3ee8422a5681aef602  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf.sample
 602040a7a7853b763fbf513f6a8f29fe  opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.sh
 2de3faa701c1d35fa99a1d491e606177  opt/sysadmws-utils/README.md
