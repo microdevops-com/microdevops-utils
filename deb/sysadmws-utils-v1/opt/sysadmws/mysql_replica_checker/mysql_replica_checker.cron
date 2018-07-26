@@ -1,0 +1,2 @@
+# Check MYSQL replication
+*/30 * * * *	root	/opt/sysadmws-utils/mysql_replica_checker/mysql_replica_checker.sh
