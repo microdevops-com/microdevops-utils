@@ -4,6 +4,6 @@ Section: misc
 Installed-Size: 100
 Maintainer: Sysadmin Workshop Admin <admin@sysadm.ws>
 Architecture: all
-Version: 1.6
+Version: 1.9
 Depends: gawk, python, python-yaml, python-jinja2, rsnapshot
 Description: Sysadmin Workshop Utilities - a set of useful utils for system administration.
