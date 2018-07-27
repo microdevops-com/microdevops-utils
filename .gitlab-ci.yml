@@ -1,5 +1,9 @@
 # we excplicitly use tag with runner hostname to ensure stages on the same runner
 # this brakes parallelism but makes things much clearer and simplier
+#
+# this should be done before run ci on runner:
+# mkdir -p /var/lib/sysadmws/builds
+# chown -R gitlab-runner:gitlab-runner /var/lib/sysadmws/builds
 
 stages:
 - make_deb
