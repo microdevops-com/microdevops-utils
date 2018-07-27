@@ -8,5 +8,12 @@ make_deb:
   tags:
     - dev1.sysadm.ws
   stage: make_deb
+  artifacts:
+    name: v1
+    paths:
+      - builds/v1
+  only:
+    refs:
+      - master
   script:
-    - mkdir -p builds/$CI_COMMIT_REF_NAME
+    - mkdir -p builds/v1
