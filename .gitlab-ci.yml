@@ -1,0 +1,12 @@
+# we excplicitly use tag with runner hostname to ensure stages on the same runner
+# this brakes parallelism but makes things much clearer and simplier
+
+stages:
+- make_deb
+
+make_deb:
+  tags:
+    - dev1.sysadm.ws
+  stage: make_deb
+  script:
+    - mkdir -p /var/lib/sysadmws/builds/sysadmws-utils

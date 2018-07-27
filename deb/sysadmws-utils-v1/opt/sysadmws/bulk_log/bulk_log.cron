@@ -1,2 +1,0 @@
-# Bulk Log Collection
-*/2 * * * *	root	/opt/sysadmws-utils/bulk_log/bulk_log.sh >> /opt/sysadmws-utils/bulk_log/bulk_log.log
