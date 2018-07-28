@@ -34,6 +34,6 @@ make_deb_v1:
              builds/v1/sysadmws-utils-v1/opt/sysadmws/backup_check \
              builds/v1/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
-    cp ../LICENSE \
-    	 ../README.md \
+    cp LICENSE \
+    	 README.md \
     builds/v1/sysadmws-utils-v1/opt/sysadmws
