@@ -17,6 +17,6 @@ make_deb_v1:
       - master
   script: |
     mkdir -p builds/v1/DEBIAN
-    NEW_VERSION=$(curl -s https://repo.sysadm.ws/sysadmws-apt/dists/any/main/binary-amd64/Packages | grep -Pzo 'Package: sysadmws-utils-v1\n.*\n.*\n.*\n.*\n' | grep --text 'Version' | sed -e 's/Version: 1\.//')
-    export NEW_VERSION=$((NEW_VERSION+1))
-    cat deb/control | sed -e "s#__NEW_VERSION__#$NEW_VERSION#" > builds/v1/DEBIAN/control
+    CUR_VERSION=$(curl -s https://repo.sysadm.ws/sysadmws-apt/dists/any/main/binary-amd64/Packages | grep -Pzo 'Package: sysadmws-utils-v1\n.*\n.*\n.*\n.*\n' | grep --text 'Version' | sed -e 's/Version: 1\.//')
+    export NEW_VERSION=$((CUR_VERSION+1))
+    cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" > builds/v1/DEBIAN/control
