@@ -35,7 +35,8 @@ make_deb_v0:
              builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/mikrotik_backup \
              builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/rsnapshot_backup \
              builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/backup_check \
-             builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/misc
+             builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/misc \
+             builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/salt
     # LICENSE utils_readme.md
     cp LICENSE \
        README.md \
@@ -132,6 +133,9 @@ make_deb_v0:
        misc/mysql_table_extractor.sh \
        misc/mysql_create_new_database.sh \
        builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/misc
+    # salt
+    cp salt/*.template \
+       builds/v0/deb/sysadmws-utils/opt/sysadmws-utils/salt
     # Make control dir
     mkdir -p builds/v0/deb/sysadmws-utils/DEBIAN
     # Make md5sums
