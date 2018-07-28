@@ -4,17 +4,18 @@
 stages:
 - make_deb
 - make_tgz
+- add_repo_deb
 
 cache:
   paths:
     - builds
 
-make_v1_deb:
+make_deb_v1:
   tags:
     - dev1.sysadm.ws
   stage: make_deb
   artifacts:
-    name: v1
+    name: deb_v1
     paths:
       - builds/v1/deb/sysadmws-utils-v1.deb
   only:
@@ -33,9 +34,9 @@ make_v1_deb:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/backup_check \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
-    # LICENSE README.md
+    # LICENSE utils_readme.md
     cp LICENSE \
-       README.md \
+       utils_readme.md \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws
     # bulk_log
     cp bulk_log/bulk_log.sh \
@@ -127,12 +128,12 @@ make_v1_deb:
     # Make deb
     ( cd builds/v1/deb && fakeroot dpkg-deb -b sysadmws-utils-v1 )
 
-make_v1_tgz:
+make_tgz_v1:
   tags:
     - dev1.sysadm.ws
   stage: make_tgz
   artifacts:
-    name: v1
+    name: tgz_v1
     paths:
       - builds/v1/tgz/sysadmws-utils-v1.tar.gz
   only:
@@ -143,7 +144,22 @@ make_v1_tgz:
     cd builds/v1/tgz
     rm -rf sysadmws-utils-v1
     cp -R ../deb/sysadmws-utils-v1 .
-    cat sysadmws-utils-v1/DEBIAN/control | grep Version > sysadmws-utils-v1/opt/sysadmws/VERSION
+    cat sysadmws-utils-v1/DEBIAN/control | grep Version > sysadmws-utils-v1/opt/sysadmws/utils_version
     rm -rf sysadmws-utils-v1/DEBIAN
     fakeroot tar zcf sysadmws-utils-v1.tar.gz -C sysadmws-utils-v1 .
     rm -rf sysadmws-utils-v1
+
+add_repo_deb_v1:
+  tags:
+    - dev1.sysadm.ws
+  stage: add_repo_deb
+  only:
+    refs:
+      - master
+  script: |
+    export GNUPGHOME=/opt/sysadmws/gnupg/.gnupg
+    killall gpg-agent; gpg-agent --daemon --allow-preset-passphrase
+    sleep 3
+    /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS E5337B7B1B6C8A420A48AB069BA912449F148CFB
+    /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS 846876C563DD34B899FCD3C61F7C554D9AEDE1C2
+    reprepro -v --basedir /opt/sysadmws/apt --gnupghome /opt/sysadmws/gnupg/.gnupg includedeb any builds/v1/deb/sysadmws-utils-v1.deb
