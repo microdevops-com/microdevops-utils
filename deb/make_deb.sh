@@ -1,8 +1,4 @@
 #!/bin/sh
-if [ `dirname $0` != "." ]; then
-	echo "You should run this script from `dirname $0`"
-	exit;
-fi
 
 # Increase a version of the package
 perl -pi -e '($_=$1.q^.^.(int($2)+1).qq#\n#)if/^(Version:\s+\d+)\.(\d+)$/' sysadmws-utils-v1/DEBIAN/control
