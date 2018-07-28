@@ -2,77 +2,82 @@
 # This brakes parallelism but makes things much clearer and simplier.
 
 stages:
-- make_deb_v1
+- make_deb
+- make_tgz
 
-make_deb_v1:
+cache:
+  paths:
+    - builds
+
+make_v1_deb:
   tags:
     - dev1.sysadm.ws
-  stage: make_deb_v1
+  stage: make_deb
   artifacts:
     name: v1
     paths:
-      - builds/v1/sysadmws-utils-v1.deb
+      - builds/v1/deb/sysadmws-utils-v1.deb
   only:
     refs:
       - master
   script: |
     # Create dir for every util
-    mkdir -p builds/v1/sysadmws-utils-v1/opt/sysadmws/bulk_log \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/notify_devilry \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/disk_alert \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/put_check_files \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/backup_check \
-             builds/v1/sysadmws-utils-v1/opt/sysadmws/misc
+    mkdir -p builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/bulk_log \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/notify_devilry \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/disk_alert \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/backup_check \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
     cp LICENSE \
        README.md \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws
     # bulk_log
     cp bulk_log/bulk_log.sh \
        bulk_log/bulk_log.cron \
        bulk_log/bulk_log.logrotate \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/bulk_log
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/bulk_log
     # mysql_queries_log
     cp mysql_queries_log/mysql_queries_log.sh \
        mysql_queries_log/mysql_queries_log.cron \
        mysql_queries_log/mysql_queries_log.logrotate \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log
     # mysql_replica_checker
     cp mysql_replica_checker/mysql_replica_checker.sh \
        mysql_replica_checker/mysql_replica_checker.cron \
        mysql_replica_checker/mysql_replica_checker.conf.sample \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker
     # notify_devilry
     cp notify_devilry/notify_devilry.py \
        notify_devilry/notify_devilry_test.sh \
        notify_devilry/notify_devilry.yaml.jinja.example \
        notify_devilry/notify_devilry.yaml.jinja.shortex \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/notify_devilry
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/notify_devilry
     # disk_alert
     cp disk_alert/disk_alert.sh \
        disk_alert/disk_alert.cron \
        disk_alert/disk_alert.conf \
        disk_alert/lr.awk \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/disk_alert
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/disk_alert
     # put_check_files
     cp put_check_files/put_check_files.sh \
        put_check_files/put_check_files.cron \
        put_check_files/put_check_files.conf.sample \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/put_check_files
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files
     # logrotate_db_backup
     cp logrotate_db_backup/logrotate_db_backup.awk \
        logrotate_db_backup/logrotate_db_backup.conf.sample \
        logrotate_db_backup/logrotate_db_backup.sh \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup
     # mikrotik_backup
     cp mikrotik_backup/mikrotik_backup.sh \
        mikrotik_backup/mikrotik_backup.conf.sample \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
        rsnapshot_backup/rsnapshot_backup.sh \
@@ -87,7 +92,7 @@ make_deb_v1:
        rsnapshot_backup/rsnapshot_backup_hourly.cron \
        rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql \
        rsnapshot_backup/rsnapshot_backup.logrotate \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup
     # backup_check
     cp backup_check/backup_check.sh \
        backup_check/by_check_file.awk \
@@ -101,23 +106,44 @@ make_deb_v1:
        backup_check/compare_rsnapshot_backup_with_backup_check.awk \
        backup_check/compare_rsnapshot_backup_with_backup_check.sh \
        backup_check/check_rsnapshot_backup_no_compress_files.sh \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/backup_check
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/backup_check
     # misc
     cp misc/mysql_dump_all_dbs_to_files.sh \
        misc/postgresql_dump_all_dbs_to_files.sh \
        misc/mysql_table_extractor.sh \
        misc/mysql_create_new_database.sh \
-       builds/v1/sysadmws-utils-v1/opt/sysadmws/misc
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # Make control dir
-    mkdir -p builds/v1/sysadmws-utils-v1/DEBIAN
+    mkdir -p builds/v1/deb/sysadmws-utils-v1/DEBIAN
     # Make md5sums
-    ( cd builds/v1/sysadmws-utils-v1 && find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums )
+    ( cd builds/v1/deb/sysadmws-utils-v1 && find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums )
     # Get size
-    export SIZE=$(du -s builds/v1/sysadmws-utils-v1 | awk '{print $1}')
+    export SIZE=$(du -s builds/v1/deb/sysadmws-utils-v1 | awk '{print $1}')
     # Get current and new version
     CUR_VERSION=$(curl -s https://repo.sysadm.ws/sysadmws-apt/dists/any/main/binary-amd64/Packages | grep -Pzo 'Package: sysadmws-utils-v1\n.*\n.*\n.*\n.*\n' | grep --text 'Version' | sed -e 's/Version: 1\.//')
     export NEW_VERSION=$((CUR_VERSION+1))
     # Prepare control
-    cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" -e "s#__SIZE__#$SIZE#" > builds/v1/sysadmws-utils-v1/DEBIAN/control
+    cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" -e "s#__SIZE__#$SIZE#" > builds/v1/deb/sysadmws-utils-v1/DEBIAN/control
     # Make deb
-    ( cd builds/v1 && fakeroot dpkg-deb -b sysadmws-utils-v1 )
+    ( cd builds/v1/deb && fakeroot dpkg-deb -b sysadmws-utils-v1 )
+
+make_v1_tgz:
+  tags:
+    - dev1.sysadm.ws
+  stage: make_tgz
+  artifacts:
+    name: v1
+    paths:
+      - builds/v1/tgz/sysadmws-utils-v1.tar.gz
+  only:
+    refs:
+      - master
+  script: |
+    mkdir -p builds/v1/tgz
+    cd builds/v1/tgz
+    rm -rf sysadmws-utils-v1
+    cp -R ../deb/sysadmws-utils-v1 .
+    cat sysadmws-utils-v1/DEBIAN/control | grep Version > sysadmws-utils-v1/opt/sysadmws/VERSION
+    rm -rf sysadmws-utils-v1/DEBIAN
+    fakeroot tar zcf sysadmws-utils-v1.tar.gz -C sysadmws-utils-v1 .
+    rm -rf sysadmws-utils-v1
