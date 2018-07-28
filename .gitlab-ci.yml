@@ -108,12 +108,13 @@ make_deb_v1:
        misc/mysql_table_extractor.sh \
        misc/mysql_create_new_database.sh \
        builds/v1/sysadmws-utils-v1/opt/sysadmws/misc
+    # Make control dir
+    mkdir -p builds/v1/DEBIAN
     # Make md5sums
-    ( cd builds/v1/sysadmws-utils-v1 && find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums )
+    ( cd builds/v1/sysadmws-utils-v1 && find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > ../DEBIAN/md5sums )
     # Get size
     export SIZE=$(du -s builds/v1/sysadmws-utils-v1)
     # Get current and new version
-    mkdir -p builds/v1/DEBIAN
     CUR_VERSION=$(curl -s https://repo.sysadm.ws/sysadmws-apt/dists/any/main/binary-amd64/Packages | grep -Pzo 'Package: sysadmws-utils-v1\n.*\n.*\n.*\n.*\n' | grep --text 'Version' | sed -e 's/Version: 1\.//')
     export NEW_VERSION=$((CUR_VERSION+1))
     # Prepare control
