@@ -1,9 +1,9 @@
 Package: sysadmws-utils
 Priority: optional
 Section: misc
-Installed-Size: 100
+Installed-Size: __SIZE__
 Maintainer: Sysadmin Workshop Admin <admin@sysadm.ws>
 Architecture: all
-Version: 0.135
+Version: 0.__VERSION__
 Depends: gawk, python, python-yaml, python-jinja2, rsnapshot
 Description: Sysadmin Workshop Utilities - a set of useful utils for system administration.
