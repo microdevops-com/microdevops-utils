@@ -36,4 +36,4 @@ make_deb_v1:
     # LICENSE README.md
     cp ../LICENSE \
     	 ../README.md \
-    sysadmws-utils-v1/opt/sysadmws
+    builds/v1/sysadmws-utils-v1/opt/sysadmws
