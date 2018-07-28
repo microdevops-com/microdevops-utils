@@ -11,7 +11,7 @@ make_deb_v1:
   artifacts:
     name: v1
     paths:
-      - builds/v1
+      - builds/v1/sysadmws-utils-v1.deb
   only:
     refs:
       - master
