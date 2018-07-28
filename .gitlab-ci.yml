@@ -1,5 +1,5 @@
-# we excplicitly use tag with runner hostname to ensure stages on the same runner
-# this brakes parallelism but makes things much clearer and simplier
+# we excplicitly use tag with runner hostname to ensure stages on the same runner.
+# This brakes parallelism but makes things much clearer and simplier.
 
 stages:
 - make_deb_v1
@@ -16,7 +16,24 @@ make_deb_v1:
     refs:
       - master
   script: |
+    # Get current and new version
     mkdir -p builds/v1/DEBIAN
     CUR_VERSION=$(curl -s https://repo.sysadm.ws/sysadmws-apt/dists/any/main/binary-amd64/Packages | grep -Pzo 'Package: sysadmws-utils-v1\n.*\n.*\n.*\n.*\n' | grep --text 'Version' | sed -e 's/Version: 1\.//')
     export NEW_VERSION=$((CUR_VERSION+1))
     cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" > builds/v1/DEBIAN/control
+    # Create dir for every util
+    mkdir -p builds/v1/sysadmws-utils-v1/opt/sysadmws/bulk_log \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/notify_devilry \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/disk_alert \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/put_check_files \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/backup_check \
+             builds/v1/sysadmws-utils-v1/opt/sysadmws/misc
+    # LICENSE README.md
+    cp ../LICENSE \
+    	 ../README.md \
+    sysadmws-utils-v1/opt/sysadmws
