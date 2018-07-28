@@ -5,8 +5,6 @@ stages:
 - make_deb
 - make_tgz
 - add_repo_deb
-- add_repo_tgz
-- rsync_repo
 
 cache:
   paths:
@@ -196,24 +194,3 @@ add_repo_deb_v0:
     /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS 846876C563DD34B899FCD3C61F7C554D9AEDE1C2
     reprepro -v --basedir /opt/sysadmws/apt --gnupghome /opt/sysadmws/gnupg/.gnupg remove any sysadmws-utils
     reprepro -v --basedir /opt/sysadmws/apt --gnupghome /opt/sysadmws/gnupg/.gnupg includedeb any builds/v0/deb/sysadmws-utils.deb
-
-add_repo_tgz_v0:
-  tags:
-    - dev1.sysadm.ws
-  stage: add_repo_tgz
-  only:
-    refs:
-      - v0
-  script: |
-    cp -f builds/v0/tgz/sysadmws-utils.tar.gz /opt/sysadmws/tgz/sysadmws-utils.tar.gz
-
-rsync_repo:
-  tags:
-    - dev1.sysadm.ws
-  stage: rsync_repo
-  only:
-    refs:
-      - v0
-  script: |
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/apt/ repo@web1.sysadm.ws:/var/www/repo.sysadm.ws/sysadmws-apt/
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/tgz/ repo@web1.sysadm.ws:/var/www/repo.sysadm.ws/tgz/
