@@ -1,7 +1,7 @@
 Package: sysadmws-utils-v1
 Priority: optional
 Section: misc
-Installed-Size: 100
+Installed-Size: __SIZE__
 Maintainer: Sysadmin Workshop Admin <admin@sysadm.ws>
 Architecture: all
 Version: 1.__VERSION__
