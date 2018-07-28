@@ -184,4 +184,5 @@ add_repo_deb_v0:
     sleep 3
     /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS E5337B7B1B6C8A420A48AB069BA912449F148CFB
     /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS 846876C563DD34B899FCD3C61F7C554D9AEDE1C2
+    reprepro -v --basedir /opt/sysadmws/apt --gnupghome /opt/sysadmws/gnupg/.gnupg remove any sysadmws-utils
     reprepro -v --basedir /opt/sysadmws/apt --gnupghome /opt/sysadmws/gnupg/.gnupg includedeb any builds/v0/deb/sysadmws-utils.deb
