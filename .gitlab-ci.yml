@@ -99,6 +99,14 @@ make_deb_v0:
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
        rsnapshot_backup/rsnapshot_backup.sh \
+       rsnapshot_backup.conf.localhost \
+       rsnapshot_backup.conf.sample \
+       rsnapshot_backup.conf_centos.sh \
+       rsnapshot_backup.conf_debian.sh \
+       rsnapshot_backup.conf_mysql.sh \
+       rsnapshot_backup.conf_path.sh \
+       rsnapshot_backup.conf_postgresql.sh \
+       rsnapshot_backup.conf_ubuntu.sh \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf \
