@@ -45,6 +45,7 @@ CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
 	# Loop over conf file items
+	IFS=$'\n' # Separate only by newlines
 	for CONF_ROW in $(cat ${CONF_FILE} | jq -c '.[]'); do
 		# Get values from JSON
 		ROW_NUMBER=$((ROW_NUMBER+1))
