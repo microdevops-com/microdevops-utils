@@ -39,6 +39,11 @@ function print_timestamp() {
 }
 
 {
+	# Check if enabled
+	if (row_enabled != "true") {
+		next;
+	}
+
 	# Assign variables
 	host_name	= row_connect;
 	backup_type	= row_type;
@@ -51,7 +56,7 @@ function print_timestamp() {
 	run_args	= row_run_args;
 	connect_user	= row_connect_user;
 	connect_passwd	= row_connect_passwd;
-	
+
 	# Check retains
 	if (retain_h == "null") {
 		retain_h = "NONE";
@@ -75,7 +80,7 @@ function print_timestamp() {
 	}
 
 	# Display what we backup
-	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " run_args " " connect_user " " connect_passwd "'");
+	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " run_args " " connect_user " " connect_passwd " " row_comment "'");
 
 	# Progress bar on verbosity
 	if (verbosity == "1") {

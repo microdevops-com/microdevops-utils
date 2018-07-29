@@ -44,8 +44,12 @@ CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
+	# Loop over conf file items
 	for CONF_ROW in $(cat ${CONF_FILE} | jq -c '.[]'); do
+		# Get values from JSON
 		ROW_NUMBER=$((ROW_NUMBER+1))
+		ROW_ENABLED=$(echo ${CONF_ROW} | jq -r '.enabled')
+		ROW_COMMENT=$(echo ${CONF_ROW} | jq -r '.comment')
 		ROW_CONNECT=$(echo ${CONF_ROW} | jq -r '.connect')
 		ROW_PATH=$(echo ${CONF_ROW} | jq -r '.path')
 		ROW_SOURCE=$(echo ${CONF_ROW} | jq -r '.source')
@@ -57,6 +61,7 @@ if [ -f $CONF_FILE ]; then
 		ROW_RUN_ARGS=$(echo ${CONF_ROW} | jq -r '.run_args')
 		ROW_CONNECT_USER=$(echo ${CONF_ROW} | jq -r '.connect_user')
 		ROW_CONNECT_PASSWD=$(echo ${CONF_ROW} | jq -r '.connect_password')
+		# If item number in $2 - skip everything but needed
 		if [ "$2" != "" ]; then
 			if [ "$2" -ne "${ROW_NUMBER}" ]; then
 				continue
@@ -67,6 +72,8 @@ if [ -f $CONF_FILE ]; then
 			-v rsnapshot_type=$1 \
 			-v verbosity=$3 \
 			-v row_number=${ROW_NUMBER} \
+			-v row_enabled=${ROW_ENABLED} \
+			-v row_comment=${ROW_COMMENT} \
 			-v row_connect=${ROW_CONNECT} \
 			-v row_path=${ROW_PATH} \
 			-v row_source=${ROW_SOURCE} \
