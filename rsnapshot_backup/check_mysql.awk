@@ -2,7 +2,7 @@ BEGIN {
 	total_lines	= 0;
 	total_errors	= 0;
 	total_ok        = 0;
-	backup_check_skip_postgresql_warning	= 0;
+	check_backup_skip_mysql_warning	= 0;
 	# Get my hostname
 	hn_cmd = "salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'";
 	hn_cmd | getline checked_host_name;
@@ -16,8 +16,8 @@ function print_timestamp() {
 
 {
         # Find backup check skip warning
-        if (match($0, /^# backup_check_skip_postgresql_warning: True$/)) {
-                backup_check_skip_postgresql_warning = 1;
+        if (match($0, /^# check_backup_skip_mysql_warning: True$/)) {
+                check_backup_skip_mysql_warning = 1;
                 next;
         }
 
@@ -92,18 +92,18 @@ function print_timestamp() {
 			}
 			# Read lines of dump file
 			while ((dump_cat_cmd | getline dump_file_line) > 0) {
-				if (match(dump_file_line, /^.connect .+/)) {
+				if (match(dump_file_line, /^CREATE DATABASE/)) {
 					# Save DB name and its lines = 0
-					if (match(dump_file_line, /^.connect (.+)$/, dump_file_line_sub)) {
+					if (match(dump_file_line, /`(.+)`/, dump_file_line_sub)) {
 						dump_file_analyze[dump_file, "databases"][dump_file_line_sub[1]] = 0;
 					}
 				}
 				# Inc lines count for DB
-				if (match(dump_file_line, /^COPY.*FROM stdin/)) {
+				if (match(dump_file_line, /^INSERT INTO/)) {
 					dump_file_analyze[dump_file, "databases"][dump_file_line_sub[1]]++;
 				}
 				# Save dump date
-				if (match(dump_file_line, /^-- Completed on (.+)$/, dump_file_date)) {
+				if (match(dump_file_line, /^-- Dump completed on (.+)$/, dump_file_date)) {
 					dump_file_analyze[dump_file, "date"] = dump_file_date[1];
 				}
 			}
@@ -122,8 +122,8 @@ function print_timestamp() {
 		secs_dfa_date_cmd | getline secs_dfa_date;
 		close(secs_dfa_date_cmd);
 	} else {
-                secs_dfa_date = 0;
-        }
+		secs_dfa_date = 0;
+	}
 
 	# Check DB in dump
 	if (dump_file_analyze[dump_file, "databases"][db_sub_name] < 1) {
@@ -148,23 +148,23 @@ function print_timestamp() {
 }
 END {
         # Total lines check
-        if ((total_lines == 0) && (backup_check_skip_postgresql_warning == 0))  {
-                print_timestamp(); print("WARNING: Backup server " checked_host_name " postgresql backup check txt config empty");
+        if ((total_lines == 0) && (check_backup_skip_mysql_warning == 0))  {
+                print_timestamp(); print("WARNING: Backup server " checked_host_name " mysql backup check txt config empty");
         }
-        if ((total_lines > 0) && (backup_check_skip_postgresql_warning == 1))  {
-                print_timestamp(); print("WARNING: Backup server " checked_host_name " postgresql backup check txt config not empty but you have backup_check_skip_postgresql_warning: True set");
+        if ((total_lines > 0) && (check_backup_skip_mysql_warning == 1))  {
+                print_timestamp(); print("WARNING: Backup server " checked_host_name " mysql backup check txt config not empty but you have check_backup_skip_mysql_warning: True set");
         }
 	# Summ results
-        my_folder = "/opt/sysadmws-utils/backup_check";
-        system("awk '{ print $1 + " total_errors "}' < " my_folder "/errors_count.txt > " my_folder "/errors_count.txt.new && mv -f " my_folder "/errors_count.txt.new " my_folder "/errors_count.txt");
-        system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
+        my_folder = "/opt/sysadmws/rsnapshot_backup";
+        system("awk '{ print $1 + " total_errors "}' < " my_folder "/check_backup_error_count.txt > " my_folder "/check_backup_error_count.txt.new && mv -f " my_folder "/check_backup_error_count.txt.new " my_folder "/check_backup_error_count.txt");
+        system("awk '{ print $1 + " total_ok "}' < " my_folder "/check_backup_ok_count.txt > " my_folder "/check_backup_ok_count.txt.new && mv -f " my_folder "/check_backup_ok_count.txt.new " my_folder "/check_backup_ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Backup server " checked_host_name " postgresql backups checked OK: " total_ok);
+			print_timestamp(); print("NOTICE: Backup server " checked_host_name " mysql backups checked OK: " total_ok);
 		}
 	} else {
-		print_timestamp(); print("ERROR: Backup server " checked_host_name " postgresql backup errors found: " total_errors);
+		print_timestamp(); print("ERROR: Backup server " checked_host_name " mysql backup errors found: " total_errors);
 		exit(1);
 	}
 }

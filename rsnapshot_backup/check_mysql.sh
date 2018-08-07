@@ -13,7 +13,7 @@ if [ "$1" != "0" ] && [ "$1" != "1" ] && [ "$1" != "2" ]; then
 	echo -e >&2 "ERROR: Use $0 0|1|2 [HOSTNAME]"
 	echo -e >&2 "ERROR: 0 to show only basic notices, 1 to show all notices and stats, 2 to show basic notices and stats"
 	echo -e >&2 "ERROR: HOSTNAME is optional to check specific host backups only"
-	exit 1
+        exit 1
 fi
 
 if [ "$1" == "1" ]; then
@@ -22,8 +22,8 @@ if [ "$1" == "1" ]; then
 	salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'
 fi
 
-CONF_FILE=/opt/sysadmws-utils/backup_check/by_fresh_files.txt
-SKIP_FILE=/opt/sysadmws-utils/backup_check/by_fresh_files.skip
+CONF_FILE=/opt/sysadmws/rsnapshot_backup/check_mysql.txt
+SKIP_FILE=/opt/sysadmws/rsnapshot_backup/check_mysql.skip
 
 if [ -f $SKIP_FILE ]; then
         if [ -f $CONF_FILE ]; then
@@ -48,7 +48,7 @@ if [ -f $SKIP_FILE ]; then
 fi
 
 if [ -f $CONF_FILE ]; then
-	awk -f /opt/sysadmws-utils/backup_check/by_fresh_files.awk -F '\t' -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
+	awk -f /opt/sysadmws/rsnapshot_backup/check_mysql.awk -F '\t' -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
 	exit $?
 else
 	date '+%F %T ' | tr -d '\n'

@@ -482,16 +482,16 @@ function print_timestamp() {
 			next;
 		}
 		if (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") {
-			# Check remote .backup_check existance, if no file - skip to next. Remote windows rsync server can give empty set in some cases, which can lead to backup to be erased.
+			# Check remote .backup existance, if no file - skip to next. Remote windows rsync server can give empty set in some cases, which can lead to backup to be erased.
 			system("touch /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("chmod 600 /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("echo '" connect_passwd "' > /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
-			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" host_name "" backup_src "/ | grep .backup_check");
+			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" host_name "" backup_src "/ | grep .backup");
 			if (err != 0) {
-				print_timestamp(); print("ERROR: .backup_check not found, failed on line " row_number ", skipping to next line");
+				print_timestamp(); print("ERROR: .backup not found, failed on line " row_number ", skipping to next line");
 				next;
 			} else {
-				print_timestamp(); print("NOTICE: .backup_check found on line " row_number);
+				print_timestamp(); print("NOTICE: .backup found on line " row_number);
 			}
 			system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		}

@@ -16,17 +16,17 @@ if [ "$1" != "0" ] && [ "$1" != "1" ] && [ "$1" != "2" ]; then
 	exit 1
 fi
 
-OK_COUNT_FILE=/opt/sysadmws-utils/backup_check/ok_count.txt
-ERRORS_COUNT_FILE=/opt/sysadmws-utils/backup_check/errors_count.txt
+OK_COUNT_FILE=/opt/sysadmws/rsnapshot_backup/check_backup_ok_count.txt
+ERRORS_COUNT_FILE=/opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt
 echo "0" > $OK_COUNT_FILE
 echo "0" > $ERRORS_COUNT_FILE
 
-/opt/sysadmws-utils/backup_check/check_rsnapshot_backup_no_compress_files.sh $1
-/opt/sysadmws-utils/backup_check/by_check_file.sh $1 $2
-/opt/sysadmws-utils/backup_check/by_fresh_files.sh $1 $2
-/opt/sysadmws-utils/backup_check/by_mysql.sh $1 $2
-/opt/sysadmws-utils/backup_check/by_postgresql.sh $1 $2
-/opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.sh $1 $2
+/opt/sysadmws/rsnapshot_backup/check_rsnapshot_backup_no_compress_files.sh $1
+/opt/sysadmws/rsnapshot_backup/check_dot_backup.sh $1 $2
+/opt/sysadmws/rsnapshot_backup/check_file_age.sh $1 $2
+/opt/sysadmws/rsnapshot_backup/check_mysql.sh $1 $2
+/opt/sysadmws/rsnapshot_backup/check_postgresql.sh $1 $2
+/opt/sysadmws/rsnapshot_backup/check_no_checks.sh $1 $2
 
 if [ "$1" == "1" ]; then
 	date '+%F %T ' | tr -d '\n'

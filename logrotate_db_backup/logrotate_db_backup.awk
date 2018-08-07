@@ -7,11 +7,11 @@ function check_ssh(f_host_name, f_host_port) {
 		print_timestamp(); printf("NOTICE: Checking hostname: ");
 		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " 'hostname'";
 	} else {
-		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " 'hostname' > /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt 2>&1";
+		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " 'hostname' > /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt 2>&1";
 	}
 	err = system(ssh_check_cmd);
 	if (err != 0) {
-		if (!show_notices) system("cat /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
+		if (!show_notices) system("cat /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
 		print_timestamp(); print("ERROR: SSH "f_host_name" port " f_host_port " without password failed");
 		return(0);
 	} else {
@@ -24,11 +24,11 @@ function exec_ssh(f_host_name, f_host_port, f_cmd) {
 		print_timestamp(); print("NOTICE: Executing remote command '" f_cmd "', output: ");
 		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " '" f_cmd "'";
 	} else {
-		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " '" f_cmd "' > /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt 2>&1";
+		ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_host_name " '" f_cmd "' > /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt 2>&1";
 	}
 	err = system(ssh_check_cmd);
 	if (err != 0) {
-		if (!show_notices) system("cat /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
+		if (!show_notices) system("cat /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
 		print_timestamp(); print("ERROR: Remote execution on " f_host_name " port " f_host_port " of command " f_cmd " failed");
 		return(0);
 	} else {
@@ -43,10 +43,10 @@ function print_timestamp() {
 function system_wrap(f_cmd) {
 	if (!show_notices) {
 		f_cmd = f_cmd " 2>&1";
-		printf("") > "/opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt";
+		printf("") > "/opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt";
 		ERRNO = 0;
 		while ((f_cmd | getline cmd_out_line) > 0) {
-			print(cmd_out_line) >> "/opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt";
+			print(cmd_out_line) >> "/opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt";
 		}
 		err = ERRNO;
 		close(f_cmd);
@@ -54,7 +54,7 @@ function system_wrap(f_cmd) {
 		err = system(f_cmd);
 	}
 	if (err != 0) {
-		if (!show_notices) system("cat /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
+		if (!show_notices) system("cat /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.tmp_out.txt");
 	}
 	return(err);
 }
@@ -148,12 +148,12 @@ END {
 				# Make working directory
 				system_wrap("mkdir -v -p `dirname " targets[i]["dst"][m] "`");
 				# Prepare logrotate config
-				system_wrap("echo '" targets[i]["dst"][m] " {' > /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-				system_wrap("echo '	rotate " targets[i]["copies_quantity"] "' >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-				if (targets[i]["compress"] == "yes") system_wrap("echo '	compress' >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-				system_wrap("echo '}' >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
+				system_wrap("echo '" targets[i]["dst"][m] " {' > /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+				system_wrap("echo '	rotate " targets[i]["copies_quantity"] "' >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+				if (targets[i]["compress"] == "yes") system_wrap("echo '	compress' >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+				system_wrap("echo '}' >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
 				# Local logrotate
-				system_wrap("/usr/sbin/logrotate -v -f /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
+				system_wrap("/usr/sbin/logrotate -v -f /opt/sysadmws/logrotate_db_backup/logrotate.conf");
 				# MySQL dumps
 				if (targets[i]["dump_type"] == "mysql") {
 					# Nice?
@@ -213,14 +213,14 @@ END {
 						}
 						# Make working directory
 						exec_ssh(dst_host, dst_port, "mkdir -v -p `dirname " dst_path "`");
-						exec_ssh(dst_host, dst_port, "mkdir -v -p /opt/sysadmws-utils/logrotate_db_backup");
+						exec_ssh(dst_host, dst_port, "mkdir -v -p /opt/sysadmws/logrotate_db_backup");
 						# Remote logrotate
 						# Prepare logrotate config
-						exec_ssh(dst_host, dst_port, "echo \"" dst_path " {\" > /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-						exec_ssh(dst_host, dst_port, "echo \"	rotate " targets[i]["copies_quantity"] "\" >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-						if (targets[i]["compress"] == "yes") exec_ssh(dst_host, dst_port, "echo \"	compress\" >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-						exec_ssh(dst_host, dst_port, "echo \"}\" >> /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
-						exec_ssh(dst_host, dst_port, "/usr/sbin/logrotate -v -f /opt/sysadmws-utils/logrotate_db_backup/logrotate.conf");
+						exec_ssh(dst_host, dst_port, "echo \"" dst_path " {\" > /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+						exec_ssh(dst_host, dst_port, "echo \"	rotate " targets[i]["copies_quantity"] "\" >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+						if (targets[i]["compress"] == "yes") exec_ssh(dst_host, dst_port, "echo \"	compress\" >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+						exec_ssh(dst_host, dst_port, "echo \"}\" >> /opt/sysadmws/logrotate_db_backup/logrotate.conf");
+						exec_ssh(dst_host, dst_port, "/usr/sbin/logrotate -v -f /opt/sysadmws/logrotate_db_backup/logrotate.conf");
 						# Scp local dump to remote
 						scp_cmd = "/usr/bin/scp -o BatchMode=yes -P " dst_port " " targets[i]["dst_local"] " " dst_host ":" dst_path;
 						if (show_notices) {

@@ -1,4 +1,4 @@
-/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.log {
+/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.log {
 	daily
 	missingok
 	rotate 7

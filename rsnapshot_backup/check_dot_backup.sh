@@ -22,8 +22,8 @@ if [ "$1" == "1" ]; then
 	salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'
 fi
 
-CONF_FILE=/opt/sysadmws-utils/backup_check/by_check_file.txt
-SKIP_FILE=/opt/sysadmws-utils/backup_check/by_check_file.skip
+CONF_FILE=/opt/sysadmws/rsnapshot_backup/check_dot_backup.txt
+SKIP_FILE=/opt/sysadmws/rsnapshot_backup/check_dot_backup.skip
 
 if [ -f $SKIP_FILE ]; then
 	if [ -f $CONF_FILE ]; then
@@ -48,7 +48,7 @@ if [ -f $SKIP_FILE ]; then
 fi
 
 if [ -f $CONF_FILE ]; then
-	awk -f /opt/sysadmws-utils/backup_check/by_check_file.awk -F '\t' -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
+	awk -f /opt/sysadmws/rsnapshot_backup/check_dot_backup.awk -F '\t' -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
 	exit $?
 else
 	date '+%F %T ' | tr -d '\n'

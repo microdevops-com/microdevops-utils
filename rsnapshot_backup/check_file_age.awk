@@ -2,7 +2,7 @@ BEGIN {
 	total_lines	= 0;
 	total_errors	= 0;
 	total_ok        = 0;
-	backup_check_skip_fresh_files_warning	= 0;
+	check_backup_skip_fresh_files_warning	= 0;
 	# Get my hostname
 	hn_cmd = "salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'";
 	hn_cmd | getline checked_host_name;
@@ -16,8 +16,8 @@ function print_timestamp() {
 
 {
 	# Find backup check skip warning
-	if (match($0, /^# backup_check_skip_fresh_files_warning: True$/)) {
-		backup_check_skip_fresh_files_warning = 1;
+	if (match($0, /^# check_backup_skip_fresh_files_warning: True$/)) {
+		check_backup_skip_fresh_files_warning = 1;
 		next;
 	}
 	
@@ -139,16 +139,16 @@ function print_timestamp() {
 }
 END {
 	# Total lines check
-	if ((total_lines == 0) && (backup_check_skip_fresh_files_warning == 0))  {
+	if ((total_lines == 0) && (check_backup_skip_fresh_files_warning == 0))  {
 		print_timestamp(); print("WARNING: Backup server " checked_host_name " fresh files backup check txt config empty");
 	}
-	if ((total_lines > 0) && (backup_check_skip_fresh_files_warning == 1))  {
-		print_timestamp(); print("WARNING: Backup server " checked_host_name " fresh files backup check txt config not empty but you have backup_check_skip_fresh_files_warning: True set");
+	if ((total_lines > 0) && (check_backup_skip_fresh_files_warning == 1))  {
+		print_timestamp(); print("WARNING: Backup server " checked_host_name " fresh files backup check txt config not empty but you have check_backup_skip_fresh_files_warning: True set");
 	}
         # Summ results
-        my_folder = "/opt/sysadmws-utils/backup_check";
-        system("awk '{ print $1 + " total_errors "}' < " my_folder "/errors_count.txt > " my_folder "/errors_count.txt.new && mv -f " my_folder "/errors_count.txt.new " my_folder "/errors_count.txt");
-        system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
+        my_folder = "/opt/sysadmws/rsnapshot_backup";
+        system("awk '{ print $1 + " total_errors "}' < " my_folder "/check_backup_error_count.txt > " my_folder "/check_backup_error_count.txt.new && mv -f " my_folder "/check_backup_error_count.txt.new " my_folder "/check_backup_error_count.txt");
+        system("awk '{ print $1 + " total_ok "}' < " my_folder "/check_backup_ok_count.txt > " my_folder "/check_backup_ok_count.txt.new && mv -f " my_folder "/check_backup_ok_count.txt.new " my_folder "/check_backup_ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {

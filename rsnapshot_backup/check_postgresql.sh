@@ -22,8 +22,8 @@ if [ "$1" == "1" ]; then
 	salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'
 fi
 
-CONF_FILE=/opt/sysadmws-utils/rsnapshot_backup/rsnapshot_backup.conf
-SKIP_FILE=/opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.skip
+CONF_FILE=/opt/sysadmws/rsnapshot_backup/check_postgresql.txt
+SKIP_FILE=/opt/sysadmws/rsnapshot_backup/check_postgresql.skip
 
 if [ -f $SKIP_FILE ]; then
         if [ -f $CONF_FILE ]; then
@@ -48,10 +48,10 @@ if [ -f $SKIP_FILE ]; then
 fi
 
 if [ -f $CONF_FILE ]; then
-	awk -f /opt/sysadmws-utils/backup_check/compare_rsnapshot_backup_with_backup_check.awk -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
+	awk -f /opt/sysadmws/rsnapshot_backup/check_postgresql.awk -F '\t' -v show_notices=$1 -v hostname_filter=$2 $CONF_FILE 2>&1
 	exit $?
 else
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "WARNING: There is no $CONF_FILE config file on backup server"
         exit 1
-fi
+fi	

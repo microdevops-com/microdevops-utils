@@ -42,7 +42,7 @@ MPL_TOTAL_COUNT=$(echo "$MPL_SNAP" | grep -c "Command:")
 echo -e "$CUR_DATE_TIME START#\n"
 
 # Exit if lock exists (prevent multiple execution)
-LOCK_DIR=/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.lock
+LOCK_DIR=/opt/sysadmws/mysql_queries_log/mysql_queries_log.lock
 
 if mkdir "$LOCK_DIR"
 then

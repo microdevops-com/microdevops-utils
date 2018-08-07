@@ -34,10 +34,10 @@ except ImportError:
     ARGPARSE = False
 
 # Constants
-WORK_DIR = "/opt/sysadmws-utils/notify_devilry"
-HISTORY_DIR = "/opt/sysadmws-utils/notify_devilry/history"
+WORK_DIR = "/opt/sysadmws/notify_devilry"
+HISTORY_DIR = "/opt/sysadmws/notify_devilry/history"
 CONFIG_FILE = "notify_devilry.yaml.jinja"
-LOG_DIR = "/opt/sysadmws-utils/notify_devilry/log"
+LOG_DIR = "/opt/sysadmws/notify_devilry/log"
 LOG_FILE = "notify_devilry.log"
 HISTORY_MESSAGE_IN_PREFIX = "in"
 HISTORY_MESSAGE_OUT_PREFIX = "out"

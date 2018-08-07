@@ -8,7 +8,7 @@ if [ "$1" != "0" ] && [ "$1" != "1" ]; then
 fi
 
 # Exit if lock exists (prevent multiple execution)
-LOCK_DIR=/opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.lock
+LOCK_DIR=/opt/sysadmws/mikrotik_backup/mikrotik_backup.lock
 
 if mkdir "$LOCK_DIR"
 then
@@ -22,7 +22,7 @@ else
 fi
 
 # Exit if no config file
-ROUTERS="/opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.conf"
+ROUTERS="/opt/sysadmws/mikrotik_backup/mikrotik_backup.conf"
 if [ ! -f $ROUTERS ]; then
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "ERROR: $ROUTERS config file not found"
@@ -41,7 +41,7 @@ ID="/root/.ssh/mktik"
 DEBUG=$1
 TARGET=$2
 # Log file if debug
-OUTLOG="/opt/sysadmws-utils/mikrotik_backup/mikrotik_backup.log"
+OUTLOG="/opt/sysadmws/mikrotik_backup/mikrotik_backup.log"
 # Empty log file
 >$OUTLOG
 

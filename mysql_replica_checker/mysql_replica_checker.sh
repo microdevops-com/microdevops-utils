@@ -36,7 +36,7 @@ function report {
 	rsp+='}'
 
 	# Send response
-	echo "${rsp}" | sed -e "s/,}/}/g" | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+	echo "${rsp}" | sed -e "s/,}/}/g" | /opt/sysadmws/notify_devilry/notify_devilry.py
 	exit 0
 }
 

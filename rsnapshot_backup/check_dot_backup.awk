@@ -2,7 +2,7 @@ BEGIN {
 	total_lines	= 0;
 	total_errors	= 0;
 	total_ok	= 0;
-	backup_check_skip_check_file_warning	= 0;
+	check_backup_skip_check_file_warning	= 0;
 	# Get my hostname
 	hn_cmd = "salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'";
 	hn_cmd | getline checked_host_name;
@@ -16,8 +16,8 @@ function print_timestamp() {
 
 {
         # Find backup check skip warning
-        if (match($0, /^# backup_check_skip_check_file_warning: True$/)) {
-                backup_check_skip_check_file_warning = 1;
+        if (match($0, /^# check_backup_skip_check_file_warning: True$/)) {
+                check_backup_skip_check_file_warning = 1;
                 next;
         }
 
@@ -53,7 +53,7 @@ function print_timestamp() {
 		host_path_arr[5] = "/var/spool/cron";
 		host_path_arr[6] = "/usr/local";
 		host_path_arr[7] = "/lib/ufw";
-		host_path_arr[8] = "/opt/sysadmws-utils";
+		host_path_arr[8] = "/opt/sysadmws";
 	} else if (host_path == "DEBIAN") {
 		host_path_arr[1] = "/etc";
 		host_path_arr[2] = "/home";
@@ -62,7 +62,7 @@ function print_timestamp() {
 		host_path_arr[5] = "/var/spool/cron";
 		host_path_arr[6] = "/usr/local";
 		host_path_arr[7] = "/lib/ufw";
-		host_path_arr[8] = "/opt/sysadmws-utils";
+		host_path_arr[8] = "/opt/sysadmws";
 	} else if (host_path == "CENTOS") {
 		host_path_arr[1] = "/etc";
 		host_path_arr[2] = "/home";
@@ -70,7 +70,7 @@ function print_timestamp() {
 		host_path_arr[4] = "/var/log";
 		host_path_arr[5] = "/var/spool/cron";
 		host_path_arr[6] = "/usr/local";
-		host_path_arr[7] = "/opt/sysadmws-utils";
+		host_path_arr[7] = "/opt/sysadmws";
 	} else {
 		host_path_arr[1] = host_path;
 	}
@@ -80,10 +80,10 @@ function print_timestamp() {
 		chf_host = ""; chf_path = ""; chf_date = ""; chf_backup_host = ""; chf_backup_path = ""; chf_backup_path_type = "";
 		# Construct path
 		if (backup_dst_type == "Absolute") {
-			check_file = backup_dst "/.backup_check";
+			check_file = backup_dst "/.backup";
 			check_dir = backup_dst;
 		} else if (backup_dst_type == "Relative") {
-			check_file = backup_dst "/" host_path "/.backup_check";
+			check_file = backup_dst "/" host_path "/.backup";
 			check_dir = backup_dst "/" host_path;
 		}
 
@@ -200,16 +200,16 @@ function print_timestamp() {
 }
 END {
         # Total lines check
-        if ((total_lines == 0) && (backup_check_skip_check_file_warning == 0))  {
+        if ((total_lines == 0) && (check_backup_skip_check_file_warning == 0))  {
                 print_timestamp(); print("WARNING: Backup server " checked_host_name " check file backup check txt config empty");
         }
-        if ((total_lines > 0) && (backup_check_skip_check_file_warning == 1))  {
-                print_timestamp(); print("WARNING: Backup server " checked_host_name " check file backup check txt config not empty but you have backup_check_skip_check_file_warning: True set");
+        if ((total_lines > 0) && (check_backup_skip_check_file_warning == 1))  {
+                print_timestamp(); print("WARNING: Backup server " checked_host_name " check file backup check txt config not empty but you have check_backup_skip_check_file_warning: True set");
         }
 	# Summ results
-	my_folder = "/opt/sysadmws-utils/backup_check";
-	system("awk '{ print $1 + " total_errors "}' < " my_folder "/errors_count.txt > " my_folder "/errors_count.txt.new && mv -f " my_folder "/errors_count.txt.new " my_folder "/errors_count.txt");
-	system("awk '{ print $1 + " total_ok "}' < " my_folder "/ok_count.txt > " my_folder "/ok_count.txt.new && mv -f " my_folder "/ok_count.txt.new " my_folder "/ok_count.txt");
+	my_folder = "/opt/sysadmws/rsnapshot_backup";
+	system("awk '{ print $1 + " total_errors "}' < " my_folder "/check_backup_error_count.txt > " my_folder "/check_backup_error_count.txt.new && mv -f " my_folder "/check_backup_error_count.txt.new " my_folder "/check_backup_error_count.txt");
+	system("awk '{ print $1 + " total_ok "}' < " my_folder "/check_backup_ok_count.txt > " my_folder "/check_backup_ok_count.txt.new && mv -f " my_folder "/check_backup_ok_count.txt.new " my_folder "/check_backup_ok_count.txt");
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
