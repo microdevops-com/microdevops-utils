@@ -26,7 +26,6 @@ echo "0" > $ERRORS_COUNT_FILE
 /opt/sysadmws/rsnapshot_backup/check_file_age.sh $1 $2
 /opt/sysadmws/rsnapshot_backup/check_mysql.sh $1 $2
 /opt/sysadmws/rsnapshot_backup/check_postgresql.sh $1 $2
-/opt/sysadmws/rsnapshot_backup/check_no_checks.sh $1 $2
 
 if [ "$1" == "1" ]; then
 	date '+%F %T ' | tr -d '\n'
