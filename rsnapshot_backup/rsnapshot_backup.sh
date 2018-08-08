@@ -25,7 +25,6 @@ if [ "$1" != "sync" ]; then
 	fi
 fi
 
-
 # Exit if lock exists (prevent multiple execution)
 LOCK_DIR=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.lock
 
@@ -41,6 +40,7 @@ else
 fi
 
 CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf
+GRAND_EXIT=0
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
@@ -52,6 +52,7 @@ if [ -f $CONF_FILE ]; then
 		ROW_ENABLED=$(echo ${CONF_ROW} | jq -r '.enabled')
 		ROW_COMMENT=$(echo ${CONF_ROW} | jq -r '.comment')
 		ROW_CONNECT=$(echo ${CONF_ROW} | jq -r '.connect')
+		ROW_HOST=$(echo ${CONF_ROW} | jq -r '.host')
 		ROW_PATH=$(echo ${CONF_ROW} | jq -r '.path')
 		ROW_SOURCE=$(echo ${CONF_ROW} | jq -r '.source')
 		ROW_TYPE=$(echo ${CONF_ROW} | jq -r '.type')
@@ -76,6 +77,7 @@ if [ -f $CONF_FILE ]; then
 			-v row_enabled=${ROW_ENABLED} \
 			-v row_comment=${ROW_COMMENT} \
 			-v row_connect=${ROW_CONNECT} \
+			-v row_host=${ROW_HOST} \
 			-v row_path=${ROW_PATH} \
 			-v row_source=${ROW_SOURCE} \
 			-v row_type=${ROW_TYPE} \
@@ -85,10 +87,17 @@ if [ -f $CONF_FILE ]; then
 			-v row_retain_m=${ROW_RETAIN_M} \
 			-v row_run_args=${ROW_RUN_ARGS} \
 			-v row_connect_user=${ROW_CONNECT_USER} \
-			-v row_connect_passwd=${ROW_CONNECT_PASSWD} \
-			2>&1
+			-v row_connect_passwd=${ROW_CONNECT_PASSWD}
+		# Exit code depends on rows
+		if [ $? -gt 0 ]; then
+			GRAND_EXIT=1
+		fi
 	done
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "NOTICE: Script finished"
-	exit $?
+	exit $GRAND_EXIT
+else
+	date '+%F %T ' | tr -d '\n'
+	echo -e >&2 "WARNING: There is no $CONF_FILE config file on backup server"
+        exit 1
 fi	

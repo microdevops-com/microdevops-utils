@@ -1,10 +1,8 @@
 BEGIN {
-	total_lines	= 0;
 	total_errors	= 0;
 	total_ok        = 0;
-	check_backup_skip_mysql_warning	= 0;
 	# Get my hostname
-	hn_cmd = "salt-call --local grains.item fqdn 2>&1 | tail -n 1 | sed 's/^ *//'";
+	hn_cmd = "hostname -f";
 	hn_cmd | getline checked_host_name;
 	close(hn_cmd);
 }
@@ -15,59 +13,39 @@ function print_timestamp() {
 }
 
 {
-        # Find backup check skip warning
-        if (match($0, /^# check_backup_skip_mysql_warning: True$/)) {
-                check_backup_skip_mysql_warning = 1;
-                next;
-        }
-
-	# Skip commnets
-	if ((substr($0, 1, 1) == "#") || (NF == "0")) {
+	# Check if enabled
+	if (row_enabled != "true") {
 		next;
 	}
 
-	# Count total non comment lines
-	total_lines++;
-
 	# Assign variables
-	host_name	= $1;
-	db_name		= $2;
-	db_sub_name	= $3;
-	dump_file	= $4;
-
-	# Apply hostname_filter
-	if (hostname_filter != "") {
-		if (host_name != hostname_filter) {
-			next;
-		}
-	}
+	host_name	= row_host;
+	db_name		= row_source;
+	dump_dir	= row_path "/.sync/rsnapshot/var/backups/mysql";
+	db_sub_name	= row_db_sub_name;
 
 	# Check dump dir or file existance
-	if (system("test -d " dump_file) == 0) {
+	if (system("test -d " dump_dir) == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump dir found: '" dump_file "' on line " FNR);
+			print_timestamp(); print("NOTICE: Dump dir found: '" dump_dir "' on line " row_number);
 		}
-		if (system("test -f " dump_file "/" db_sub_name) == 0) {
-			dump_file = dump_file "/" db_sub_name;
+		if (system("test -f " dump_dir "/" db_sub_name) == 0) {
+			dump_file = dump_dir "/" db_sub_name;
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " FNR);
+				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " row_number);
 			}
-		} else if (system("test -f " dump_file "/" db_sub_name ".gz") == 0) {
-			dump_file = dump_file "/" db_sub_name ".gz";
+		} else if (system("test -f " dump_dir "/" db_sub_name ".gz") == 0) {
+			dump_file = dump_dir "/" db_sub_name ".gz";
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " FNR);
+				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " row_number);
 			}
 		} else {
-			print_timestamp(); print("ERROR: Dump file inside dir missing: '" dump_file "/" db_sub_name "[.gz]' on line " FNR);
+			print_timestamp(); print("ERROR: Dump file inside dir missing: '" dump_dir "/" db_sub_name "[.gz]' on line " row_number);
 			total_errors = total_errors + 1;
 			next;
 		}
-	} else if (system("test -f " dump_file) == 0) {
-		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump file found: '" dump_file "' on line " FNR);
-		}
 	} else {
-		print_timestamp(); print("ERROR: Dump file missing: '" dump_file "' on line " FNR);
+		print_timestamp(); print("ERROR: Dump dir missing: '" dump_dir "' on line " row_number);
 		total_errors = total_errors + 1;
 		next;
 	}
@@ -127,33 +105,26 @@ function print_timestamp() {
 
 	# Check DB in dump
 	if (dump_file_analyze[dump_file, "databases"][db_sub_name] < 1) {
-		print_timestamp(); print("ERROR: Dump file contains < 1 INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " FNR);
+		print_timestamp(); print("ERROR: Dump file contains < 1 INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump contains " dump_file_analyze[dump_file, "databases"][db_sub_name] " INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " FNR);
+			print_timestamp(); print("NOTICE: Dump contains " dump_file_analyze[dump_file, "databases"][db_sub_name] " INSERTS for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
 	# Check dump date
 	if ((secs_now - secs_dfa_date) > 86400) {
-		print_timestamp(); print("ERROR: Dump file date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " FNR);
+		print_timestamp(); print("ERROR: Dump file date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump file date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " FNR);
+			print_timestamp(); print("NOTICE: Dump file date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
 }
 END {
-        # Total lines check
-        if ((total_lines == 0) && (check_backup_skip_mysql_warning == 0))  {
-                print_timestamp(); print("WARNING: Backup server " checked_host_name " mysql backup check txt config empty");
-        }
-        if ((total_lines > 0) && (check_backup_skip_mysql_warning == 1))  {
-                print_timestamp(); print("WARNING: Backup server " checked_host_name " mysql backup check txt config not empty but you have check_backup_skip_mysql_warning: True set");
-        }
 	# Summ results
         my_folder = "/opt/sysadmws/rsnapshot_backup";
         system("awk '{ print $1 + " total_errors "}' < " my_folder "/check_backup_error_count.txt > " my_folder "/check_backup_error_count.txt.new && mv -f " my_folder "/check_backup_error_count.txt.new " my_folder "/check_backup_error_count.txt");
