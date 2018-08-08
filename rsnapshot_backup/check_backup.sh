@@ -30,7 +30,7 @@ then
 else
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "ERROR: Cannot acquire lock, giving up on $LOCK_DIR"
-	exit 0
+	exit 1
 fi
 
 CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf

@@ -1,7 +1,13 @@
 BEGIN {
+	total_errors    = 0;
+	# Get my hostname
+	hn_cmd = "hostname -f";
+	hn_cmd | getline checked_host_name;
+	close(hn_cmd);
 	# Check rsnapshot type
 	if ((rsnapshot_type != "sync") && (rsnapshot_type != "hourly") && (rsnapshot_type != "daily") && (rsnapshot_type != "weekly") && (rsnapshot_type != "monthly")) {
 		print_timestamp(); print("ERROR: Unknown rsnapshot type: " rsnapshot_type);
+		total_errors = total_errors + 1;
 		exit;
 	}
 }
@@ -13,12 +19,14 @@ function check_ssh(f_connect_user, f_host_name, f_row_number) {
 	err = system(ssh_check_cmd);
 	if (err != 0) {
 		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+		total_errors = total_errors + 1;
 		next;
 	} else {
 		ssh_check_cmd | getline checked_host_name;
 		close(ssh_check_cmd);
 		if (checked_host_name != host_name) {
 			print_timestamp(); print("ERROR: Remote hostname doesn't match config hostname on line " f_row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		}
 	}
@@ -30,6 +38,7 @@ function check_ssh_no_hostname_custom_port(f_connect_user, f_host_name, f_host_p
 	err = system(ssh_check_cmd);
 	if (err != 0) {
 		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+		total_errors = total_errors + 1;
 		next;
 	}
 }
@@ -111,6 +120,7 @@ function print_timestamp() {
 		err = system("rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Backup failed on line " row_number);
+			total_errors = total_errors + 1;
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
@@ -199,6 +209,7 @@ function print_timestamp() {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
 				system(template_file " | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
@@ -217,6 +228,7 @@ function print_timestamp() {
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
@@ -261,6 +273,7 @@ function print_timestamp() {
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote temp file creation failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		} else {
 			print_timestamp(); print("NOTICE: Remote temp file creation finished on line " row_number);
@@ -296,6 +309,7 @@ function print_timestamp() {
 		err = system(make_dump_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		} else {
 			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
@@ -329,6 +343,7 @@ function print_timestamp() {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
@@ -347,6 +362,7 @@ function print_timestamp() {
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
@@ -411,6 +427,7 @@ function print_timestamp() {
 		err = system(make_dump_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		} else {
 			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
@@ -444,6 +461,7 @@ function print_timestamp() {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
@@ -462,6 +480,7 @@ function print_timestamp() {
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
@@ -479,6 +498,7 @@ function print_timestamp() {
 		# If native rsync - password is mandatory (passwordless rsync is unsafe)
 		if (connect_passwd == "null") {
 			print_timestamp(); print("ERROR: No Rsync password provided for native rsync on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		}
 		if (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") {
@@ -489,6 +509,7 @@ function print_timestamp() {
 			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" host_name "" backup_src "/ | grep .backup");
 			if (err != 0) {
 				print_timestamp(); print("ERROR: .backup not found, failed on line " row_number ", skipping to next line");
+				total_errors = total_errors + 1;
 				next;
 			} else {
 				print_timestamp(); print("NOTICE: .backup found on line " row_number);
@@ -529,6 +550,7 @@ function print_timestamp() {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
@@ -546,6 +568,7 @@ function print_timestamp() {
 				err2 = system(timeout_prefix "bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
@@ -560,6 +583,7 @@ function print_timestamp() {
 		err = system(host_name);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Preexec failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
 			next;
 		}
 		# Check no compress file
@@ -586,6 +610,7 @@ function print_timestamp() {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
@@ -601,6 +626,7 @@ function print_timestamp() {
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
 					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
@@ -608,10 +634,26 @@ function print_timestamp() {
 				}
 			}
 			print_timestamp(); print("ERROR: Backup failed on line " row_number);
+			total_errors = total_errors + 1;
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
 	} else {
 		print_timestamp(); print("ERROR: unknown backup type: " backup_type);
+		total_errors = total_errors + 1;
+	}
+}
+END {
+	# Summ results
+	my_folder = "/opt/sysadmws/rsnapshot_backup";
+	system("awk '{ print $1 + " total_errors "}' < " my_folder "/rsnapshot_backup_error_count.txt > " my_folder "/rsnapshot_backup_error_count.txt.new && mv -f " my_folder "/rsnapshot_backup_error_count.txt.new " my_folder "/rsnapshot_backup_error_count.txt");
+	# Total errors
+	if (total_errors == 0) {
+		if (show_notices == 1) {
+			print_timestamp(); print("NOTICE: rsnapshot_backup on server " checked_host_name " run OK: ");
+		}
+	} else {
+		print_timestamp(); print("ERROR: rsnapshot_backup on server " checked_host_name " errors found: " total_errors);
+		exit(1);
 	}
 }

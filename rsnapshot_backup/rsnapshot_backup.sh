@@ -36,11 +36,13 @@ then
 else
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "ERROR: Cannot acquire lock, giving up on $LOCK_DIR"
-	exit 0
+	exit 1
 fi
 
 CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf
+ERROR_COUNT_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_error_count.txt
 GRAND_EXIT=0
+echo "0" > $ERROR_COUNT_FILE
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
@@ -93,6 +95,12 @@ if [ -f $CONF_FILE ]; then
 			GRAND_EXIT=1
 		fi
 	done
+	if [ "`cat $ERROR_COUNT_FILE`" != "0" ]; then
+		date '+%F %T ' | tr -d '\n'
+		echo -n "RESULT: Errors occuried: "
+		cat $ERROR_COUNT_FILE
+		GRAND_EXIT=1
+	fi
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "NOTICE: Script finished"
 	exit $GRAND_EXIT
