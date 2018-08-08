@@ -50,7 +50,7 @@ function print_timestamp() {
 	if (system("test ! -e " check_file) == 0) {
 		print_timestamp(); print("ERROR: Check file missing: '" check_file "' on line " row_number);
 		total_errors = total_errors + 1;
-		continue;
+		next;
 	}
 	# Read variables from check file
 	delete line_array;
@@ -80,12 +80,10 @@ function print_timestamp() {
 	if (s3_bucket != chf_bucket) {
 		print_timestamp(); print("ERROR: Check file S3 bucket mismatch: '" s3_bucket "' != '" chf_bucket "', file: '" check_file "' on line " row_number);
 		total_errors = total_errors + 1;
-		continue;
 	}
 	if (s3_path != chf_path) {
 		print_timestamp(); print("ERROR: Check file S3 path mismatch: '" s3_path "' != '" chf_path "', file: '" check_file "' on line " row_number);
 		total_errors = total_errors + 1;
-		continue;
 	}
 	# Calculate diff between dates
 	secs_now_cmd = "date '+%s'";
@@ -97,7 +95,6 @@ function print_timestamp() {
 	if ((secs_now - secs_chf_date) > 86400) {
 		print_timestamp(); print("ERROR: Check file date older than one day: '" chf_date "', file: '" check_file "' on line " row_number);
 		total_errors = total_errors + 1;
-		continue;
 	}
 	if (backup_hosts_num > 0) {
 		backup_host_found = 0;
@@ -109,18 +106,15 @@ function print_timestamp() {
 		if (backup_host_found == 0) {
 			print_timestamp(); print("ERROR: Check file backup host not found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 	} else {
 		if (checked_host_name != chf_backup_host) {
 			print_timestamp(); print("ERROR: Check file backup host mismatch: '" checked_host_name "' != '" chf_backup_host "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 		if (backup_dst != chf_backup_path) {
 			print_timestamp(); print("ERROR: Check file backup path mismatch: '" backup_dst "' != '" chf_backup_path "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 	}
 	# So if it is ok

@@ -120,12 +120,10 @@ function print_timestamp() {
 		if (host_name != chf_host) {
 			print_timestamp(); print("ERROR: Check file host mismatch: '" host_name "' != '" chf_host "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 		if (host_path != chf_path) {
 			print_timestamp(); print("ERROR: Check file path mismatch: '" host_path "' != '" chf_path "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 		# Calculate diff between dates
 		secs_now_cmd = "date '+%s'";
@@ -137,7 +135,6 @@ function print_timestamp() {
 		if ((secs_now - secs_chf_date) > 86400) {
 			print_timestamp(); print("ERROR: Check file date older than one day: '" chf_date "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
-			continue;
 		}
 		if (backup_hosts_num > 0) {
 			backup_host_found = 0;
@@ -149,18 +146,15 @@ function print_timestamp() {
 			if (backup_host_found == 0) {
 				print_timestamp(); print("ERROR: Check file backup host not found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
-				continue;
 			}
 		} else {
 			if (checked_host_name != chf_backup_host) {
 				print_timestamp(); print("ERROR: Check file backup host mismatch: '" checked_host_name "' != '" chf_backup_host "', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
-				continue;
 			}
 			if (backup_dst != chf_backup_path) {
 				print_timestamp(); print("ERROR: Check file backup path mismatch: '" backup_dst "' != '" chf_backup_path "', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
-				continue;
 			}
 		}
 		# So if it is ok
