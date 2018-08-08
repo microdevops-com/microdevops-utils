@@ -103,8 +103,34 @@ if [ -f $CONF_FILE ]; then
 					if [ $? -gt 0 ]; then
 						GRAND_EXIT=1
 					fi
-				fi
-				if [ "${CHECK_TYPE}" == "FILE_AGE" ]; then
+				elif [ "${CHECK_TYPE}" == "s3/.backup" ]; then
+					CHECK_S3_BUCKET=$(echo ${CHECK} | jq -r '.s3_bucket')
+					CHECK_S3_PATH=$(echo ${CHECK} | jq -r '.s3_path')
+					# No data need to be read by awk, so send just null
+					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_s3_dot_backup.awk \
+						-v show_notices=$1 \
+						-v row_number=${ROW_NUMBER} \
+						-v row_enabled=${ROW_ENABLED} \
+						-v row_comment=${ROW_COMMENT} \
+						-v row_connect=${ROW_CONNECT} \
+						-v row_host=${ROW_HOST} \
+						-v row_path=${ROW_PATH} \
+						-v row_source=${ROW_SOURCE} \
+						-v row_type=${ROW_TYPE} \
+						-v row_retain_h=${ROW_RETAIN_H} \
+						-v row_retain_d=${ROW_RETAIN_D} \
+						-v row_retain_w=${ROW_RETAIN_W} \
+						-v row_retain_m=${ROW_RETAIN_M} \
+						-v row_run_args=${ROW_RUN_ARGS} \
+						-v row_connect_user=${ROW_CONNECT_USER} \
+						-v row_connect_passwd=${ROW_CONNECT_PASSWD} \
+						-v check_s3_bucket=${CHECK_S3_BUCKET} \
+						-v check_s3_path=${CHECK_S3_PATH}
+					# Exit code depends on rows
+					if [ $? -gt 0 ]; then
+						GRAND_EXIT=1
+					fi
+				elif [ "${CHECK_TYPE}" == "FILE_AGE" ]; then
 					CHECK_MIN_FILE_SIZE=$(echo ${CHECK} | jq -r '.min_file_size')
 					CHECK_FILE_TYPE=$(echo ${CHECK} | jq -r '.file_type')
 					CHECK_LAST_FILE_AGE=$(echo ${CHECK} | jq -r '.last_file_age')
@@ -137,8 +163,7 @@ if [ -f $CONF_FILE ]; then
 					if [ $? -gt 0 ]; then
 						GRAND_EXIT=1
 					fi
-				fi
-				if [ "${CHECK_TYPE}" == "POSTGRESQL" -o "${CHECK_TYPE}" == "MYSQL" ]; then
+				elif [ "${CHECK_TYPE}" == "POSTGRESQL" -o "${CHECK_TYPE}" == "MYSQL" ]; then
 					if [ "${CHECK_TYPE}" == "POSTGRESQL" ]; then
 						DB_LIST_PATH="postgresql/db_list.txt"
 						AWK_SCRIPT="check_postgresql.awk"
@@ -210,6 +235,10 @@ if [ -f $CONF_FILE ]; then
 						fi
 					fi
 					rm -f /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
+				else
+					date '+%F %T ' | tr -d '\n'
+					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found"
+					GRAND_EXIT=1
 				fi
 			done
 			rm -f /opt/sysadmws/rsnapshot_backup/check_backup_checks.tmp

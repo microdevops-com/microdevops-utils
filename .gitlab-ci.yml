@@ -96,6 +96,7 @@ make_deb_v1:
        rsnapshot_backup/rsnapshot_backup.logrotate \
        rsnapshot_backup/check_backup.sh \
        rsnapshot_backup/check_dot_backup.awk \
+       rsnapshot_backup/check_s3_dot_backup.awk \
        rsnapshot_backup/check_file_age.awk \
        rsnapshot_backup/check_mysql.awk \
        rsnapshot_backup/check_postgresql.awk \
