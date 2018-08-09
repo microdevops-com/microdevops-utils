@@ -83,6 +83,7 @@ make_deb_v1:
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
        rsnapshot_backup/rsnapshot_backup.sh \
+       rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf \
        rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf \

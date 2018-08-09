@@ -2,7 +2,7 @@ BEGIN {
 	total_errors    = 0;
 	# Get my hostname
 	hn_cmd = "hostname -f";
-	hn_cmd | getline checked_host_name;
+	hn_cmd | getline my_host_name;
 	close(hn_cmd);
 	# Check rsnapshot type
 	if ((rsnapshot_type != "sync") && (rsnapshot_type != "hourly") && (rsnapshot_type != "daily") && (rsnapshot_type != "weekly") && (rsnapshot_type != "monthly")) {
@@ -14,13 +14,41 @@ BEGIN {
 
 # Func to check batch ssh login and hostname match
 function check_ssh(f_connect_user, f_host_name, f_row_number) {
-	print_timestamp(); printf("NOTICE: Checked hostname: ");
+	print_timestamp(); printf("NOTICE: Checking remote hostname: ");
 	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
-		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
-		total_errors = total_errors + 1;
-		next;
+		# If connect to self try to add key automaticaly
+		if (f_host_name == my_host_name) {
+			print_timestamp(); print("NOTICE: Loopback connect detected on line " f_row_number ", trying to add server key to authorized");
+			err2 = system("/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh");
+			if (err2 != 0) {
+				print_timestamp(); print("ERROR: Adding key failed on line " f_row_number ", skipping to next line");
+				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback_out.tmp");
+				total_errors = total_errors + 1;
+				next;
+			} else {
+				print_timestamp(); printf("NOTICE: Checking remote hostname again: ");
+				err3 = system(ssh_check_cmd);
+				if (err3 != 0) {
+					print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+					total_errors = total_errors + 1;
+					next;
+				} else {
+					ssh_check_cmd | getline checked_host_name;
+					close(ssh_check_cmd);
+					if (checked_host_name != host_name) {
+						print_timestamp(); print("ERROR: Remote hostname doesn't match config hostname on line " f_row_number ", skipping to next line");
+						total_errors = total_errors + 1;
+						next;
+					}
+				}
+			}
+		} else {
+			print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+			total_errors = total_errors + 1;
+			next;
+		}
 	} else {
 		ssh_check_cmd | getline checked_host_name;
 		close(ssh_check_cmd);
@@ -33,7 +61,7 @@ function check_ssh(f_connect_user, f_host_name, f_row_number) {
 }
 # Func to check batch ssh login and hostname match
 function check_ssh_no_hostname_custom_port(f_connect_user, f_host_name, f_host_port, f_row_number) {
-	print_timestamp(); printf("NOTICE: Checked hostname: ");
+	print_timestamp(); printf("NOTICE: Checking remote hostname: ");
 	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
@@ -650,10 +678,10 @@ END {
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: rsnapshot_backup on server " checked_host_name " run OK: ");
+			print_timestamp(); print("NOTICE: rsnapshot_backup on server " my_host_name " run OK: ");
 		}
 	} else {
-		print_timestamp(); print("ERROR: rsnapshot_backup on server " checked_host_name " errors found: " total_errors);
+		print_timestamp(); print("ERROR: rsnapshot_backup on server " my_host_name " errors found: " total_errors);
 		exit(1);
 	}
 }
