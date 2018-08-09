@@ -15,7 +15,7 @@ BEGIN {
 # Func to check batch ssh login and hostname match
 function check_ssh(f_connect_user, f_host_name, f_row_number) {
 	print_timestamp(); printf("NOTICE: Checked hostname: ");
-	ssh_check_cmd = "ssh -o BatchMode=yes " f_connect_user "@" f_host_name " 'hostname'";
+	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
 		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
@@ -34,7 +34,7 @@ function check_ssh(f_connect_user, f_host_name, f_row_number) {
 # Func to check batch ssh login and hostname match
 function check_ssh_no_hostname_custom_port(f_connect_user, f_host_name, f_host_port, f_row_number) {
 	print_timestamp(); printf("NOTICE: Checked hostname: ");
-	ssh_check_cmd = "ssh -o BatchMode=yes -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
+	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
 		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
@@ -136,15 +136,15 @@ function print_timestamp() {
 		if (match(host_name, ":")) {
 			host_port = substr(host_name, RSTART + 1);
 			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -p " host_port;
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
 		} else if (backup_type == "FS_RSYNC_SSH_NOCHECK") {
-			ssh_args = "-o BatchMode=yes -p 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
 		} else {
-			ssh_args = "-o BatchMode=yes -p 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
 			# Check batch ssh login and hostname match
 			check_ssh(connect_user, host_name, row_number);
 		}
@@ -246,18 +246,18 @@ function print_timestamp() {
 		if (match(host_name, ":")) {
 			host_port = substr(host_name, RSTART + 1);
 			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -p " host_port;
-			scp_args = "-o BatchMode=yes -P " host_port;
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P " host_port;
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
 		} else if ((backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
-			ssh_args = "-o BatchMode=yes -p 22"
-			scp_args = "-o BatchMode=yes -P 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22"
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
 		} else {
-			ssh_args = "-o BatchMode=yes -p 22"
-			scp_args = "-o BatchMode=yes -P 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22"
 			# Check batch ssh login and hostname match
 			check_ssh(connect_user, host_name, row_number);
 		}
@@ -380,15 +380,15 @@ function print_timestamp() {
 		if (match(host_name, ":")) {
 			host_port = substr(host_name, RSTART + 1);
 			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -p " host_port;
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
 		} else if ((backup_type == "MYSQL_NOEVENTS_NOCHECK") || (backup_type == "MYSQL_NOCHECK")) {
-			ssh_args = "-o BatchMode=yes -p 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
 			# Check batch ssh login only
 			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
 		} else {
-			ssh_args = "-o BatchMode=yes -p 22"
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
 			# Check batch ssh login and hostname match
 			check_ssh(connect_user, host_name, row_number);
 		}
