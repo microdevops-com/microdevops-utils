@@ -43,6 +43,7 @@ CONF_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.conf
 ERROR_COUNT_FILE=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_error_count.txt
 GRAND_EXIT=0
 echo "0" > $ERROR_COUNT_FILE
+declare -A ROTATIONS
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
@@ -69,6 +70,16 @@ if [ -f $CONF_FILE ]; then
 		if [ "$2" != "" ]; then
 			if [ "$2" -ne "${ROW_NUMBER}" ]; then
 				continue
+			fi
+		fi
+		# For rotation items (!= sync) - do a rotation only once per path (ROW_PATH)
+		if [ "$1" != "sync" ]; then
+			if [ "_${ROTATIONS[${ROW_PATH}]}" == "_done" ]; then
+				date '+%F %T ' | tr -d '\n'
+				echo -e >&2 "NOTICE: Rotation for ${ROW_PATH} has been already made, skipping"
+				continue
+			else
+				ROTATIONS[${ROW_PATH}]="done"
 			fi
 		fi
 		# No data need to be read by awk, so send just null
