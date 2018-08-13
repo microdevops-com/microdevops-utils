@@ -257,10 +257,10 @@ if [ -f $CONF_FILE ]; then
 		date '+%F %T ' | tr -d '\n'
 		echo -n "RESULT: Successful checks made: "
 		cat $OK_COUNT_FILE
-		date '+%F %T ' | tr -d '\n'
-		echo -n "RESULT: Errors during checks: "
-		cat $ERROR_COUNT_FILE
 		if [ "`cat $ERROR_COUNT_FILE`" != "0" ]; then
+			date '+%F %T ' | tr -d '\n'
+			echo -n "RESULT: Errors during checks: "
+			cat $ERROR_COUNT_FILE
 			GRAND_EXIT=1
 		fi
 	fi
