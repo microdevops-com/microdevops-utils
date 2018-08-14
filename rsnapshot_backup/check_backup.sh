@@ -173,7 +173,11 @@ if [ -f $CONF_FILE ]; then
 						AWK_SCRIPT="check_mysql.awk"
 					fi
 					# Get empty_db
-					echo ${CHECK} | jq -r '.empty_db' | jq -c '.[]' | sed -e 's/^"//' -e 's/"$//' > /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
+					if [ $(echo ${CHECK} | jq -r '.empty_db') != "null" ]; then
+						echo ${CHECK} | jq -r '.empty_db' | jq -c '.[]' | sed -e 's/^"//' -e 's/"$//' > /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
+					else
+						echo "" > /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
+					fi
 					# Expand db_list.txt for ALL
 					if [ "${ROW_SOURCE}" == "ALL" ]; then
 						if [ ! -f "${ROW_PATH}/.sync/rsnapshot/var/backups/${DB_LIST_PATH}" ]; then
