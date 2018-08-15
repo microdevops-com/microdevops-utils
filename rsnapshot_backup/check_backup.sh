@@ -173,7 +173,7 @@ if [ -f $CONF_FILE ]; then
 						AWK_SCRIPT="check_mysql.awk"
 					fi
 					# Get empty_db
-					if [ $(echo ${CHECK} | jq -r '.empty_db') != "null" ]; then
+					if [ "$(echo ${CHECK} | jq -r '.empty_db')" != "null" ]; then
 						echo ${CHECK} | jq -r '.empty_db' | jq -c '.[]' | sed -e 's/^"//' -e 's/"$//' > /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
 					else
 						echo "" > /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
