@@ -54,7 +54,7 @@ function print_timestamp() {
 	if (show_notices >= 1) {
 		print_timestamp();
 		printf("NOTICE: Dump file stats: " host_name "/" db_sub_name " ");
-		system("ls -h -s " gensub("/.sync/", "/daily.1/", "g", dump_file) " | awk '{print $1}' | tr -d '\n'");
+		system("( [ -f '" gensub("/.sync/", "/daily.1/", "g", dump_file) "' ] && ls -h -s " gensub("/.sync/", "/daily.1/", "g", dump_file) " || echo 0 ) | awk '{print $1}' | tr -d '\n'");
 		printf(" -> ");
 		system("ls -h -s " dump_file " | awk '{print $1}'");
 	}
