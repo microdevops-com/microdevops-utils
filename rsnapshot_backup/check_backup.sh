@@ -181,6 +181,7 @@ if [ -f $CONF_FILE ]; then
 					# Expand db_list.txt for ALL
 					if [ "${ROW_SOURCE}" == "ALL" ]; then
 						if [ ! -f "${ROW_PATH}/.sync/rsnapshot/var/backups/${DB_LIST_PATH}" ]; then
+							date '+%F %T ' | tr -d '\n'
 							echo -e >&2 "ERROR: ${ROW_PATH}/.sync/rsnapshot/var/backups/${DB_LIST_PATH} not found on ALL source"
 							GRAND_EXIT=1
 						else
