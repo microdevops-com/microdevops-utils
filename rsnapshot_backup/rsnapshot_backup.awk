@@ -441,10 +441,10 @@ function print_timestamp() {
 			for (db_exclude in db_excludes) {
 				grep_part = grep_part "-e " db_excludes[db_exclude] " ";
 			}
-			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v performance_schema | " grep_part " > /var/backups/mysql/db_list.txt";
+			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema | " grep_part " > /var/backups/mysql/db_list.txt";
 			backup_src = "ALL";
 		} else {
-			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v performance_schema > /var/backups/mysql/db_list.txt";
+			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema > /var/backups/mysql/db_list.txt";
 		}
 		if (backup_src == "ALL") {
 			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db | gzip > /var/backups/mysql/$db.gz ); done } '";
