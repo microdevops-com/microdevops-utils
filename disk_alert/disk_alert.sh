@@ -12,7 +12,9 @@ declare -A DISK_ALERT_PREDICT_CRITICAL
 TIMESTAMP=$(date '+%s')
 
 # Include config
-. /opt/sysadmws/disk_alert/disk_alert.conf
+if [ -f /opt/sysadmws/disk_alert/disk_alert.conf ]; then
+	. /opt/sysadmws/disk_alert/disk_alert.conf
+fi
 
 # Check defaults
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
