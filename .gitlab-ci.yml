@@ -63,7 +63,7 @@ make_deb_v1:
     # disk_alert
     cp disk_alert/disk_alert.sh \
        disk_alert/disk_alert.cron \
-       disk_alert/disk_alert.conf \
+       disk_alert/disk_alert.conf.example \
        disk_alert/lr.awk \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/disk_alert
     # put_check_files
