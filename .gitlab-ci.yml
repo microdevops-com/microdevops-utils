@@ -52,7 +52,7 @@ make_deb_v1:
     # mysql_replica_checker
     cp mysql_replica_checker/mysql_replica_checker.sh \
        mysql_replica_checker/mysql_replica_checker.cron \
-       mysql_replica_checker/mysql_replica_checker.conf.sample \
+       mysql_replica_checker/mysql_replica_checker.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker
     # notify_devilry
     cp notify_devilry/notify_devilry.py \
@@ -69,16 +69,16 @@ make_deb_v1:
     # put_check_files
     cp put_check_files/put_check_files.sh \
        put_check_files/put_check_files.cron \
-       put_check_files/put_check_files.conf.sample \
+       put_check_files/put_check_files.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files
     # logrotate_db_backup
     cp logrotate_db_backup/logrotate_db_backup.awk \
-       logrotate_db_backup/logrotate_db_backup.conf.sample \
+       logrotate_db_backup/logrotate_db_backup.conf.example \
        logrotate_db_backup/logrotate_db_backup.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup
     # mikrotik_backup
     cp mikrotik_backup/mikrotik_backup.sh \
-       mikrotik_backup/mikrotik_backup.conf.sample \
+       mikrotik_backup/mikrotik_backup.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
