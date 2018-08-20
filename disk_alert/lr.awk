@@ -1,5 +1,5 @@
-# Predict the time of disk fill at 100% based on historic data and linear regression
-# AWK bug: sometimes it cannot == zero with zero, division by zero occurs, but it doesn't matter it only occurs on zero angle slope
+# Predict the time of disk fill at 100% based on historic data and linear regression.
+# AWK bug: sometimes it cannot == zero with zero, division by zero occurs, but it doesn't matter it only occurs on zero angle slope.
 BEGIN {
 	FS = "\t"
 }
