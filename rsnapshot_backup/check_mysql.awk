@@ -132,7 +132,7 @@ END {
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Backup server " checked_host_name " mysql backups checked OK: " total_ok);
+			print_timestamp(); print("NOTICE: Backup server " checked_host_name " mysql backups OK checks: " total_ok);
 		}
 	} else {
 		print_timestamp(); print("ERROR: Backup server " checked_host_name " mysql backup errors found: " total_errors);

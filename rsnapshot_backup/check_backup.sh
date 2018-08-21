@@ -87,6 +87,8 @@ if [ -f $CONF_FILE ]; then
 			for CHECK in $(cat /opt/sysadmws/rsnapshot_backup/check_backup_checks.tmp | jq -c '.[]'); do
 				CHECK_TYPE=$(echo ${CHECK} | jq -r '.type')
 				if [ "${CHECK_TYPE}" == ".backup" ]; then
+					# AWK interprets slashes as special sequences, so we double slash them
+					CHECK_PATH=$(echo ${CHECK} | jq -r '.path' | sed -e 's#\\#\\\\#g')
 					# No data need to be read by awk, so send just null
 					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_dot_backup.awk \
 						-v show_notices=$1 \
@@ -110,7 +112,8 @@ if [ -f $CONF_FILE ]; then
 						-v row_mysql_noevents=${ROW_MYSQL_NOEVENTS} \
 						-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 						-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
-						-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC}
+						-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+						-v check_path=${CHECK_PATH}
 					# Exit code depends on rows
 					if [ $? -gt 0 ]; then
 						GRAND_EXIT=1
@@ -150,10 +153,10 @@ if [ -f $CONF_FILE ]; then
 					fi
 				elif [ "${CHECK_TYPE}" == "FILE_AGE" ]; then
 					CHECK_MIN_FILE_SIZE=$(echo ${CHECK} | jq -r '.min_file_size')
-					CHECK_FILE_TYPE=$(echo ${CHECK} | jq -r '.file_type')
+					CHECK_FILE_TYPE=$(echo ${CHECK} | jq -r '.file_type' | sed -e 's#\\#\\\\#g')
 					CHECK_LAST_FILE_AGE=$(echo ${CHECK} | jq -r '.last_file_age')
 					CHECK_FILES_TOTAL=$(echo ${CHECK} | jq -r '.files_total')
-					CHECK_FILES_MASK=$(echo ${CHECK} | jq -r '.files_mask')
+					CHECK_FILES_MASK=$(echo ${CHECK} | jq -r '.files_mask' | sed -e 's#\\#\\\\#g')
 					# No data need to be read by awk, so send just null
 					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_file_age.awk \
 						-v show_notices=$1 \

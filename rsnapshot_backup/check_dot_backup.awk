@@ -23,6 +23,7 @@ function print_timestamp() {
 	host_path	= row_source;
 	backup_dst	= row_path;
 	backup_type	= row_type;
+	check_path	= check_path;
 
 	# Expand macro values
 	delete host_path_arr;
@@ -61,8 +62,11 @@ function print_timestamp() {
 		chf_host = ""; chf_path = ""; chf_date = ""; chf_backup_host = ""; chf_backup_path = "";
 		# Construct path
 		if (backup_type == "FS_RSYNC_NATIVE") {
-			check_file = backup_dst "/.sync/rsnapshot/.backup";
-			check_dir = backup_dst "/.sync/rsnapshot";
+			strip_first_dir_cmd = "echo '" host_path "' | cut -d'/' -f3-";
+			strip_first_dir_cmd | getline stripped_host_path;
+			close(strip_first_dir_cmd);
+			check_file = backup_dst "/.sync/rsnapshot/" stripped_host_path "/.backup";
+			check_dir = backup_dst "/.sync/rsnapshot/" stripped_host_path;
 		} else if (backup_type == "FS_RSYNC_SSH") {
 			check_file = backup_dst "/.sync/rsnapshot" host_path "/.backup";
 			check_dir = backup_dst "/.sync/rsnapshot" host_path;
@@ -87,6 +91,11 @@ function print_timestamp() {
 			print_timestamp(); print("ERROR: .backup file missing: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
 			continue;
+		} else {
+			if (show_notices == 1) {
+				print_timestamp(); print("NOTICE: .backup file exists: '" check_file "' on line " row_number);
+			}
+			total_ok = total_ok + 1;
 		}
 		# Read variables from check file
 		delete line_array;
@@ -120,10 +129,26 @@ function print_timestamp() {
 		if (host_name != chf_host) {
 			print_timestamp(); print("ERROR: .backup file host mismatch: '" host_name "' != '" chf_host "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
+		} else {
+			if (show_notices == 1) {
+				print_timestamp(); print("NOTICE: .backup file host match: '" host_name "' == '" chf_host "', file: '" check_file "' on line " row_number);
+			}
+			total_ok = total_ok + 1;
 		}
-		if (host_path != chf_path) {
-			print_timestamp(); print("ERROR: .backup file path mismatch: '" host_path "' != '" chf_path "', file: '" check_file "' on line " row_number);
+		# Check if check has own path
+		if (check_path != "null") {
+			path_to_check = check_path;
+		} else {
+			path_to_check = host_path;
+		}
+		if (path_to_check != chf_path) {
+			print_timestamp(); print("ERROR: .backup file path mismatch: '" path_to_check "' != '" chf_path "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
+		} else {
+			if (show_notices == 1) {
+				print_timestamp(); print("NOTICE: .backup file path match: '" path_to_check "' == '" chf_path "', file: '" check_file "' on line " row_number);
+			}
+			total_ok = total_ok + 1;
 		}
 		# Calculate diff between dates
 		secs_now_cmd = "date '+%s'";
@@ -135,6 +160,11 @@ function print_timestamp() {
 		if ((secs_now - secs_chf_date) > 86400) {
 			print_timestamp(); print("ERROR: .backup file date older than one day: '" chf_date "', file: '" check_file "' on line " row_number);
 			total_errors = total_errors + 1;
+		} else {
+			if (show_notices == 1) {
+				print_timestamp(); print("NOTICE: .backup file date OK: '" chf_date "', file: '" check_file "' on line " row_number);
+			}
+			total_ok = total_ok + 1;
 		}
 		if (backup_hosts_num > 0) {
 			backup_host_found = 0;
@@ -146,15 +176,30 @@ function print_timestamp() {
 			if (backup_host_found == 0) {
 				print_timestamp(); print("ERROR: .backup file backup host not found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
+			} else {
+				if (show_notices == 1) {
+					print_timestamp(); print("NOTICE: .backup file backup host found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
+				}
+				total_ok = total_ok + 1;
 			}
 		} else {
 			if (checked_host_name != chf_backup_host) {
 				print_timestamp(); print("ERROR: .backup file backup host mismatch: '" checked_host_name "' != '" chf_backup_host "', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
+			} else {
+				if (show_notices == 1) {
+					print_timestamp(); print("NOTICE: .backup file backup host match: '" checked_host_name "' == '" chf_backup_host "', file: '" check_file "' on line " row_number);
+				}
+				total_ok = total_ok + 1;
 			}
 			if (backup_dst != chf_backup_path) {
 				print_timestamp(); print("ERROR: .backup file backup path mismatch: '" backup_dst "' != '" chf_backup_path "', file: '" check_file "' on line " row_number);
 				total_errors = total_errors + 1;
+			} else {
+				if (show_notices == 1) {
+					print_timestamp(); print("NOTICE: .backup file backup path match: '" backup_dst "' == '" chf_backup_path "', file: '" check_file "' on line " row_number);
+				}
+				total_ok = total_ok + 1;
 			}
 		}
 		# So if it is ok
@@ -172,7 +217,7 @@ END {
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Backup server " checked_host_name " check file backups checked OK: " total_ok);
+			print_timestamp(); print("NOTICE: Backup server " checked_host_name " check file backups OK checks: " total_ok);
 		}
 	} else {
 		print_timestamp(); print("ERROR: Backup server " checked_host_name " check file backup errors found: " total_errors);

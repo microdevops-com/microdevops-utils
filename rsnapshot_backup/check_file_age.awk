@@ -21,10 +21,10 @@ function print_timestamp() {
 	}
 
 	# Assign variables
-	host_name	= row_host;
-	host_path	= row_source;
-	backup_dst	= row_path;
-	backup_type	= row_type;
+	host_name			= row_host;
+	host_path			= row_source;
+	backup_dst			= row_path;
+	backup_type			= row_type;
 	backup_min_file_size		= check_min_file_size;
 	backup_file_type		= check_file_type;
 	backup_last_file_age		= check_last_file_age;
@@ -67,12 +67,19 @@ function print_timestamp() {
 
 		# Construct path
 		if (backup_type == "FS_RSYNC_NATIVE") {
-			backup_dst_full = backup_dst "/.sync/rsnapshot";
+                        strip_first_dir_cmd = "echo '" host_path "' | cut -d'/' -f3-";
+                        strip_first_dir_cmd | getline stripped_host_path;
+                        close(strip_first_dir_cmd);
+			backup_dst_full = backup_dst "/.sync/rsnapshot/" stripped_host_path;
 		} else if (backup_type == "FS_RSYNC_SSH") {
 			backup_dst_full = backup_dst "/.sync/rsnapshot" host_path;
 		}
 		# Construct find cmd
 		find_cmd = "find " backup_dst_full " -type f -regex '.*/" backup_files_mask "'";
+		if (show_notices == 1) {
+			print_timestamp(); print("NOTICE: find cmd: " find_cmd);
+		}
+
 		# Read files from find
 		delete find_files;
 		i = 0;
@@ -164,7 +171,7 @@ END {
 	# Total errors
 	if (total_errors == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Backup server " checked_host_name " backups file age checked OK: " total_ok);
+			print_timestamp(); print("NOTICE: Backup server " checked_host_name " backups file age OK checks: " total_ok);
 		}
 	} else {
 		print_timestamp(); print("ERROR: Backup server " checked_host_name " backup file age errors found: " total_errors);
