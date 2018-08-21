@@ -12,56 +12,56 @@ BEGIN {
 	}
 }
 
-# Func to check batch ssh login and hostname match
-function check_ssh(f_connect_user, f_host_name, f_row_number) {
+# Func to check remote hostname
+function check_ssh_remote_hostname(f_connect_user, f_host_name, f_host_port, f_row_number) {
 	print_timestamp(); printf("NOTICE: Checking remote hostname: ");
-	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no " f_connect_user "@" f_host_name " 'hostname'";
+	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
+	# Get exit code of ssh first
 	err = system(ssh_check_cmd);
-	if (err != 0) {
-		# If connect to self try to add key automaticaly
-		if (f_host_name == my_host_name) {
-			print_timestamp(); print("NOTICE: Loopback connect detected on line " f_row_number ", trying to add server key to authorized");
-			err2 = system("/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh");
-			if (err2 != 0) {
-				print_timestamp(); print("ERROR: Adding key failed on line " f_row_number ", skipping to next line");
-				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback_out.tmp");
-				total_errors = total_errors + 1;
-				next;
-			} else {
-				print_timestamp(); printf("NOTICE: Checking remote hostname again: ");
-				err3 = system(ssh_check_cmd);
-				if (err3 != 0) {
-					print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
-					total_errors = total_errors + 1;
-					next;
-				} else {
-					ssh_check_cmd | getline checked_host_name;
-					close(ssh_check_cmd);
-					if (checked_host_name != host_name) {
-						print_timestamp(); print("ERROR: Remote hostname doesn't match config hostname on line " f_row_number ", skipping to next line");
-						total_errors = total_errors + 1;
-						next;
-					}
-				}
-			}
-		} else {
-			print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
-			total_errors = total_errors + 1;
-			next;
-		}
-	} else {
+	if (err == 0) {
+		# Get output of hostname cmd then
 		ssh_check_cmd | getline checked_host_name;
 		close(ssh_check_cmd);
 		if (checked_host_name != host_name) {
-			print_timestamp(); print("ERROR: Remote hostname doesn't match config hostname on line " f_row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote hostname " checked_host_name " doesn't match expected hostname " host_name " on line " f_row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		}
 	}
 }
+
+# Func to check loopback batch ssh login and try to authorize
+function check_ssh_loopback(f_connect_user, f_host_name, f_host_port, f_row_number) {
+	print_timestamp(); printf("NOTICE: Checking remote SSH: ");
+	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
+	err = system(ssh_check_cmd);
+	# If OK - do nothing else, if error - try to authorize
+	if (err != 0) {
+		print_timestamp(); print("NOTICE: SSH without password failed on line " f_row_number ", trying to add server key to authorized");
+		err2 = system("/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh");
+		# If authorize script OK - check ssh again
+		if (err2 == 0) {
+			print_timestamp(); printf("NOTICE: Checking remote SSH again: ");
+			err3 = system(ssh_check_cmd);
+			# If second ssh check is not OK
+			if (err3 != 0) {
+				print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+				total_errors = total_errors + 1;
+				next;
+			}
+		# If authorize script error
+		} else {
+			print_timestamp(); print("ERROR: Adding key failed on line " f_row_number ", skipping to next line");
+			system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback_out.tmp");
+			total_errors = total_errors + 1;
+			next;
+		}
+	}
+}
+
 # Func to check batch ssh login and hostname match
-function check_ssh_no_hostname_custom_port(f_connect_user, f_host_name, f_host_port, f_row_number) {
-	print_timestamp(); printf("NOTICE: Checking remote hostname: ");
+function check_ssh(f_connect_user, f_host_name, f_host_port, f_row_number) {
+	print_timestamp(); printf("NOTICE: Checking remote SSH: ");
 	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
@@ -70,6 +70,7 @@ function check_ssh_no_hostname_custom_port(f_connect_user, f_host_name, f_host_p
 		next;
 	}
 }
+
 # Func to print timestamp at the beginning of line
 function print_timestamp() {
 	system("date '+%F %T ' | tr -d '\n'");
@@ -82,17 +83,23 @@ function print_timestamp() {
 	}
 
 	# Assign variables
-	host_name	= row_connect;
-	backup_type	= row_type;
-	backup_src	= row_source;
-	backup_dst	= row_path;
-	retain_h	= row_retain_h;
-	retain_d	= row_retain_d;
-	retain_w	= row_retain_w;
-	retain_m	= row_retain_m;
-	run_args	= row_run_args;
-	connect_user	= row_connect_user;
-	connect_passwd	= row_connect_passwd;
+	host_name		= row_host;
+	backup_type		= row_type;
+	backup_src		= row_source;
+	backup_dst		= row_path;
+	retain_h		= row_retain_h;
+	retain_d		= row_retain_d;
+	retain_w		= row_retain_w;
+	retain_m		= row_retain_m;
+	rsync_args		= row_rsync_args;
+	connect_hn		= row_connect;
+	connect_user		= row_connect_user;
+	connect_passwd		= row_connect_passwd;
+	validate_hostname	= row_validate_hostname;
+	postgresql_noclean	= row_postgresql_noclean;
+	mysql_noevents		= row_mysql_noevents;
+	native_txt_check	= row_native_txt_check;
+	native_10h_limit	= row_native_10h_limit;
 
 	# Check retains
 	if (retain_h == "null") {
@@ -116,8 +123,53 @@ function print_timestamp() {
 		connect_user = "root";
 	}
 
-	# Display what we backup
-	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " run_args " " connect_user " " connect_passwd " " row_comment "'");
+	# Default validate_hostname
+	if (validate_hostname == "null") {
+		validate_hostname = 1;
+	} else if (validate_hostname == "true") {
+		validate_hostname = 1;
+	} else {
+		validate_hostname = 0;
+	}
+
+	# Default postgresql_noclean
+	if (postgresql_noclean == "null") {
+		postgresql_noclean = 0;
+	} else if (postgresql_noclean == "true") {
+		postgresql_noclean = 1;
+	} else {
+		postgresql_noclean = 0;
+	}
+
+	# Default mysql_noevents
+	if (mysql_noevents == "null") {
+		mysql_noevents = 0;
+	} else if (mysql_noevents == "true") {
+		mysql_noevents = 1;
+	} else {
+		mysql_noevents = 0;
+	}
+
+	# Default native_txt_check
+	if (native_txt_check == "null") {
+		native_txt_check = 0;
+	} else if (native_txt_check == "true") {
+		native_txt_check = 1;
+	} else {
+		native_txt_check = 0;
+	}
+
+	# Default native_10h_limit
+	if (native_10h_limit == "null") {
+		native_10h_limit = 0;
+	} else if (native_10h_limit == "true") {
+		native_10h_limit = 1;
+	} else {
+		native_10h_limit = 0;
+	}
+
+	# Display what do we backup
+	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " rsync_args " " connect_hn " " connect_user " " connect_passwd " " row_comment "'");
 
 	# Progress bar on verbosity
 	if (verbosity == "1") {
@@ -156,25 +208,31 @@ function print_timestamp() {
 	}
 
 	# Main
-	if ((backup_type == "FS_RSYNC_SSH") || (backup_type == "FS_RSYNC_SSH_NOCHECK")) {
+	if (backup_type == "FS_RSYNC_SSH") {
 		# Default ssh and rsync args
-		if (run_args == "null") {
-			run_args = "";
+		if (rsync_args == "null") {
+			rsync_args = "";
 		}
-		if (match(host_name, ":")) {
-			host_port = substr(host_name, RSTART + 1);
-			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
-		} else if (backup_type == "FS_RSYNC_SSH_NOCHECK") {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
+		# Decide which port to use
+		if (match(connect_hn, ":")) {
+			connect_port = substr(connect_hn, RSTART + 1);
+			connect_hn = substr(connect_hn, 1, RSTART - 1);
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port;
 		} else {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			# Check batch ssh login and hostname match
-			check_ssh(connect_user, host_name, row_number);
+			connect_port = "22";
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22";
+		}
+		# If connect to self call func with autoauthorization
+		if (host_name == my_host_name) {
+			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
+		} else {
+			check_ssh(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Validate hostname if needed
+		if (validate_hostname) {
+			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		#
 		if (backup_src == "UBUNTU") {
@@ -213,7 +271,7 @@ function print_timestamp() {
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 		if (checknc == 0) {
-			run_args = run_args " --no-compress";
+			rsync_args = rsync_args " --no-compress";
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
@@ -225,11 +283,11 @@ function print_timestamp() {
 			-e 's#__W__#" retain_w "#g' \
 			-e 's#__M__#" retain_m "#g' \
 			-e 's#__USER__#" connect_user "#g' \
-			-e 's#__HOST_NAME__#" host_name "#g' \
+			-e 's#__HOST_NAME__#" connect_hn "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
 			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
 			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -246,11 +304,11 @@ function print_timestamp() {
 					-e 's#__W__#" retain_w "#g' \
 					-e 's#__M__#" retain_m "#g' \
 					-e 's#__USER__#" connect_user "#g' \
-					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__HOST_NAME__#" connect_hn "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
 					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
 					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -266,37 +324,44 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if ((backup_type == "POSTGRESQL") || (backup_type == "POSTGRESQL_NOCLEAN") || (backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
+	} else if (backup_type == "POSTGRESQL") {
 		# Default ssh and rsync args
-		if (run_args == "null") {
-			run_args = "";
+		if (rsync_args == "null") {
+			rsync_args = "";
 		}
-		if (match(host_name, ":")) {
-			host_port = substr(host_name, RSTART + 1);
-			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
-			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P " host_port;
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
-		} else if ((backup_type == "POSTGRESQL_NOCLEAN_NOCHECK") || (backup_type == "POSTGRESQL_NOCHECK")) {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22"
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
+		# Decide which port to use
+		if (match(connect_hn, ":")) {
+			connect_port = substr(connect_hn, RSTART + 1);
+			connect_hn = substr(connect_hn, 1, RSTART - 1);
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port;
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P " connect_port;
 		} else {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22"
-			# Check batch ssh login and hostname match
-			check_ssh(connect_user, host_name, row_number);
+			connect_port = "22";
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22";
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22";
+		}
+		# If connect to self call func with autoauthorization
+		if (host_name == my_host_name) {
+			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
+		} else {
+			check_ssh(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Validate hostname if needed
+		if (validate_hostname) {
+			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		#
-		if ((backup_type == "POSTGRESQL_NOCLEAN") || (backup_type == "POSTGRESQL_NOCLEAN_NOCHECK")) {
+		if (postgresql_noclean) {
+			print_timestamp(); print("NOTICE: postgresql_noclean set to True on line " row_number);
 			clean_part = "";
 		} else {
+			print_timestamp(); print("NOTICE: postgresql_noclean set to False on line " row_number);
 			clean_part = "--clean";
 		}
 		#
-		make_tmp_file_cmd = "scp " scp_args " /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" host_name ":/tmp/";
+		make_tmp_file_cmd = "scp " scp_args " /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" connect_hn ":/tmp/";
 		print_timestamp(); print("NOTICE: Running remote temp file creation");
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
@@ -329,9 +394,9 @@ function print_timestamp() {
                         dblist_part = "su - postgres -c \"cat /tmp/rsnapshot_backup_postgresql_query1.sql | psql --no-align -t template1\" > /var/backups/postgresql/db_list.txt";
                 }
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
@@ -347,7 +412,7 @@ function print_timestamp() {
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 		if (checknc == 0) {
-			run_args = run_args " --no-compress";
+			rsync_args = rsync_args " --no-compress";
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
@@ -359,10 +424,10 @@ function print_timestamp() {
 			-e 's#__W__#" retain_w "#g' \
 			-e 's#__M__#" retain_m "#g' \
 			-e 's#__USER__#" connect_user "#g' \
-			-e 's#__HOST_NAME__#" host_name "#g' \
+			-e 's#__HOST_NAME__#" connect_hn "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
 			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
 			-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
@@ -380,10 +445,10 @@ function print_timestamp() {
 					-e 's#__W__#" retain_w "#g' \
 					-e 's#__M__#" retain_m "#g' \
 					-e 's#__USER__#" connect_user "#g' \
-					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__HOST_NAME__#" connect_hn "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
 					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
 					-e 's#__SRC__#" "/var/backups/postgresql/#g' \
 					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
@@ -400,30 +465,38 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if ((backup_type == "MYSQL") || (backup_type == "MYSQL_NOEVENTS") || (backup_type == "MYSQL_NOEVENTS_NOCHECK") || (backup_type == "MYSQL_NOCHECK")) {
+	} else if (backup_type == "MYSQL") {
 		# Default ssh and rsync args
-		if (run_args == "null") {
-			run_args = "";
+		if (rsync_args == "null") {
+			rsync_args = "";
 		}
-		if (match(host_name, ":")) {
-			host_port = substr(host_name, RSTART + 1);
-			host_name = substr(host_name, 1, RSTART - 1);
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " host_port;
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, host_port, row_number);
-		} else if ((backup_type == "MYSQL_NOEVENTS_NOCHECK") || (backup_type == "MYSQL_NOCHECK")) {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			# Check batch ssh login only
-			check_ssh_no_hostname_custom_port(connect_user, host_name, "22", row_number);
+		# Decide which port to use
+		if (match(connect_hn, ":")) {
+			connect_port = substr(connect_hn, RSTART + 1);
+			connect_hn = substr(connect_hn, 1, RSTART - 1);
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port;
 		} else {
-			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22"
-			# Check batch ssh login and hostname match
-			check_ssh(connect_user, host_name, row_number);
+			connect_port = "22";
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22";
+		}
+		# If connect to self call func with autoauthorization
+		if (host_name == my_host_name) {
+			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
+		} else {
+			check_ssh(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Validate hostname if needed
+		if (validate_hostname) {
+			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		#
-		if ((backup_type == "MYSQL_NOEVENTS") || (backup_type == "MYSQL_NOEVENTS_NOCHECK")) {
+		if (mysql_noevents) {
+			print_timestamp(); print("NOTICE: mysql_noevents set to True on line " row_number);
 			events_part = "";
 		} else {
+			print_timestamp(); print("NOTICE: mysql_noevents set to False on line " row_number);
 			events_part = "--events";
 		}
 		#
@@ -447,9 +520,9 @@ function print_timestamp() {
 			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema > /var/backups/mysql/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db | gzip > /var/backups/mysql/$db.gz ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db | gzip > /var/backups/mysql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" host_name " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases " backup_src " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases " backup_src " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
@@ -465,7 +538,7 @@ function print_timestamp() {
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 		if (checknc == 0) {
-			run_args = run_args " --no-compress";
+			rsync_args = rsync_args " --no-compress";
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
@@ -477,10 +550,10 @@ function print_timestamp() {
 			-e 's#__W__#" retain_w "#g' \
 			-e 's#__M__#" retain_m "#g' \
 			-e 's#__USER__#" connect_user "#g' \
-			-e 's#__HOST_NAME__#" host_name "#g' \
+			-e 's#__HOST_NAME__#" connect_hn "#g' \
 			-e 's#__SSH_ARGS__#" ssh_args "#g' \
 			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
 			-e 's#__SRC__#" "/var/backups/mysql/#g' \
 			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
@@ -498,10 +571,10 @@ function print_timestamp() {
 					-e 's#__W__#" retain_w "#g' \
 					-e 's#__M__#" retain_m "#g' \
 					-e 's#__USER__#" connect_user "#g' \
-					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__HOST_NAME__#" connect_hn "#g' \
 					-e 's#__SSH_ARGS__#" ssh_args "#g' \
 					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
 					-e 's#__SRC__#" "/var/backups/mysql/#g' \
 					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
@@ -518,10 +591,10 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if ((backup_type == "FS_RSYNC_NATIVE") || (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") || (backup_type == "FS_RSYNC_NATIVE_TO_10H")) {
+	} else if (backup_type == "FS_RSYNC_NATIVE") {
 		# Default ssh and rsync args
-		if (run_args == "null") {
-			run_args = "";
+		if (rsync_args == "null") {
+			rsync_args = "";
 		}
 		# If native rsync - password is mandatory (passwordless rsync is unsafe)
 		if (connect_passwd == "null") {
@@ -529,12 +602,13 @@ function print_timestamp() {
 			total_errors = total_errors + 1;
 			next;
 		}
-		if (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") {
+		if (native_txt_check) {
+			print_timestamp(); print("NOTICE: native_txt_check set to True on line " row_number);
 			# Check remote .backup existance, if no file - skip to next. Remote windows rsync server can give empty set in some cases, which can lead to backup to be erased.
 			system("touch /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("chmod 600 /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("echo '" connect_passwd "' > /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
-			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" host_name "" backup_src "/ | grep .backup");
+			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" connect_hn "" backup_src "/ | grep .backup");
 			if (err != 0) {
 				print_timestamp(); print("ERROR: .backup not found, failed on line " row_number ", skipping to next line");
 				total_errors = total_errors + 1;
@@ -544,15 +618,17 @@ function print_timestamp() {
 			}
 			system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		}
-		if (backup_type == "FS_RSYNC_NATIVE_TO_10H") {
+		if (native_10h_limit) {
+			print_timestamp(); print("NOTICE: native_10h_limit set to True on line " row_number);
 			timeout_prefix = "timeout --preserve-status -k 60 10h ";
 		} else {
+			print_timestamp(); print("NOTICE: native_10h_limit set to False on line " row_number);
 			timeout_prefix = "";
 		}
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 		if (checknc == 0) {
-			run_args = run_args " --no-compress";
+			rsync_args = rsync_args " --no-compress";
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
@@ -567,10 +643,10 @@ function print_timestamp() {
 			-e 's#__W__#" retain_w "#g' \
 			-e 's#__M__#" retain_m "#g' \
 			-e 's#__USER__#" connect_user "#g' \
-			-e 's#__HOST_NAME__#" host_name "#g' \
+			-e 's#__HOST_NAME__#" connect_hn "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
 			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
 			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system(timeout_prefix "bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -587,10 +663,10 @@ function print_timestamp() {
 					-e 's#__W__#" retain_w "#g' \
 					-e 's#__M__#" retain_m "#g' \
 					-e 's#__USER__#" connect_user "#g' \
-					-e 's#__HOST_NAME__#" host_name "#g' \
+					-e 's#__HOST_NAME__#" connect_hn "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
 					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
 					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system(timeout_prefix "bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -617,7 +693,7 @@ function print_timestamp() {
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 		if (checknc == 0) {
-			run_args = run_args " --no-compress";
+			rsync_args = rsync_args " --no-compress";
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
@@ -630,7 +706,7 @@ function print_timestamp() {
 			-e 's#__M__#" retain_m "#g' \
 			-e 's#__SRC__#" backup_src "/" "#g' \
 			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " run_args "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
 			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -648,7 +724,7 @@ function print_timestamp() {
 					-e 's#__M__#" retain_m "#g' \
 					-e 's#__SRC__#" backup_src "/" "#g' \
 					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " run_args " --no-compress#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
 					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
@@ -677,9 +753,7 @@ END {
 	system("awk '{ print $1 + " total_errors "}' < " my_folder "/rsnapshot_backup_error_count.txt > " my_folder "/rsnapshot_backup_error_count.txt.new && mv -f " my_folder "/rsnapshot_backup_error_count.txt.new " my_folder "/rsnapshot_backup_error_count.txt");
 	# Total errors
 	if (total_errors == 0) {
-		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: rsnapshot_backup on server " my_host_name " run OK: ");
-		}
+		print_timestamp(); print("NOTICE: rsnapshot_backup on server " my_host_name " run OK");
 	} else {
 		print_timestamp(); print("ERROR: rsnapshot_backup on server " my_host_name " errors found: " total_errors);
 		exit(1);

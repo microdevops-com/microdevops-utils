@@ -63,9 +63,14 @@ if [ -f $CONF_FILE ]; then
 		ROW_RETAIN_D=$(echo ${CONF_ROW} | jq -r '.retain_daily')
 		ROW_RETAIN_W=$(echo ${CONF_ROW} | jq -r '.retain_weekly')
 		ROW_RETAIN_M=$(echo ${CONF_ROW} | jq -r '.retain_monthly')
-		ROW_RUN_ARGS=$(echo ${CONF_ROW} | jq -r '.run_args')
+		ROW_RSYNC_ARGS=$(echo ${CONF_ROW} | jq -r '.run_args')
 		ROW_CONNECT_USER=$(echo ${CONF_ROW} | jq -r '.connect_user')
 		ROW_CONNECT_PASSWD=$(echo ${CONF_ROW} | jq -r '.connect_password')
+		ROW_VALIDATE_HOSTNAME=$(echo ${CONF_ROW} | jq -r '.validate_hostname')
+		ROW_POSTGRESQL_NOCLEAN=$(echo ${CONF_ROW} | jq -r '.postgresql_noclean')
+		ROW_MYSQL_NOEVENTS=$(echo ${CONF_ROW} | jq -r '.mysql_noevents')
+		ROW_NATIVE_TXT_CHECK=$(echo ${CONF_ROW} | jq -r '.native_txt_check')
+		ROW_NATIVE_10H_LIMIT=$(echo ${CONF_ROW} | jq -r '.native_10h_limit')
 		# If item number in $2 - skip everything but needed
 		if [ "$2" != "" ]; then
 			if [ "$2" -ne "${ROW_NUMBER}" ]; then
@@ -98,9 +103,14 @@ if [ -f $CONF_FILE ]; then
 			-v row_retain_d=${ROW_RETAIN_D} \
 			-v row_retain_w=${ROW_RETAIN_W} \
 			-v row_retain_m=${ROW_RETAIN_M} \
-			-v row_run_args=${ROW_RUN_ARGS} \
+			-v row_run_args=${ROW_RSYNC_ARGS} \
 			-v row_connect_user=${ROW_CONNECT_USER} \
-			-v row_connect_passwd=${ROW_CONNECT_PASSWD}
+			-v row_connect_passwd=${ROW_CONNECT_PASSWD} \
+			-v row_validate_hostname=${ROW_VALIDATE_HOSTNAME} \
+			-v row_postgresql_noclean=${ROW_POSTGRESQL_NOCLEAN} \
+			-v row_mysql_noevents=${ROW_MYSQL_NOEVENTS} \
+			-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
+			-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT}
 		# Exit code depends on rows
 		if [ $? -gt 0 ]; then
 			GRAND_EXIT=1

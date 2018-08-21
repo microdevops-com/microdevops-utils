@@ -60,10 +60,10 @@ function print_timestamp() {
 		# Clear variables
 		chf_host = ""; chf_path = ""; chf_date = ""; chf_backup_host = ""; chf_backup_path = "";
 		# Construct path
-		if ((backup_type == "FS_RSYNC_NATIVE") || (backup_type == "FS_RSYNC_NATIVE_TXT_CHECK") || (backup_type == "FS_RSYNC_NATIVE_TO_10H")) {
+		if (backup_type == "FS_RSYNC_NATIVE") {
 			check_file = backup_dst "/.sync/rsnapshot/.backup";
 			check_dir = backup_dst "/.sync/rsnapshot";
-		} else if ((backup_type == "FS_RSYNC_SSH") || (backup_type == "FS_RSYNC_SSH_NOCHECK")) {
+		} else if (backup_type == "FS_RSYNC_SSH") {
 			check_file = backup_dst "/.sync/rsnapshot" host_path "/.backup";
 			check_dir = backup_dst "/.sync/rsnapshot" host_path;
 		}
