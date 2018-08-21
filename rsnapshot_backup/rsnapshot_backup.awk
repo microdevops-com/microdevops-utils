@@ -100,6 +100,7 @@ function print_timestamp() {
 	mysql_noevents		= row_mysql_noevents;
 	native_txt_check	= row_native_txt_check;
 	native_10h_limit	= row_native_10h_limit;
+	exec_before_rsync	= row_exec_before_rsync;
 
 	# Check retains
 	if (retain_h == "null") {
@@ -168,6 +169,11 @@ function print_timestamp() {
 		native_10h_limit = 0;
 	}
 
+	# Default exec_before_rsync
+	if (exec_before_rsync == "null") {
+		exec_before_rsync = "";
+	}
+
 	# Display what do we backup
 	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " rsync_args " " connect_hn " " connect_user " " connect_passwd " " row_comment "'");
 
@@ -233,6 +239,19 @@ function print_timestamp() {
 		if (validate_hostname) {
 			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Exec exec_before_rsync
+		if (exec_before_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
 		}
 		#
 		if (backup_src == "UBUNTU") {
@@ -361,7 +380,7 @@ function print_timestamp() {
 			clean_part = "--clean";
 		}
 		#
-		make_tmp_file_cmd = "scp " scp_args " /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" connect_hn ":/tmp/";
+		make_tmp_file_cmd = "scp -q " scp_args " /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" connect_hn ":/tmp/";
 		print_timestamp(); print("NOTICE: Running remote temp file creation");
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
@@ -683,65 +702,6 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
 		system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
-	} else if (backup_type == "LOCAL_PREEXEC") {
-		err = system(host_name);
-		if (err != 0) {
-			print_timestamp(); print("ERROR: Preexec failed on line " row_number ", skipping to next line");
-			total_errors = total_errors + 1;
-			next;
-		}
-		# Check no compress file
-		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
-		if (checknc == 0) {
-			rsync_args = rsync_args " --no-compress";
-			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
-		}
-		# Prepare config and run
-		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
-			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
-			-e 's/#_h_#/" h_comment "/g' \
-			-e 's#__H__#" retain_h "#g' \
-			-e 's#__D__#" retain_d "#g' \
-			-e 's#__W__#" retain_w "#g' \
-			-e 's#__M__#" retain_m "#g' \
-			-e 's#__SRC__#" backup_src "/" "#g' \
-			-e 's#__VERB_LEVEL__#" verb_level "#g' \
-			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
-			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
-		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
-		err = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
-		if (err != 0) {
-			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
-			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
-				total_errors = total_errors + 1;
-				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_LOCAL_PREEXEC.conf | sed \
-					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
-					-e 's/#_h_#/" h_comment "/g' \
-					-e 's#__H__#" retain_h "#g' \
-					-e 's#__D__#" retain_d "#g' \
-					-e 's#__W__#" retain_w "#g' \
-					-e 's#__M__#" retain_m "#g' \
-					-e 's#__SRC__#" backup_src "/" "#g' \
-					-e 's#__VERB_LEVEL__#" verb_level "#g' \
-					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
-					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
-				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
-				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
-				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
-					total_errors = total_errors + 1;
-				} else {
-					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
-					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
-				}
-			}
-			print_timestamp(); print("ERROR: Backup failed on line " row_number);
-			total_errors = total_errors + 1;
-		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
-		}
 	} else {
 		print_timestamp(); print("ERROR: unknown backup type: " backup_type);
 		total_errors = total_errors + 1;
