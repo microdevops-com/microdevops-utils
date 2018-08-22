@@ -386,10 +386,10 @@ function print_timestamp() {
 		}
 		#
 		if (postgresql_noclean) {
-			print_timestamp(); print("NOTICE: postgresql_noclean set to True on line " row_number);
+			print_timestamp(); print("NOTICE: postgresql_noclean set to T on line " row_number);
 			clean_part = "";
 		} else {
-			print_timestamp(); print("NOTICE: postgresql_noclean set to False on line " row_number);
+			print_timestamp(); print("NOTICE: postgresql_noclean set to F on line " row_number);
 			clean_part = "--clean";
 		}
 		#
@@ -538,10 +538,10 @@ function print_timestamp() {
 		}
 		#
 		if (mysql_noevents) {
-			print_timestamp(); print("NOTICE: mysql_noevents set to True on line " row_number);
+			print_timestamp(); print("NOTICE: mysql_noevents set to T on line " row_number);
 			events_part = "";
 		} else {
-			print_timestamp(); print("NOTICE: mysql_noevents set to False on line " row_number);
+			print_timestamp(); print("NOTICE: mysql_noevents set to F on line " row_number);
 			events_part = "--events";
 		}
 		#
@@ -636,6 +636,137 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
+	} else if (backup_type == "MONGODB_SSH") {
+		# Default ssh and rsync args
+		if (rsync_args == "null") {
+			rsync_args = "";
+		}
+		# Decide which port to use
+		if (match(connect_hn, ":")) {
+			connect_port = substr(connect_hn, RSTART + 1);
+			connect_hn = substr(connect_hn, 1, RSTART - 1);
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port;
+		} else {
+			connect_port = "22";
+			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22";
+		}
+		# If connect to self call func with autoauthorization
+		if (host_name == my_host_name) {
+			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
+		} else {
+			check_ssh(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Validate hostname if needed
+		if (validate_hostname) {
+			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Exec exec_before_rsync
+		if (exec_before_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
+		}
+		#
+		mkdir_part = "mkdir -p /var/backups/mongodb";
+		lock_part = "{ while [ -d /var/backups/mongodb/dump.lock ]; do sleep 5; done } && mkdir /var/backups/mongodb/dump.lock && trap \"rm -rf /var/backups/mongodb/dump.lock\" 0";
+		# If hourly retains are used keep dumps only for 59 minutes
+		if (retain_h != "NONE") {
+			find_part = "cd /var/backups/mongodb && find /var/backups/mongodb/ -type f -name \"*.tar.gz\" -mmin +59 -delete";
+		} else {
+			find_part = "cd /var/backups/mongodb && find /var/backups/mongodb/ -type f -name \"*.tar.gz\" -mmin +720 -delete";
+		}
+		if (match(backup_src, /ALL\^/)) {
+			split(substr(backup_src, 5), db_excludes, ",");
+			grep_part = "grep -v ";
+			for (db_exclude in db_excludes) {
+				grep_part = grep_part "-e " db_excludes[db_exclude] " ";
+			}
+			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh | grep -v -e local | " grep_part " > /var/backups/mongodb/db_list.txt";
+			backup_src = "ALL";
+		} else {
+			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh | grep -v -e local > /var/backups/mongodb/db_list.txt";
+		}
+		if (backup_src == "ALL") {
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db; } ); done } '";
+		} else {
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src "; } ) '";
+		}
+		print_timestamp(); print("NOTICE: Running remote dump");
+		err = system(make_dump_cmd);
+		if (err != 0) {
+			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
+			next;
+		} else {
+			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
+		}
+		# Remove partially downloaded dumps
+                system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/mongodb/.*.tar.gz.*");
+		# Check no compress file
+		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
+		if (checknc == 0) {
+			rsync_args = rsync_args " --no-compress";
+			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
+		}
+		# Prepare config and run
+		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
+			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+			-e 's/#_h_#/" h_comment "/g' \
+			-e 's#__H__#" retain_h "#g' \
+			-e 's#__D__#" retain_d "#g' \
+			-e 's#__W__#" retain_w "#g' \
+			-e 's#__M__#" retain_m "#g' \
+			-e 's#__USER__#" connect_user "#g' \
+			-e 's#__HOST_NAME__#" connect_hn "#g' \
+			-e 's#__SSH_ARGS__#" ssh_args "#g' \
+			-e 's#__VERB_LEVEL__#" verb_level "#g' \
+			-e 's#__ARGS__#" verbosity_args " " rsync_args "#g' \
+			-e 's#__SRC__#" "/var/backups/mongodb/#g' \
+			> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
+		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
+		err = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
+		if (err != 0) {
+			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
+			if (check == 0) {
+				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				total_errors = total_errors + 1;
+				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
+					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
+					-e 's/#_h_#/" h_comment "/g' \
+					-e 's#__H__#" retain_h "#g' \
+					-e 's#__D__#" retain_d "#g' \
+					-e 's#__W__#" retain_w "#g' \
+					-e 's#__M__#" retain_m "#g' \
+					-e 's#__USER__#" connect_user "#g' \
+					-e 's#__HOST_NAME__#" connect_hn "#g' \
+					-e 's#__SSH_ARGS__#" ssh_args "#g' \
+					-e 's#__VERB_LEVEL__#" verb_level "#g' \
+					-e 's#__ARGS__#" verbosity_args " " rsync_args " --no-compress#g' \
+					-e 's#__SRC__#" "/var/backups/mongodb/#g' \
+					> /opt/sysadmws/rsnapshot_backup/rsnapshot.conf");
+				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
+				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
+				if (err2 != 0) {
+					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					total_errors = total_errors + 1;
+				} else {
+					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
+					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
+					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+				}
+			}
+		} else {
+			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+		}
 	} else if (backup_type == "RSYNC_NATIVE") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
@@ -664,10 +795,10 @@ function print_timestamp() {
 			system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		}
 		if (native_10h_limit) {
-			print_timestamp(); print("NOTICE: native_10h_limit set to True on line " row_number);
+			print_timestamp(); print("NOTICE: native_10h_limit set to T on line " row_number);
 			timeout_prefix = "timeout --preserve-status -k 60 10h ";
 		} else {
-			print_timestamp(); print("NOTICE: native_10h_limit set to False on line " row_number);
+			print_timestamp(); print("NOTICE: native_10h_limit set to F on line " row_number);
 			timeout_prefix = "";
 		}
 		# Check no compress file
