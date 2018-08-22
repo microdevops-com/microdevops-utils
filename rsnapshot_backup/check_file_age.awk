@@ -66,12 +66,12 @@ function print_timestamp() {
 		host_path = host_path_arr[jj];
 
 		# Construct path
-		if (backup_type == "FS_RSYNC_NATIVE") {
+		if (backup_type == "RSYNC_NATIVE") {
                         strip_first_dir_cmd = "echo '" host_path "' | cut -d'/' -f3-";
                         strip_first_dir_cmd | getline stripped_host_path;
                         close(strip_first_dir_cmd);
 			backup_dst_full = backup_dst "/.sync/rsnapshot/" stripped_host_path;
-		} else if (backup_type == "FS_RSYNC_SSH") {
+		} else if (backup_type == "RSYNC_SSH") {
 			backup_dst_full = backup_dst "/.sync/rsnapshot" host_path;
 		}
 		# Construct find cmd

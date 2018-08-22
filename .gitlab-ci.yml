@@ -85,12 +85,12 @@ make_deb_v1:
        rsnapshot_backup/rsnapshot_backup.sh \
        rsnapshot_backup/rsnapshot_backup_sync_monthly_weekly_daily_check_backup.sh \
        rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh \
-       rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf \
-       rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf \
-       rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf \
-       rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_CENTOS.conf \
+       rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf \
+       rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_UBUNTU.conf \
+       rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_DEBIAN.conf \
+       rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_CENTOS.conf \
        rsnapshot_backup/rsnapshot_conf_template_ROTATE.conf \
-       rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf \
+       rsnapshot_backup/rsnapshot_conf_template_RSYNC_NATIVE.conf \
        rsnapshot_backup/rsnapshot_backup_daily.cron \
        rsnapshot_backup/rsnapshot_backup_hourly.cron \
        rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql \

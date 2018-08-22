@@ -61,13 +61,13 @@ function print_timestamp() {
 		# Clear variables
 		chf_host = ""; chf_path = ""; chf_date = ""; chf_backup_host = ""; chf_backup_path = "";
 		# Construct path
-		if (backup_type == "FS_RSYNC_NATIVE") {
+		if (backup_type == "RSYNC_NATIVE") {
 			strip_first_dir_cmd = "echo '" host_path "' | cut -d'/' -f3-";
 			strip_first_dir_cmd | getline stripped_host_path;
 			close(strip_first_dir_cmd);
 			check_file = backup_dst "/.sync/rsnapshot/" stripped_host_path "/.backup";
 			check_dir = backup_dst "/.sync/rsnapshot/" stripped_host_path;
-		} else if (backup_type == "FS_RSYNC_SSH") {
+		} else if (backup_type == "RSYNC_SSH") {
 			check_file = backup_dst "/.sync/rsnapshot" host_path "/.backup";
 			check_dir = backup_dst "/.sync/rsnapshot" host_path;
 		}

@@ -214,7 +214,7 @@ function print_timestamp() {
 	}
 
 	# Main
-	if (backup_type == "FS_RSYNC_SSH") {
+	if (backup_type == "RSYNC_SSH") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
 			rsync_args = "";
@@ -255,18 +255,18 @@ function print_timestamp() {
 		}
 		#
 		if (backup_src == "UBUNTU") {
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf";
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_UBUNTU.conf";
 		} else if (backup_src == "DEBIAN") {
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf";
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_DEBIAN.conf";
 		} else if (backup_src == "CENTOS") {
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_CENTOS.conf";
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_CENTOS.conf";
 		} else if (match(backup_src, /UBUNTU\^/)) {
 			split(substr(backup_src, 8), backup_excludes, ",");
 			grep_part = " | grep -v ";
 			for (backup_exclude in backup_excludes) {
 				grep_part = grep_part "-e \"^backup.*" backup_excludes[backup_exclude] "\" ";
 			}
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_UBUNTU.conf" grep_part;
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_UBUNTU.conf" grep_part;
 			backup_src = "UBUNTU";
 		} else if (match(backup_src, /DEBIAN\^/)) {
 			split(substr(backup_src, 8), backup_excludes, ",");
@@ -274,7 +274,7 @@ function print_timestamp() {
 			for (backup_exclude in backup_excludes) {
 				grep_part = grep_part "-e \"^backup.*" backup_excludes[backup_exclude] "\" ";
 			}
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_DEBIAN.conf" grep_part;
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_DEBIAN.conf" grep_part;
 			backup_src = "DEBIAN";
 		} else if (match(backup_src, /CENTOS\^/)) {
 			split(substr(backup_src, 8), backup_excludes, ",");
@@ -282,10 +282,10 @@ function print_timestamp() {
 			for (backup_exclude in backup_excludes) {
 				grep_part = grep_part "-e \"^backup.*" backup_excludes[backup_exclude] "\" ";
 			}
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_CENTOS.conf" grep_part;
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_CENTOS.conf" grep_part;
 			backup_src = "CENTOS";
 		} else {
-			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf";
+			template_file = "cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf";
 		}
 		# Check no compress file
 		checknc = system("test -f /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
@@ -343,7 +343,7 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if (backup_type == "POSTGRESQL") {
+	} else if (backup_type == "POSTGRESQL_SSH") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
 			rsync_args = "";
@@ -435,7 +435,7 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
-		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 			-e 's/#_h_#/" h_comment "/g' \
 			-e 's#__H__#" retain_h "#g' \
@@ -456,7 +456,7 @@ function print_timestamp() {
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
 				total_errors = total_errors + 1;
-				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
 					-e 's#__H__#" retain_h "#g' \
@@ -484,7 +484,7 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if (backup_type == "MYSQL") {
+	} else if (backup_type == "MYSQL_SSH") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
 			rsync_args = "";
@@ -561,7 +561,7 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: no-compress_" row_number " file detected, adding --no-compress to rsync args");
 		}
 		# Prepare config and run
-		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 			-e 's/#_h_#/" h_comment "/g' \
 			-e 's#__H__#" retain_h "#g' \
@@ -582,7 +582,7 @@ function print_timestamp() {
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
 				total_errors = total_errors + 1;
-				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_SSH_PATH.conf | sed \
+				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
 					-e 's#__H__#" retain_h "#g' \
@@ -610,7 +610,7 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
 		}
-	} else if (backup_type == "FS_RSYNC_NATIVE") {
+	} else if (backup_type == "RSYNC_NATIVE") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
 			rsync_args = "";
@@ -654,7 +654,7 @@ function print_timestamp() {
 		system("touch /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		system("chmod 600 /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		system("echo '" connect_passwd "' > /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
-		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf | sed \
+		system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_NATIVE.conf | sed \
 			-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 			-e 's/#_h_#/" h_comment "/g' \
 			-e 's#__H__#" retain_h "#g' \
@@ -674,7 +674,7 @@ function print_timestamp() {
 			if (check == 0) {
 				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
 				total_errors = total_errors + 1;
-				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_FS_RSYNC_NATIVE.conf | sed \
+				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_NATIVE.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
 					-e 's/#_h_#/" h_comment "/g' \
 					-e 's#__H__#" retain_h "#g' \
