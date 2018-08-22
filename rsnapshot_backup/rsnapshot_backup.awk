@@ -696,9 +696,9 @@ function print_timestamp() {
 			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh | grep -v -e local > /var/backups/mongodb/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db; } ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src "; } ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
