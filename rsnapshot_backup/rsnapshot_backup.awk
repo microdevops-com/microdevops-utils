@@ -371,6 +371,19 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
+		# Exec exec_before_rsync
+		if (exec_before_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
+		}
 		#
 		if (postgresql_noclean) {
 			print_timestamp(); print("NOTICE: postgresql_noclean set to True on line " row_number);
@@ -509,6 +522,19 @@ function print_timestamp() {
 		if (validate_hostname) {
 			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
+		}
+		# Exec exec_before_rsync
+		if (exec_before_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
 		}
 		#
 		if (mysql_noevents) {
