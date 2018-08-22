@@ -1,5 +1,15 @@
 # sysadmws-utils-v1
-Sysadmin Workshop Utilities
+Sysadmin Workshop Utilities:
+- bulk_log - collect and logrotate raw output from debug commands, useful for post-mortem diagnosis.
+- disk_alert - simple autonomouos script to check free space and space prediction using linear regression, sends alerts to Telegram usign notify_devilry.
+- logrotate_db_backup - script to rotate db dumps using logrotate.
+- mikrotik_backup - script to dump Mikrotik RouterOS config and binary backup via ssh for multiple boxes.
+- misc - various cmd tools.
+- mysql_queries_log - script helps to catch some kind of mysql queries, useful for post-mortem diagnosis.
+- mysql_replica_checker - simple autonomouos script to check mysql replica status, sends alerts to Telegram usign notify_devilry.
+- notify_devilry - configured with YAML+Jinja2, sends input JSON to Telegram.
+- put_check_files - autonomous script to put check files for rsnapshot_backup, if Salt formula sysadmws-formula is unavailable.
+- rsnapshot_backup - rsnapshot wrapper, makes usage of rsnapshot for ssh, native, mysql, postgresql etc on hundreds of servers manageable.
 
 Example Salt state to install for Ubuntu/Debian:
 ```

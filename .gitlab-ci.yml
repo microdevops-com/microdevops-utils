@@ -35,9 +35,9 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
-    # LICENSE utils_readme.md
+    # LICENSE README.md
     cp LICENSE \
-       utils_readme.md \
+       README.md \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws
     # bulk_log
     cp bulk_log/bulk_log.sh \
