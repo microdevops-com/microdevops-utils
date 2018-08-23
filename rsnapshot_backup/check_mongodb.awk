@@ -58,7 +58,7 @@ function print_timestamp() {
 	if (!dump_file_analyze[dump_file, "analyzed"]) {
 		if ((dump_file != "") && (system("test -e " dump_file) == 0)) {
 			# Construct command for tar arch test
-			tar_test_cmd = "tar ztvf settings.tar.gz | grep -v -e '/\\$' | grep -e '\.bson$' | awk '{print $3 \" \" $4 \" \" $5}'";
+			tar_test_cmd = "tar ztvf " dump_file " | grep -v -e '/\\$' | grep -e '\\.bson$' | awk '{print $3 \" \" $4 \" \" $5}'";
 			# Read lines of tar test
 			while ((tar_test_cmd | getline tar_test_line) > 0) {
 				# Get size, date of bson files
@@ -98,16 +98,16 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: Dump archive contains " dump_file_analyze[dump_file, "non_zero_bsons"] " non zero sized bsons for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " row_number);
 		}
 		total_ok = total_ok + 1;
-	}
-	# Check dump date
-	if ((secs_now - secs_dfa_date) > 86400) {
-		print_timestamp(); print("ERROR: Dump archive bsons date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
-		total_errors = total_errors + 1;
-	} else {
-		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump archive bsons date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
+		# Check dump date
+		if ((secs_now - secs_dfa_date) > 86400) {
+			print_timestamp(); print("ERROR: Dump archive bsons date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
+			total_errors = total_errors + 1;
+		} else {
+			if (show_notices == 1) {
+				print_timestamp(); print("NOTICE: Dump archive bsons date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
+			}
+			total_ok = total_ok + 1;
 		}
-		total_ok = total_ok + 1;
 	}
 }
 END {
