@@ -101,6 +101,7 @@ make_deb_v1:
        rsnapshot_backup/check_file_age.awk \
        rsnapshot_backup/check_mysql.awk \
        rsnapshot_backup/check_postgresql.awk \
+       rsnapshot_backup/check_mongodb.awk \
        rsnapshot_backup/mongodb_db_list.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup
     # misc
