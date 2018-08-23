@@ -190,7 +190,7 @@ if [ -f $CONF_FILE ]; then
 					if [ $? -gt 0 ]; then
 						GRAND_EXIT=1
 					fi
-				elif [ "${CHECK_TYPE}" == "POSTGRESQL" -o "${CHECK_TYPE}" == "MYSQL" ]; then
+				elif [ "${CHECK_TYPE}" == "POSTGRESQL" -o "${CHECK_TYPE}" == "MYSQL" -o "${CHECK_TYPE}" == "MONGODB" ]; then
 					if [ "${CHECK_TYPE}" == "POSTGRESQL" ]; then
 						DB_LIST_PATH="postgresql/db_list.txt"
 						AWK_SCRIPT="check_postgresql.awk"
@@ -198,6 +198,10 @@ if [ -f $CONF_FILE ]; then
 					if [ "${CHECK_TYPE}" == "MYSQL" ]; then
 						DB_LIST_PATH="mysql/db_list.txt"
 						AWK_SCRIPT="check_mysql.awk"
+					fi
+					if [ "${CHECK_TYPE}" == "MONGODB" ]; then
+						DB_LIST_PATH="mongodb/db_list.txt"
+						AWK_SCRIPT="check_mongodb.awk"
 					fi
 					# Get empty_db
 					if [ "$(echo ${CHECK} | jq -r '.empty_db')" != "null" ]; then
