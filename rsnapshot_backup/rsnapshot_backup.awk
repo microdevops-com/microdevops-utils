@@ -92,6 +92,7 @@ function print_timestamp() {
 	retain_w		= row_retain_w;
 	retain_m		= row_retain_m;
 	rsync_args		= row_rsync_args;
+	mongo_args		= row_mongo_args;
 	connect_hn		= row_connect;
 	connect_user		= row_connect_user;
 	connect_passwd		= row_connect_passwd;
@@ -175,7 +176,7 @@ function print_timestamp() {
 	}
 
 	# Display what do we backup
-	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " rsync_args " " connect_hn " " connect_user " " connect_passwd " " row_comment "'");
+	print_timestamp(); print("NOTICE: Backup config line " row_number ": '" host_name " " backup_type " " backup_src " " backup_dst " " retain_h " " retain_d " " retain_w " " retain_m " " rsync_args " " mongo_args " " connect_hn " " connect_user " " connect_passwd " " row_comment "'");
 
 	# Progress bar on verbosity
 	if (verbosity == "1") {
@@ -641,6 +642,10 @@ function print_timestamp() {
 		if (rsync_args == "null") {
 			rsync_args = "";
 		}
+		# Default mongo args
+		if (mongo_args == "null") {
+			mongo_args = "";
+		}
 		# Decide which port to use
 		if (match(connect_hn, ":")) {
 			connect_port = substr(connect_hn, RSTART + 1);
@@ -690,15 +695,15 @@ function print_timestamp() {
 			for (db_exclude in db_excludes) {
 				grep_part = grep_part "-e " db_excludes[db_exclude] " ";
 			}
-			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh | grep -v -e local | " grep_part " > /var/backups/mongodb/db_list.txt";
+			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh " mongo_args " | grep -v -e local | " grep_part " > /var/backups/mongodb/db_list.txt";
 			backup_src = "ALL";
 		} else {
-			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh | grep -v -e local > /var/backups/mongodb/db_list.txt";
+			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh " mongo_args " | grep -v -e local > /var/backups/mongodb/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
