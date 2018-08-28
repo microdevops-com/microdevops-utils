@@ -393,16 +393,16 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: postgresql_noclean set to F on line " row_number);
 			clean_part = "--clean";
 		}
-		#
+		# Upload helper script
 		make_tmp_file_cmd = "scp -q " scp_args " /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_postgresql_query1.sql " connect_user "@" connect_hn ":/tmp/";
-		print_timestamp(); print("NOTICE: Running remote temp file creation");
+		print_timestamp(); print("NOTICE: Running remote helper script upload");
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote temp file creation failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote helper script upload failed on line " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote temp file creation finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote helper script upload finished on line " row_number);
 		}
 		#
 		mkdir_part = "mkdir -p /var/backups/postgresql";
@@ -651,9 +651,11 @@ function print_timestamp() {
 			connect_port = substr(connect_hn, RSTART + 1);
 			connect_hn = substr(connect_hn, 1, RSTART - 1);
 			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port;
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P " connect_port;
 		} else {
 			connect_port = "22";
 			ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -p 22";
+			scp_args = "-o BatchMode=yes -o StrictHostKeyChecking=no -P 22";
 		}
 		# If connect to self call func with autoauthorization
 		if (host_name == my_host_name) {
@@ -680,8 +682,20 @@ function print_timestamp() {
 				total_errors = total_errors + 1;
 			}
 		}
+		# Upload helper script
+		make_tmp_file_cmd = "scp -q " scp_args " /opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh " connect_user "@" connect_hn ":/tmp/";
+		print_timestamp(); print("NOTICE: Running remote helper script upload");
+		err = system(make_tmp_file_cmd);
+		if (err != 0) {
+			print_timestamp(); print("ERROR: Remote helper script upload failed on line " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
+			next;
+		} else {
+			print_timestamp(); print("NOTICE: Remote helper script upload finished on line " row_number);
+		}
 		#
 		mkdir_part = "mkdir -p /var/backups/mongodb";
+		chmod_part = "chmod 755 /tmp/mongodb_db_list.sh";
 		lock_part = "{ while [ -d /var/backups/mongodb/dump.lock ]; do sleep 5; done } && mkdir /var/backups/mongodb/dump.lock && trap \"rm -rf /var/backups/mongodb/dump.lock\" 0";
 		# If hourly retains are used keep dumps only for 59 minutes
 		if (retain_h != "NONE") {
@@ -695,15 +709,15 @@ function print_timestamp() {
 			for (db_exclude in db_excludes) {
 				grep_part = grep_part "-e " db_excludes[db_exclude] " ";
 			}
-			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh " mongo_args " | grep -v -e local | " grep_part " > /var/backups/mongodb/db_list.txt";
+			dblist_part = "/tmp/mongodb_db_list.sh " mongo_args " | grep -v -e local | " grep_part " > /var/backups/mongodb/db_list.txt";
 			backup_src = "ALL";
 		} else {
-			dblist_part = "/opt/sysadmws/rsnapshot_backup/mongodb_db_list.sh " mongo_args " | grep -v -e local > /var/backups/mongodb/db_list.txt";
+			dblist_part = "/tmp/mongodb_db_list.sh " mongo_args " | grep -v -e local > /var/backups/mongodb/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
