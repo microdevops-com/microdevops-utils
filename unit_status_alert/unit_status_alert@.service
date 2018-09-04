@@ -1,0 +1,10 @@
+# %i == Full unit name, who reporting
+# %p == The current unit's prefix, "unit-status-alert"
+# %H == Hostname of current server
+
+[Unit]
+Description=Unit Status Alerting Service
+After=network.target
+
+[Service]
+ExecStart=/opt/sysadmws/unit_status_alert/unit_status_alert %i %p %H
