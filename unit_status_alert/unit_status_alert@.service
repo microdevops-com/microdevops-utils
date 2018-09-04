@@ -7,4 +7,4 @@ Description=Unit Status Alerting Service
 After=network.target
 
 [Service]
-ExecStart=/opt/sysadmws/unit_status_alert/unit_status_alert %i %p %H
+ExecStart=/opt/sysadmws/unit_status_alert/unit_status_alert.sh %i %p %H
