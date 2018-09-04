@@ -33,6 +33,7 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/unit_status_alert \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
@@ -80,6 +81,10 @@ make_deb_v1:
     cp mikrotik_backup/mikrotik_backup.sh \
        mikrotik_backup/mikrotik_backup.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup
+    # unit_status_alert
+    cp unit_status_alert/unit_status_alert.sh \
+       unit_status_alert/unit_status_alert@.service \
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/unit_status_alert
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
        rsnapshot_backup/rsnapshot_backup.sh \
