@@ -33,6 +33,7 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/unit_status_alert \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
