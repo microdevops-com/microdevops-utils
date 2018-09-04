@@ -1,5 +1,5 @@
 # %i == Full unit name, who reporting
-# %p == The current unit's prefix, "unit-status-alert"
+# %p == The current unit's prefix, "unit_status_alert"
 # %H == Hostname of current server
 
 [Unit]
