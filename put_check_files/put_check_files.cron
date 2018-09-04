@@ -1,1 +1,1 @@
-00 21 * * *	root	/opt/sysadmws-utils/put_check_files/put_check_files.sh >> /opt/sysadmws-utils/put_check_files/put_check_files.log 2>&1
+00 21 * * *	root	/opt/sysadmws/put_check_files/put_check_files.sh >> /opt/sysadmws/put_check_files/put_check_files.log 2>&1

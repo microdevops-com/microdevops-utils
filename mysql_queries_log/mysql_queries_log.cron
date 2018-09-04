@@ -1,2 +1,2 @@
 # Mysql Queries Collection
-* * * * *	root	/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.sh >> /opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.log 2>&1
+* * * * *	root	/opt/sysadmws/mysql_queries_log/mysql_queries_log.sh >> /opt/sysadmws/mysql_queries_log/mysql_queries_log.log 2>&1

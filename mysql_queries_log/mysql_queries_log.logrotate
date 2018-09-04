@@ -1,4 +1,4 @@
-/opt/sysadmws-utils/mysql_queries_log/mysql_queries_log.log {
+/opt/sysadmws/mysql_queries_log/mysql_queries_log.log {
 	daily
 	missingok
 	rotate 52

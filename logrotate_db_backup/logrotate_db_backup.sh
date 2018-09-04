@@ -15,7 +15,7 @@ if [ "$1" != "0" ] && [ "$1" != "1" ]; then
 fi
 
 # Exit if lock exists (prevent multiple execution)
-LOCK_DIR=/opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.lock
+LOCK_DIR=/opt/sysadmws/logrotate_db_backup/logrotate_db_backup.lock
 
 if mkdir "$LOCK_DIR"
 then
@@ -28,10 +28,10 @@ else
 	exit 0
 fi
 
-CONF_FILE=/opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.conf
+CONF_FILE=/opt/sysadmws/logrotate_db_backup/logrotate_db_backup.conf
 
 if [ -f $CONF_FILE ]; then
-	awk -f /opt/sysadmws-utils/logrotate_db_backup/logrotate_db_backup.awk -v show_notices=$1 -v target_name=$2 $CONF_FILE 2>&1
+	awk -f /opt/sysadmws/logrotate_db_backup/logrotate_db_backup.awk -v show_notices=$1 -v target_name=$2 $CONF_FILE 2>&1
 	date '+%F %T ' | tr -d '\n'
 	echo -e >&2 "NOTICE: Script finished"
 	exit $?

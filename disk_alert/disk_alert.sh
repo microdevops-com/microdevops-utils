@@ -12,7 +12,9 @@ declare -A DISK_ALERT_PREDICT_CRITICAL
 TIMESTAMP=$(date '+%s')
 
 # Include config
-. /opt/sysadmws-utils/disk_alert/disk_alert.conf
+if [ -f /opt/sysadmws/disk_alert/disk_alert.conf ]; then
+	. /opt/sysadmws/disk_alert/disk_alert.conf
+fi
 
 # Check defaults
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
@@ -36,7 +38,7 @@ else
 fi
 
 # Make history dir
-mkdir -p "/opt/sysadmws-utils/disk_alert/history"
+mkdir -p "/opt/sysadmws/disk_alert/history"
 
 # Check df space
 df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read output; do
@@ -71,22 +73,22 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	if [[ $USAGE_CHECK == "PERCENT" ]]; then
 		# Critical percent message
 		if [[ $USEP -ge $CRITICAL ]]; then
-			echo '{"host": "'$HOSTNAME'", "from": "disk_alert.sh", "type": "disk used space percent", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+			echo '{"host": "'$HOSTNAME'", "from": "disk_alert.sh", "type": "disk used space percent", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
 	elif [[ $USAGE_CHECK == "FREE_SPACE" ]]; then
 		# Critical free space message
 		if [[ $FREESP -le $FREE_SPACE_CRITICAL ]]; then
-			echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk free space MB", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$FREE_SPACE_CRITICAL'MB"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+			echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk free space MB", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$FREE_SPACE_CRITICAL'MB"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
 	fi
 	# Add partition usage history by seconds from unix epoch
 	PARTITION_FN=$(echo $PARTITION | sed -e 's#/#_#g')
-	echo "$TIMESTAMP	$USEP" >> "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt"
+	echo "$TIMESTAMP	$USEP" >> "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt"
 	# Leave only last N lines in file
-	tail -n $HISTORY_SIZE "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt" > "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt.new"
-	mv -f "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt.new" "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt"
+	tail -n $HISTORY_SIZE "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt" > "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt.new"
+	mv -f "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt.new" "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt"
 	# Get linear regression json
-	LR=$(awk -f /opt/sysadmws-utils/disk_alert/lr.awk --assign timestamp="$TIMESTAMP" "/opt/sysadmws-utils/disk_alert/history/$PARTITION_FN.txt" 2>/dev/null)
+	LR=$(awk -f /opt/sysadmws/disk_alert/lr.awk --assign timestamp="$TIMESTAMP" "/opt/sysadmws/disk_alert/history/$PARTITION_FN.txt" 2>/dev/null)
 	if [[ _$LR == "_" ]]; then
 		P_ANGLE="None"
 		P_SHIFT="None"
@@ -106,7 +108,7 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	if [[ $PREDICT_SECONDS != "None" ]]; then
 		if [[ $PREDICT_SECONDS -lt $PREDICT_CRITICAL ]]; then
 			if [[ $PREDICT_SECONDS -gt 0 ]]; then
-				echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk used space predict", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "angle": "'$P_ANGLE'", "shift": "'$P_SHIFT'", "quality": "'$P_QUALITY'", "predict seconds": "'$PREDICT_SECONDS'", "predict hms": "'$P_HMS'", "predict threshold": "'$PREDICT_CRITICAL'"}' | /opt/sysadmws-utils/notify_devilry/notify_devilry.py
+				echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk used space predict", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "angle": "'$P_ANGLE'", "shift": "'$P_SHIFT'", "quality": "'$P_QUALITY'", "predict seconds": "'$PREDICT_SECONDS'", "predict hms": "'$P_HMS'", "predict threshold": "'$PREDICT_CRITICAL'"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 			fi
 		fi
 	fi
