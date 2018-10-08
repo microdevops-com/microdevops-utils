@@ -77,7 +77,7 @@ function print_timestamp() {
 	for (jj in host_path_arr) {
 		host_path = host_path_arr[jj];
 		# Clear variables
-		chf_host = ""; chf_path = ""; chf_date = ""; chf_backup_host = ""; chf_backup_path = ""; chf_backup_path_type = "";
+		chf_host = ""; chf_path = ""; chf_date = "1970-01-01 00:00:00"; chf_backup_host = ""; chf_backup_path = ""; chf_backup_path_type = "";
 		# Construct path
 		if (backup_dst_type == "Absolute") {
 			check_file = backup_dst "/.backup_check";
