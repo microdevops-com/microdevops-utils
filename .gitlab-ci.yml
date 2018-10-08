@@ -184,5 +184,5 @@ rsync_repo:
     refs:
       - master
   script: |
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/apt/ repo@web1.sysadm.ws:/var/www/repo.sysadm.ws/sysadmws-apt/
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/tgz/ repo@web1.sysadm.ws:/var/www/repo.sysadm.ws/tgz/
+    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/apt/ repo@web1.sysadm.ws:/var/www/repo/sysadmws-apt/
+    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa" /opt/sysadmws/tgz/ repo@web1.sysadm.ws:/var/www/repo/tgz/
