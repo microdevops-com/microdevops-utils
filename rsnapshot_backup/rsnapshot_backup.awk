@@ -37,7 +37,7 @@ function check_ssh_loopback(f_connect_user, f_host_name, f_host_port, f_row_numb
 	err = system(ssh_check_cmd);
 	# If OK - do nothing else, if error - try to authorize
 	if (err != 0) {
-		print_timestamp(); print("NOTICE: SSH without password failed on line " f_row_number ", trying to add server key to authorized");
+		print_timestamp(); print("NOTICE: SSH without password didnt work on line " f_row_number ", trying to add server key to authorized");
 		err2 = system("/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh");
 		# If authorize script OK - check ssh again
 		if (err2 == 0) {
