@@ -1,5 +1,5 @@
-# Path		Backup Host		Backup Path							Backup Path Type	
-UBUNTU		backup1.example.com	/var/backups/example/server.example.com/.sync/rsnapshot		Relative
-DEBIAN		backup2.example.com	/var/backups/example/server.example.com/.sync/rsnapshot		Relative
-CENTOS		backup3.example.com	/mnt/backups/example/server.example.com/.sync/rsnapshot		Relative
-/etc		backup4.example.com	/var/backups/example/server.example.com/.sync/rsnapshot		Relative
+# Path		Backup Host		Backup Path					Backup Path Type	
+UBUNTU		backup1.example.com	/var/backups/example/server.example.com		Relative
+DEBIAN		backup2.example.com	/var/backups/example/server.example.com		Relative
+CENTOS		backup3.example.com	/mnt/backups/example/server.example.com		Relative
+/etc		backup4.example.com	/var/backups/example/server.example.com		Relative
