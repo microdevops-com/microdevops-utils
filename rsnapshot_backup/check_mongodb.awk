@@ -27,20 +27,20 @@ function print_timestamp() {
 	# Check dump dir or file existance
 	if (system("test -d " dump_dir) == 0) {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump dir found: '" dump_dir "' on line " row_number);
+			print_timestamp(); print("NOTICE: Dump dir found: '" dump_dir "' on config item " row_number);
 		}
 		if (system("test -f " dump_dir "/" db_sub_name ".tar.gz") == 0) {
 			dump_file = dump_dir "/" db_sub_name ".tar.gz";
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on line " row_number);
+				print_timestamp(); print("NOTICE: Dump file inside dir found: '" dump_file "' on config item " row_number);
 			}
 		} else {
-			print_timestamp(); print("ERROR: Dump file inside dir missing: '" dump_dir "/" db_sub_name "[.tar.gz]' on line " row_number);
+			print_timestamp(); print("ERROR: Dump file inside dir missing: '" dump_dir "/" db_sub_name "[.tar.gz]' on config item " row_number);
 			total_errors = total_errors + 1;
 			next;
 		}
 	} else {
-		print_timestamp(); print("ERROR: Dump dir missing: '" dump_dir "' on line " row_number);
+		print_timestamp(); print("ERROR: Dump dir missing: '" dump_dir "' on config item " row_number);
 		total_errors = total_errors + 1;
 		next;
 	}
@@ -91,20 +91,20 @@ function print_timestamp() {
 
 	# Check non_zero_bsons
 	if (dump_file_analyze[dump_file, "non_zero_bsons"] == 0) {
-		print_timestamp(); print("ERROR: Dump archive does not contain non zero sized bsons for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " row_number);
+		print_timestamp(); print("ERROR: Dump archive does not contain non zero sized bsons for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on config item " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: Dump archive contains " dump_file_analyze[dump_file, "non_zero_bsons"] " non zero sized bsons for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on line " row_number);
+			print_timestamp(); print("NOTICE: Dump archive contains " dump_file_analyze[dump_file, "non_zero_bsons"] " non zero sized bsons for DB: " host_name "/" db_sub_name ", file: '" dump_file "' on config item " row_number);
 		}
 		total_ok = total_ok + 1;
 		# Check dump date
 		if ((secs_now - secs_dfa_date) > 86400) {
-			print_timestamp(); print("ERROR: Dump archive bsons date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
+			print_timestamp(); print("ERROR: Dump archive bsons date older than one day: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: Dump archive bsons date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on line " row_number);
+				print_timestamp(); print("NOTICE: Dump archive bsons date OK: '" dump_file_analyze[dump_file, "date"] "', file: '" dump_file "' on config item " row_number);
 			}
 			total_ok = total_ok + 1;
 		}

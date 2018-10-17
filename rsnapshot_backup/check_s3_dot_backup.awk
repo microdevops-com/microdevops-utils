@@ -48,12 +48,12 @@ function print_timestamp() {
 
 	# Check check file existance
 	if (system("test ! -e " check_file) == 0) {
-		print_timestamp(); print("ERROR: s3/.backup file missing: '" check_file "' on line " row_number);
+		print_timestamp(); print("ERROR: s3/.backup file missing: '" check_file "' on config item " row_number);
 		total_errors = total_errors + 1;
 		next;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: s3/.backup file exists: '" check_file "' on line " row_number);
+			print_timestamp(); print("NOTICE: s3/.backup file exists: '" check_file "' on config item " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
@@ -83,20 +83,20 @@ function print_timestamp() {
 	
 	# Check variables to be correct
 	if (s3_bucket != chf_bucket) {
-		print_timestamp(); print("ERROR: s3/.backup file S3 bucket mismatch: '" s3_bucket "' != '" chf_bucket "', file: '" check_file "' on line " row_number);
+		print_timestamp(); print("ERROR: s3/.backup file S3 bucket mismatch: '" s3_bucket "' != '" chf_bucket "', file: '" check_file "' on config item " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: s3/.backup file S3 bucket match: '" s3_bucket "' == '" chf_bucket "', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("NOTICE: s3/.backup file S3 bucket match: '" s3_bucket "' == '" chf_bucket "', file: '" check_file "' on config item " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
 	if (s3_path != chf_path) {
-		print_timestamp(); print("ERROR: s3/.backup file S3 path mismatch: '" s3_path "' != '" chf_path "', file: '" check_file "' on line " row_number);
+		print_timestamp(); print("ERROR: s3/.backup file S3 path mismatch: '" s3_path "' != '" chf_path "', file: '" check_file "' on config item " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: s3/.backup file S3 path match: '" s3_path "' == '" chf_path "', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("NOTICE: s3/.backup file S3 path match: '" s3_path "' == '" chf_path "', file: '" check_file "' on config item " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
@@ -108,11 +108,11 @@ function print_timestamp() {
 	secs_chf_date_cmd | getline secs_chf_date;
 	close(secs_chf_date_cmd);
 	if ((secs_now - secs_chf_date) > 86400) {
-		print_timestamp(); print("ERROR: s3/.backup file date older than one day: '" chf_date "', file: '" check_file "' on line " row_number);
+		print_timestamp(); print("ERROR: s3/.backup file date older than one day: '" chf_date "', file: '" check_file "' on config item " row_number);
 		total_errors = total_errors + 1;
 	} else {
 		if (show_notices == 1) {
-			print_timestamp(); print("NOTICE: s3/.backup file date OK: '" chf_date "', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("NOTICE: s3/.backup file date OK: '" chf_date "', file: '" check_file "' on config item " row_number);
 		}
 		total_ok = total_ok + 1;
 	}
@@ -124,37 +124,37 @@ function print_timestamp() {
 			}
 		}
 		if (backup_host_found == 0) {
-			print_timestamp(); print("ERROR: s3/.backup file backup host not found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("ERROR: s3/.backup file backup host not found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: s3/.backup file backup host found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on line " row_number);
+				print_timestamp(); print("NOTICE: s3/.backup file backup host found: '" checked_host_name " + "backup_dst"', file: '" check_file "' on config item " row_number);
 			}
 			total_ok = total_ok + 1;
 		}
 	} else {
 		if (checked_host_name != chf_backup_host) {
-			print_timestamp(); print("ERROR: s3/.backup file backup host mismatch: '" checked_host_name "' != '" chf_backup_host "', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("ERROR: s3/.backup file backup host mismatch: '" checked_host_name "' != '" chf_backup_host "', file: '" check_file "' on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: s3/.backup file backup host match: '" checked_host_name "' == '" chf_backup_host "', file: '" check_file "' on line " row_number);
+				print_timestamp(); print("NOTICE: s3/.backup file backup host match: '" checked_host_name "' == '" chf_backup_host "', file: '" check_file "' on config item " row_number);
 			}
 			total_ok = total_ok + 1;
 		}
 		if (backup_dst != chf_backup_path) {
-			print_timestamp(); print("ERROR: s3/.backup file backup path mismatch: '" backup_dst "' != '" chf_backup_path "', file: '" check_file "' on line " row_number);
+			print_timestamp(); print("ERROR: s3/.backup file backup path mismatch: '" backup_dst "' != '" chf_backup_path "', file: '" check_file "' on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: s3/.backup file backup path match: '" backup_dst "' == '" chf_backup_path "', file: '" check_file "' on line " row_number);
+				print_timestamp(); print("NOTICE: s3/.backup file backup path match: '" backup_dst "' == '" chf_backup_path "', file: '" check_file "' on config item " row_number);
 			}
 			total_ok = total_ok + 1;
 		}
 	}
 	# So if it is ok
 	if (show_notices == 1) {
-		print_timestamp(); print("NOTICE: s3/.backup file check done: '" check_file "' on line " row_number);
+		print_timestamp(); print("NOTICE: s3/.backup file check done: '" check_file "' on config item " row_number);
 	}
 }
 END {

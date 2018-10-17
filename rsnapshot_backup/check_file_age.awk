@@ -91,11 +91,11 @@ function print_timestamp() {
 
 		# Check files count
 		if (i < backup_files_total) {
-			print_timestamp(); print("ERROR: Found only " i " files instead of " backup_files_total ", path: '" backup_dst_full "' on line " row_number);
+			print_timestamp(); print("ERROR: Found only " i " files instead of " backup_files_total ", path: '" backup_dst_full "' on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
 			if (show_notices == 1) {
-				print_timestamp(); print("NOTICE: Files qty OK: " i ", path: '" backup_dst_full "' on line " row_number);
+				print_timestamp(); print("NOTICE: Files qty OK: " i ", path: '" backup_dst_full "' on config item " row_number);
 			}
 			total_ok = total_ok + 1;
 		}
@@ -118,11 +118,11 @@ function print_timestamp() {
 			size_file_cmd | getline size_file;
 			close(size_file_cmd);
 			if (size_file < backup_min_file_size) {
-				print_timestamp(); print("ERROR: File size: " size_file " < " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on line " row_number);
+				print_timestamp(); print("ERROR: File size: " size_file " < " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on config item " row_number);
 				total_errors = total_errors + 1;
 			} else {
 				if (show_notices == 1) {
-					print_timestamp(); print("NOTICE: File size OK: " size_file " >= " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on line " row_number);
+					print_timestamp(); print("NOTICE: File size OK: " size_file " >= " backup_min_file_size " minimal size, file: '" find_files[cur_file] "' on config item " row_number);
 				}
 				total_ok = total_ok + 1;
 			}
@@ -131,11 +131,11 @@ function print_timestamp() {
 			file_file_cmd | getline file_file;
 			close(file_file_cmd);
 			if (!match(file_file, backup_file_type)) {
-				print_timestamp(); print("ERROR: File type mismatch: '" file_file "' != '" backup_file_type "', file: '" find_files[cur_file] "' on line " row_number);
+				print_timestamp(); print("ERROR: File type mismatch: '" file_file "' != '" backup_file_type "', file: '" find_files[cur_file] "' on config item " row_number);
 				total_errors = total_errors + 1;
 			} else {
 				if (show_notices == 1) {
-					print_timestamp(); print("NOTICE: File type OK: '" file_file "' == '" backup_file_type "', file: '" find_files[cur_file] "' on line " row_number);
+					print_timestamp(); print("NOTICE: File type OK: '" file_file "' == '" backup_file_type "', file: '" find_files[cur_file] "' on config item " row_number);
 				}
 				total_ok = total_ok + 1;
 			}
@@ -149,16 +149,16 @@ function print_timestamp() {
 			secs_readable_cmd | getline secs_readable;
 			close(secs_readable_cmd);
 			if ((secs_now - max_secs) > (backup_last_file_age * 86400)) {
-				print_timestamp(); print("ERROR: Last file is older than " backup_last_file_age " day(s): '" secs_readable "', file: '" max_secs_file "' on line " row_number);
+				print_timestamp(); print("ERROR: Last file is older than " backup_last_file_age " day(s): '" secs_readable "', file: '" max_secs_file "' on config item " row_number);
 				total_errors = total_errors + 1;
 			} else {
 				if (show_notices == 1) {
-					print_timestamp(); print("NOTICE: Last file age (" backup_last_file_age " day(s)) OK: '" secs_readable "', file: '" max_secs_file "' on line " row_number);
+					print_timestamp(); print("NOTICE: Last file age (" backup_last_file_age " day(s)) OK: '" secs_readable "', file: '" max_secs_file "' on config item " row_number);
 				}
 				total_ok = total_ok + 1;
 			}
 		} else {
-			print_timestamp(); print("ERROR: Last file not found on line " row_number);
+			print_timestamp(); print("ERROR: Last file not found on config item " row_number);
 			total_errors = total_errors + 1;
 		}
 	}

@@ -291,7 +291,7 @@ if [ -f $CONF_FILE ]; then
 					rm -f /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
 				else
 					date '+%F %T ' | tr -d '\n'
-					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found on line ${ROW_NUMBER}"
+					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found on config item ${ROW_NUMBER}"
 					awk '{ print $1 + 1}' \
 						< /opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt \
 						> /opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt.new \

@@ -23,7 +23,7 @@ function check_ssh_remote_hostname(f_connect_user, f_host_name, f_host_port, f_r
 		ssh_check_cmd | getline checked_host_name;
 		close(ssh_check_cmd);
 		if (checked_host_name != host_name) {
-			print_timestamp(); print("ERROR: Remote hostname " checked_host_name " doesn't match expected hostname " host_name " on line " f_row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote hostname " checked_host_name " doesn't match expected hostname " host_name " on config item " f_row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		}
@@ -37,7 +37,7 @@ function check_ssh_loopback(f_connect_user, f_host_name, f_host_port, f_row_numb
 	err = system(ssh_check_cmd);
 	# If OK - do nothing else, if error - try to authorize
 	if (err != 0) {
-		print_timestamp(); print("NOTICE: SSH without password didnt work on line " f_row_number ", trying to add server key to authorized");
+		print_timestamp(); print("NOTICE: SSH without password didnt work on config item " f_row_number ", trying to add server key to authorized");
 		err2 = system("/opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback.sh");
 		# If authorize script OK - check ssh again
 		if (err2 == 0) {
@@ -45,13 +45,13 @@ function check_ssh_loopback(f_connect_user, f_host_name, f_host_port, f_row_numb
 			err3 = system(ssh_check_cmd);
 			# If second ssh check is not OK
 			if (err3 != 0) {
-				print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+				print_timestamp(); print("ERROR: SSH without password failed on config item " f_row_number ", skipping to next line");
 				total_errors = total_errors + 1;
 				next;
 			}
 		# If authorize script error
 		} else {
-			print_timestamp(); print("ERROR: Adding key failed on line " f_row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Adding key failed on config item " f_row_number ", skipping to next line");
 			system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_backup_authorize_loopback_out.tmp");
 			total_errors = total_errors + 1;
 			next;
@@ -65,7 +65,7 @@ function check_ssh(f_connect_user, f_host_name, f_host_port, f_row_number) {
 	ssh_check_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " f_host_port " " f_connect_user "@" f_host_name " 'hostname'";
 	err = system(ssh_check_cmd);
 	if (err != 0) {
-		print_timestamp(); print("ERROR: SSH without password failed on line " f_row_number ", skipping to next line");
+		print_timestamp(); print("ERROR: SSH without password failed on config item " f_row_number ", skipping to next line");
 		total_errors = total_errors + 1;
 		next;
 	}
@@ -206,10 +206,10 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running rsnapshot " rsnapshot_type);
 		err = system("rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Backup failed on line " row_number);
+			print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 			total_errors = total_errors + 1;
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 		next;
 	}
@@ -231,26 +231,26 @@ function print_timestamp() {
 		}
 		# If connect to self call func with autoauthorization
 		if (host_name == my_host_name) {
-			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			print_timestamp(); print("NOTICE: Loopback connect detected on config item " row_number);
 			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
 		} else {
 			check_ssh(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Validate hostname if needed
 		if (validate_hostname) {
-			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			print_timestamp(); print("NOTICE: Hostname validation required on config item " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Exec exec_before_rsync
 		if (exec_before_rsync != "") {
-			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on config item " row_number);
 			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
 			# Get exit code of script
 			err = system(ssh_exec_cmd);
 			if (err == 0) {
-				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on config item " row_number);
 			} else {
-				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on config item " row_number ", but script continues");
 				total_errors = total_errors + 1;
 			}
 		}
@@ -314,7 +314,7 @@ function print_timestamp() {
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				print_timestamp(); print("ERROR: Backup failed with inflate error on config item " row_number);
 				total_errors = total_errors + 1;
 				system(template_file " | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -333,16 +333,16 @@ function print_timestamp() {
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+					print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 				}
 			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 	} else if (backup_type == "POSTGRESQL_SSH") {
 		# Default ssh and rsync args
@@ -362,35 +362,35 @@ function print_timestamp() {
 		}
 		# If connect to self call func with autoauthorization
 		if (host_name == my_host_name) {
-			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			print_timestamp(); print("NOTICE: Loopback connect detected on config item " row_number);
 			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
 		} else {
 			check_ssh(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Validate hostname if needed
 		if (validate_hostname) {
-			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			print_timestamp(); print("NOTICE: Hostname validation required on config item " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Exec exec_before_rsync
 		if (exec_before_rsync != "") {
-			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on config item " row_number);
 			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
 			# Get exit code of script
 			err = system(ssh_exec_cmd);
 			if (err == 0) {
-				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on config item " row_number);
 			} else {
-				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on config item " row_number ", but script continues");
 				total_errors = total_errors + 1;
 			}
 		}
 		#
 		if (postgresql_noclean) {
-			print_timestamp(); print("NOTICE: postgresql_noclean set to T on line " row_number);
+			print_timestamp(); print("NOTICE: postgresql_noclean set to T on config item " row_number);
 			clean_part = "";
 		} else {
-			print_timestamp(); print("NOTICE: postgresql_noclean set to F on line " row_number);
+			print_timestamp(); print("NOTICE: postgresql_noclean set to F on config item " row_number);
 			clean_part = "--clean";
 		}
 		# Upload helper script
@@ -398,11 +398,11 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running remote helper script upload");
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote helper script upload failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote helper script upload failed on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote helper script upload finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote helper script upload finished on config item " row_number);
 		}
 		#
 		mkdir_part = "mkdir -p /var/backups/postgresql";
@@ -434,11 +434,11 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote dump finished on config item " row_number);
 		}
 		# Remove partially downloaded dumps
                 system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/postgresql/.*.gz.*");
@@ -468,7 +468,7 @@ function print_timestamp() {
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				print_timestamp(); print("ERROR: Backup failed with inflate error on config item " row_number);
 				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -487,16 +487,16 @@ function print_timestamp() {
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+					print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 				}
 			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 	} else if (backup_type == "MYSQL_SSH") {
 		# Default ssh and rsync args
@@ -514,35 +514,35 @@ function print_timestamp() {
 		}
 		# If connect to self call func with autoauthorization
 		if (host_name == my_host_name) {
-			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			print_timestamp(); print("NOTICE: Loopback connect detected on config item " row_number);
 			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
 		} else {
 			check_ssh(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Validate hostname if needed
 		if (validate_hostname) {
-			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			print_timestamp(); print("NOTICE: Hostname validation required on config item " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Exec exec_before_rsync
 		if (exec_before_rsync != "") {
-			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on config item " row_number);
 			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
 			# Get exit code of script
 			err = system(ssh_exec_cmd);
 			if (err == 0) {
-				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on config item " row_number);
 			} else {
-				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on config item " row_number ", but script continues");
 				total_errors = total_errors + 1;
 			}
 		}
 		#
 		if (mysql_noevents) {
-			print_timestamp(); print("NOTICE: mysql_noevents set to T on line " row_number);
+			print_timestamp(); print("NOTICE: mysql_noevents set to T on config item " row_number);
 			events_part = "";
 		} else {
-			print_timestamp(); print("NOTICE: mysql_noevents set to F on line " row_number);
+			print_timestamp(); print("NOTICE: mysql_noevents set to F on config item " row_number);
 			events_part = "--events";
 		}
 		#
@@ -573,11 +573,11 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote dump finished on config item " row_number);
 		}
 		# Remove partially downloaded dumps
                 system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/mysql/.*.gz.*");
@@ -607,7 +607,7 @@ function print_timestamp() {
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				print_timestamp(); print("ERROR: Backup failed with inflate error on config item " row_number);
 				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -626,16 +626,16 @@ function print_timestamp() {
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+					print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 				}
 			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 	} else if (backup_type == "MONGODB_SSH") {
 		# Default ssh and rsync args
@@ -659,26 +659,26 @@ function print_timestamp() {
 		}
 		# If connect to self call func with autoauthorization
 		if (host_name == my_host_name) {
-			print_timestamp(); print("NOTICE: Loopback connect detected on line " row_number);
+			print_timestamp(); print("NOTICE: Loopback connect detected on config item " row_number);
 			check_ssh_loopback(connect_user, connect_hn, connect_port, row_number);
 		} else {
 			check_ssh(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Validate hostname if needed
 		if (validate_hostname) {
-			print_timestamp(); print("NOTICE: Hostname validation required on line " row_number);
+			print_timestamp(); print("NOTICE: Hostname validation required on config item " row_number);
 			check_ssh_remote_hostname(connect_user, connect_hn, connect_port, row_number);
 		}
 		# Exec exec_before_rsync
 		if (exec_before_rsync != "") {
-			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on line " row_number);
+			print_timestamp(); print("NOTICE: Executing remote exec_before_rsync '" exec_before_rsync "' on config item " row_number);
 			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_before_rsync "'";
 			# Get exit code of script
 			err = system(ssh_exec_cmd);
 			if (err == 0) {
-				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on line " row_number);
+				print_timestamp(); print("NOTICE: Remote execution of exec_before_rsync succeeded on config item " row_number);
 			} else {
-				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on line " row_number ", but script continues");
+				print_timestamp(); print("ERROR: Remote execution of exec_before_rsync failed on config item " row_number ", but script continues");
 				total_errors = total_errors + 1;
 			}
 		}
@@ -687,11 +687,11 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running remote helper script upload");
 		err = system(make_tmp_file_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote helper script upload failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote helper script upload failed on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote helper script upload finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote helper script upload finished on config item " row_number);
 		}
 		#
 		mkdir_part = "mkdir -p /var/backups/mongodb";
@@ -722,11 +722,11 @@ function print_timestamp() {
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);
 		if (err != 0) {
-			print_timestamp(); print("ERROR: Remote dump failed on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		} else {
-			print_timestamp(); print("NOTICE: Remote dump finished on line " row_number);
+			print_timestamp(); print("NOTICE: Remote dump finished on config item " row_number);
 		}
 		# Remove partially downloaded dumps
                 system("rm -f " backup_dst "/.sync/rsnapshot/var/backups/mongodb/.*.tar.gz.*");
@@ -756,7 +756,7 @@ function print_timestamp() {
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				print_timestamp(); print("ERROR: Backup failed with inflate error on config item " row_number);
 				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_SSH_PATH.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -775,16 +775,16 @@ function print_timestamp() {
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system("bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+					print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 				}
 			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 	} else if (backup_type == "RSYNC_NATIVE") {
 		# Default ssh and rsync args
@@ -793,31 +793,31 @@ function print_timestamp() {
 		}
 		# If native rsync - password is mandatory (passwordless rsync is unsafe)
 		if (connect_passwd == "null") {
-			print_timestamp(); print("ERROR: No Rsync password provided for native rsync on line " row_number ", skipping to next line");
+			print_timestamp(); print("ERROR: No Rsync password provided for native rsync on config item " row_number ", skipping to next line");
 			total_errors = total_errors + 1;
 			next;
 		}
 		if (native_txt_check) {
-			print_timestamp(); print("NOTICE: native_txt_check set to True on line " row_number);
+			print_timestamp(); print("NOTICE: native_txt_check set to True on config item " row_number);
 			# Check remote .backup existance, if no file - skip to next. Remote windows rsync server can give empty set in some cases, which can lead to backup to be erased.
 			system("touch /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("chmod 600 /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			system("echo '" connect_passwd "' > /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 			err = system("rsync --password-file=/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd rsync://" connect_user "@" connect_hn "" backup_src "/ | grep .backup");
 			if (err != 0) {
-				print_timestamp(); print("ERROR: .backup not found, failed on line " row_number ", skipping to next line");
+				print_timestamp(); print("ERROR: .backup not found, failed on config item " row_number ", skipping to next line");
 				total_errors = total_errors + 1;
 				next;
 			} else {
-				print_timestamp(); print("NOTICE: .backup found on line " row_number);
+				print_timestamp(); print("NOTICE: .backup found on config item " row_number);
 			}
 			system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 		}
 		if (native_10h_limit) {
-			print_timestamp(); print("NOTICE: native_10h_limit set to T on line " row_number);
+			print_timestamp(); print("NOTICE: native_10h_limit set to T on config item " row_number);
 			timeout_prefix = "timeout --preserve-status -k 60 10h ";
 		} else {
-			print_timestamp(); print("NOTICE: native_10h_limit set to F on line " row_number);
+			print_timestamp(); print("NOTICE: native_10h_limit set to F on config item " row_number);
 			timeout_prefix = "";
 		}
 		# Check no compress file
@@ -848,7 +848,7 @@ function print_timestamp() {
 		if (err != 0) {
 			check = system("grep -q 'inflate returned -3' /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log");
 			if (check == 0) {
-				print_timestamp(); print("ERROR: Backup failed with inflate error on line " row_number);
+				print_timestamp(); print("ERROR: Backup failed with inflate error on config item " row_number);
 				total_errors = total_errors + 1;
 				system("cat /opt/sysadmws/rsnapshot_backup/rsnapshot_conf_template_RSYNC_NATIVE.conf | sed \
 					-e 's#__SNAPSHOT_ROOT__#" backup_dst "#g' \
@@ -866,16 +866,16 @@ function print_timestamp() {
 				print_timestamp(); print("NOTICE: Re-running rsnapshot with --no-compress " rsnapshot_type);
 				err2 = system(timeout_prefix "bash -c 'set -o pipefail; rsnapshot -c /opt/sysadmws/rsnapshot_backup/rsnapshot.conf " rsnapshot_type " 2>&1 | tee /opt/sysadmws/rsnapshot_backup/rsnapshot_last_out.log'");
 				if (err2 != 0) {
-					print_timestamp(); print("ERROR: Backup failed on line " row_number);
+					print_timestamp(); print("ERROR: Backup failed on config item " row_number);
 					total_errors = total_errors + 1;
 				} else {
 					system("touch /opt/sysadmws/rsnapshot_backup/no-compress_" row_number);
 					print_timestamp(); print("NOTICE: no-compress_" row_number " file created");
-					print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+					print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 				}
 			}
 		} else {
-			print_timestamp(); print("NOTICE: Rsnapshot finished on line " row_number);
+			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 		system("rm -f /opt/sysadmws/rsnapshot_backup/rsnapshot.passwd");
 	} else {
