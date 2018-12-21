@@ -1,0 +1,5 @@
+Host: winsrv1.domain.com
+Path: C:\Some Actual\Windows Path\Some\Path
+UTC: 2018-12-21 14:18:11
+Backup 1 Host: backup1.domain.com
+Backup 1 Path: /var/backups/winsrv1.domain.com
