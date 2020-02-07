@@ -105,13 +105,15 @@ END {
 			print_timestamp(); print("ERROR: Empty DB name");
 			continue;
 		}
-		if (targets[i]["auth"] == "") {
-			print_timestamp(); print("ERROR: Empty auth params");
-			continue;
-		}
-		if ((targets[i]["db"] == "*") && (targets[i]["tables"] != "*")) {
-			print_timestamp(); print("ERROR: Table names cannot be used with all databases, use separate targets");
-			continue;
+		if (targets[i]["dump_type"] == "mysql") {
+			if (targets[i]["auth"] == "") {
+				print_timestamp(); print("ERROR: Empty auth params");
+				continue;
+			}
+			if ((targets[i]["db"] == "*") && (targets[i]["tables"] != "*")) {
+				print_timestamp(); print("ERROR: Table names cannot be used with all databases, use separate targets");
+				continue;
+			}
 		}
 		if (targets[i]["copies_quantity"] == "") {
 			print_timestamp(); print("ERROR: Empty copies_quantity param");
@@ -185,9 +187,25 @@ END {
 					system_wrap(mysqldump_cmd);
 				}
 				# PostgreSQL dumps
-				if (dump_type == "postgresql") {
-					print_timestamp(); print("ERROR: Postgresql dumps are not avalable yet");
-					continue;
+				if (targets[i]["dump_type"] == "postgresql") {
+					if (targets[i]["nice"] != "") {
+						pg_dump_cmd = "/usr/bin/nice -n " targets[i]["nice"];
+					} else {
+						pg_dump_cmd = "";
+					}
+					# Dump all dbs?
+					if (targets[i]["db"] == "*") {
+						pg_dump_cmd = pg_dump_cmd " su - postgres -c '/usr/bin/pg_dumpall " targets[i]["dump_opts"] "'";
+					# Dump specific dbs
+					} else {
+						pg_dump_cmd = pg_dump_cmd " su - postgres -c '/usr/bin/pg_dump " targets[i]["dump_opts"] "'";
+					}
+					# Add dst
+					pg_dump_cmd = pg_dump_cmd " > " targets[i]["dst"][m];
+					if (show_notices) {
+						print_timestamp(); print("NOTICE: Executing '" pg_dump_cmd "', output: ");
+					}
+					system_wrap(pg_dump_cmd);
 				}
 			}
 		}
