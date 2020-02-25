@@ -102,6 +102,7 @@ function print_timestamp() {
 	native_txt_check	= row_native_txt_check;
 	native_10h_limit	= row_native_10h_limit;
 	exec_before_rsync	= row_exec_before_rsync;
+	exec_after_rsync	= row_exec_after_rsync;
 
 	# Check retains
 	if (retain_h == "null") {
@@ -173,6 +174,11 @@ function print_timestamp() {
 	# Default exec_before_rsync
 	if (exec_before_rsync == "null") {
 		exec_before_rsync = "";
+	}
+
+	# Default exec_after_rsync
+	if (exec_after_rsync == "null") {
+		exec_after_rsync = "";
 	}
 
 	# Display what do we backup
@@ -344,6 +350,19 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
+		# Exec exec_after_rsync
+		if (exec_after_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_after_rsync '" exec_after_rsync "' on config item " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_after_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_after_rsync succeeded on config item " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_after_rsync failed on config item " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
+		}
 	} else if (backup_type == "POSTGRESQL_SSH") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
@@ -498,6 +517,19 @@ function print_timestamp() {
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
+		# Exec exec_after_rsync
+		if (exec_after_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_after_rsync '" exec_after_rsync "' on config item " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_after_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_after_rsync succeeded on config item " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_after_rsync failed on config item " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
+		}
 	} else if (backup_type == "MYSQL_SSH") {
 		# Default ssh and rsync args
 		if (rsync_args == "null") {
@@ -636,6 +668,19 @@ function print_timestamp() {
 			}
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
+		}
+		# Exec exec_after_rsync
+		if (exec_after_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_after_rsync '" exec_after_rsync "' on config item " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_after_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_after_rsync succeeded on config item " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_after_rsync failed on config item " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
 		}
 	} else if (backup_type == "MONGODB_SSH") {
 		# Default ssh and rsync args
@@ -785,6 +830,19 @@ function print_timestamp() {
 			}
 		} else {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
+		}
+		# Exec exec_after_rsync
+		if (exec_after_rsync != "") {
+			print_timestamp(); print("NOTICE: Executing remote exec_after_rsync '" exec_after_rsync "' on config item " row_number);
+			ssh_exec_cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -p " connect_port " " connect_user "@" connect_hn " '" exec_after_rsync "'";
+			# Get exit code of script
+			err = system(ssh_exec_cmd);
+			if (err == 0) {
+				print_timestamp(); print("NOTICE: Remote execution of exec_after_rsync succeeded on config item " row_number);
+			} else {
+				print_timestamp(); print("ERROR: Remote execution of exec_after_rsync failed on config item " row_number ", but script continues");
+				total_errors = total_errors + 1;
+			}
 		}
 	} else if (backup_type == "RSYNC_NATIVE") {
 		# Default ssh and rsync args
