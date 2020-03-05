@@ -92,6 +92,7 @@ function print_timestamp() {
 	retain_w		= row_retain_w;
 	retain_m		= row_retain_m;
 	rsync_args		= row_rsync_args;
+	mysqldump_args		= row_mysqldump_args;
 	mongo_args		= row_mongo_args;
 	connect_hn		= row_connect;
 	connect_user		= row_connect_user;
@@ -151,6 +152,11 @@ function print_timestamp() {
 		mysql_noevents = 1;
 	} else {
 		mysql_noevents = 0;
+	}
+
+	# Check mysqldump_args
+	if (mysqldump_args == "null") {
+		mysqldump_args = "";
 	}
 
 	# Default native_txt_check
@@ -598,9 +604,9 @@ function print_timestamp() {
 			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema > /var/backups/mysql/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db | gzip > /var/backups/mysql/$db.gz ); done } '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db " mysqldump_args " | gzip > /var/backups/mysql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases " backup_src " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
+			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases " backup_src mysqldump_args " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump");
 		err = system(make_dump_cmd);

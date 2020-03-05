@@ -65,6 +65,7 @@ if [ -f $CONF_FILE ]; then
 		ROW_RETAIN_M=$(echo ${CONF_ROW} | jq -r '.retain_monthly')
 		ROW_RSYNC_ARGS=$(echo ${CONF_ROW} | jq -r '.rsync_args')
 		ROW_MONGO_ARGS=$(echo ${CONF_ROW} | jq -r '.mongo_args')
+		ROW_MYSQLDUMP_ARGS=$(echo ${CONF_ROW} | jq -r '.mysqldump_args')
 		ROW_CONNECT_USER=$(echo ${CONF_ROW} | jq -r '.connect_user')
 		ROW_CONNECT_PASSWD=$(echo ${CONF_ROW} | jq -r '.connect_password')
 		ROW_VALIDATE_HOSTNAME=$(echo ${CONF_ROW} | jq -r '.validate_hostname')
@@ -108,6 +109,7 @@ if [ -f $CONF_FILE ]; then
 			-v row_retain_m=${ROW_RETAIN_M} \
 			-v row_rsync_args=${ROW_RSYNC_ARGS} \
 			-v row_mongo_args=${ROW_MONGO_ARGS} \
+			-v row_mysqldump_args=${ROW_MYSQLDUMP_ARGS} \
 			-v row_connect_user=${ROW_CONNECT_USER} \
 			-v row_connect_passwd=${ROW_CONNECT_PASSWD} \
 			-v row_validate_hostname=${ROW_VALIDATE_HOSTNAME} \
