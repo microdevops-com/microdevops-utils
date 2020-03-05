@@ -6,12 +6,13 @@
 # logrotate_db_backup.sh - runs all targets
 target_1:
   # Target options are prepended with <space><space>
-  # Only mysql is supported for now
   # dump_type option is mandatory
   dump_type: mysql
+  #dump_type: postgresql
   # db option is mandatory
   # * - all databases
-  # db1 db2 ... - db list is separated with spaces
+  # db1 db2 ... - db list is separated with spaces for mysql
+  # db - only one db supported for postgresql
   db: pass
   # dst_* - one local path is mandatory
   # You can use any text after _
@@ -25,9 +26,11 @@ target_1:
   nice: 10
   # Optional options for runnning dump (anything you want)
   dump_opts: --force --opt --single-transaction --quick --lock-tables=false
-  # Mandatory part for auth
+  # Mandatory part for auth for mysql
+  # Not used for postgresql
   auth: --defaults-file=/etc/mysql/debian.cnf
-  # Optionally, if dumping only one db, you can specify tables separated by space
+  # Optionally, for mysql, if dumping only one db, you can specify tables separated by space
+  # Not supported for postgresql
   tables: tmpass_categories 1tmpass_keys 1tmpass_items
   # Mandatory, how many copies to keep
   copies_quantity: 144
@@ -56,3 +59,13 @@ target_3:
   dump_opts: --force --opt --single-transaction --quick --lock-tables=false
   auth: --defaults-file=/etc/mysql/debian.cnf
   copies_quantity: 20
+
+target_4:
+  dump_type: postgresql
+  db: *
+  dst_1: /var/backups/logrotate_db_backup/all.sql
+  dst_2: root@server1.example.com:/var/backups/logrotate_db_backup/all.sql
+  dst_3: root@server2.example.com:/var/backups/logrotate_db_backup/all.sql
+  dump_opts: --create --verbose
+  copies_quantity: 10
+  compress: no

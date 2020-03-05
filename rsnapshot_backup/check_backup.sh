@@ -76,6 +76,7 @@ if [ -f $CONF_FILE ]; then
 		ROW_NATIVE_TXT_CHECK=$(echo ${CONF_ROW} | jq -r '.native_txt_check')
 		ROW_NATIVE_10H_LIMIT=$(echo ${CONF_ROW} | jq -r '.native_10h_limit')
 		ROW_EXEC_BEFORE_RSYNC=$(echo ${CONF_ROW} | jq -r '.exec_before_rsync')
+		ROW_EXEC_AFTER_RSYNC=$(echo ${CONF_ROW} | jq -r '.exec_after_rsync')
 		# If item number in $2 - skip everything but needed
 		if [ "$2" != "" ]; then
 			if [ "$2" != "${ROW_HOST}" ]; then
@@ -115,6 +116,7 @@ if [ -f $CONF_FILE ]; then
 						-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 						-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
 						-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+						-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC} \
 						-v check_path=${CHECK_PATH}
 					# Exit code depends on rows
 					if [ $? -gt 0 ]; then
@@ -148,6 +150,7 @@ if [ -f $CONF_FILE ]; then
 						-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 						-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
 						-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+						-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC} \
 						-v check_s3_bucket=${CHECK_S3_BUCKET} \
 						-v check_s3_path=${CHECK_S3_PATH}
 					# Exit code depends on rows
@@ -185,6 +188,7 @@ if [ -f $CONF_FILE ]; then
 						-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 						-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
 						-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+						-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC} \
 						-v check_min_file_size=${CHECK_MIN_FILE_SIZE} \
 						-v check_file_type=${CHECK_FILE_TYPE} \
 						-v check_last_file_age=${CHECK_LAST_FILE_AGE} \
@@ -248,7 +252,8 @@ if [ -f $CONF_FILE ]; then
 										-v row_mysql_noevents=${ROW_MYSQL_NOEVENTS} \
 										-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 										-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
-										-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC}
+										-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+										-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC}
 									# Exit code depends on rows
 									if [ $? -gt 0 ]; then
 										GRAND_EXIT=1
@@ -282,7 +287,8 @@ if [ -f $CONF_FILE ]; then
 							-v row_mysql_noevents=${ROW_MYSQL_NOEVENTS} \
 							-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 							-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
-							-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC}
+							-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
+							-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC}
 						# Exit code depends on rows
 						if [ $? -gt 0 ]; then
 							GRAND_EXIT=1
@@ -291,7 +297,7 @@ if [ -f $CONF_FILE ]; then
 					rm -f /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
 				else
 					date '+%F %T ' | tr -d '\n'
-					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found on line ${ROW_NUMBER}"
+					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found on config item ${ROW_NUMBER}"
 					awk '{ print $1 + 1}' \
 						< /opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt \
 						> /opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt.new \
