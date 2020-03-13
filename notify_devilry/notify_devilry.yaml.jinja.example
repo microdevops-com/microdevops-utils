@@ -1,5 +1,7 @@
 notify_devilry:
   enabled: True # should be set to True on config setup
+  env:
+    https_proxy: 'http://user:pass@proxy.example.com:8888' # set env vars before sending
   telegram:
     'Chat Alias 1':
       token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'

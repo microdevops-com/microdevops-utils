@@ -413,6 +413,11 @@ if __name__ == "__main__":
                                 
                                 # Get sending method settings per contact alias in yaml config
                                 sending_method_item_settings = config_dict['notify_devilry'][sending_method][sending_method_item]
+
+                                # Set env vars if needed
+                                if 'env' in config_dict['notify_devilry']:
+                                    for env in config_dict['notify_devilry']['env']:
+                                        os.environ[env] = config_dict['notify_devilry']['env'][env]
                                 
                                 # Even if sending failed, catch and show exception and try sending next items (contact aliases) and methods
                                 try:
