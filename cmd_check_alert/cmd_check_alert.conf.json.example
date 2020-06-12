@@ -1,0 +1,18 @@
+{
+	"config": {
+		"default_timeout": 10
+		}, 
+	"enabled": true, 
+	"cmd_checks": {
+		"TEST FAIL ON TIMEOUT": {
+			"timeout": 1, 
+			"cmd": "sleep 1 && echo failed && exit 130"
+		}, 
+		"TEST FAIL ON EXIT CODE": {
+			"cmd": "echo failed && exit 2"
+		}, 
+		"TEST SUCCESS": {
+			"cmd": "echo hi"
+		}
+	}
+}
