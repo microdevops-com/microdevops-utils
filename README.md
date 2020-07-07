@@ -10,6 +10,7 @@ Sysadmin Workshop Utilities:
 - notify_devilry - configured with YAML+Jinja2, sends input JSON to Telegram.
 - put_check_files - autonomous script to put check files for rsnapshot_backup, if Salt formula sysadmws-formula is unavailable.
 - rsnapshot_backup - rsnapshot wrapper, makes usage of rsnapshot for ssh, native, mysql, postgresql etc on hundreds of servers manageable.
+- cmd_check_alert - simple tool that runs configured commands and send alert if command failed
 
 rsnapshot_backup could be configured by hands with JSON config, but shouldn't. Use [sysadmws-formula/rsnapshot_backup](https://github.com/sysadmws/sysadmws-formula/blob/master/rsnapshot_backup/pillar.example).
 
