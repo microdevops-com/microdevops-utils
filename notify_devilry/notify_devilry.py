@@ -89,7 +89,7 @@ def load_yaml_config(d, f):
     config_dict = yaml.load(template.render(
         current_date = int(current_date),
         current_time = int(current_time)
-    ))
+    ), Loader=yaml.BaseLoader)
     return config_dict
 
 # Send methods
