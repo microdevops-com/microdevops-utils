@@ -1,5 +1,5 @@
 # Lines to grep from df
-#DISK_ALERT_FILTER="^Filesystem|tmpfs|cdrom|none"
+#DISK_ALERT_FILTER="^Filesystem|tmpfs|cdrom|none|/snap"
 
 # Set type of disk usage check: by % of usage or by MB free space left
 # By default = PERCENT

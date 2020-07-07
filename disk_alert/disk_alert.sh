@@ -20,7 +20,7 @@ fi
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
 	FILTER=$DISK_ALERT_FILTER
 else
-	FILTER="^Filesystem|tmpfs|cdrom|none"
+	FILTER="^Filesystem|tmpfs|cdrom|none|/snap"
 fi
 #
 if [[ _$DISK_ALERT_USAGE_CHECK == "_PERCENT" ]]; then
