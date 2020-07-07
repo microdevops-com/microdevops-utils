@@ -36,8 +36,13 @@ def parse_config(filename):
     with open(filename,"r") as f:
         config = json.load(f)
 
+    if config['enabled'] != True:
+        print("Checks is disabled in config")
+        sys.exit(0)
+
     flat_config = {}
     config_default_timeout = 0
+
 
     if config['cmd_checks']:
         if 'config' in config:
