@@ -118,7 +118,8 @@ make_deb_v1:
        cmd_check_alert/cmd_check_alert.conf.json.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cmd_check_alert
     # cloudflare
-    cp cloudflare/dns_backup.sh \
+    cp cloudflare/dns_records_backup.sh \
+       cloudflare/pagerules_backup.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cloudflare
     # misc
     cp misc/mysql_dump_all_dbs_to_files.sh \
