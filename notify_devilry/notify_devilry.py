@@ -184,7 +184,7 @@ if __name__ == "__main__":
     log_handler.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.ERROR)
-    formatter = logging.Formatter('{0} %(name)s %(process)d/%(threadName)s %(levelname)s: %(message)s'.format(datetime.datetime.now().strftime("%F %T")))
+    formatter = logging.Formatter(fmt='%(asctime)s %(filename)s %(name)s %(process)d/%(threadName)s %(levelname)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S %Z")
     log_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
     logger.addHandler(log_handler)
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         check_json_key("status", message)
 
         # Check if enabled in config
-        if not config_dict['notify_devilry']['enabled']:
+        if config_dict['notify_devilry']['enabled'] != "True":
             logger.warning("notify_devilry not enabled in config, exiting")
             sys.exit(1)
 
@@ -244,7 +244,12 @@ if __name__ == "__main__":
         logger.info("Message keys: '{0}', '{1}', '{2}', '{3}'".format(message['host'], message['from'], message['type'], message['status']))
 
         # Use some key combination to detect similiar messages and rate limit them
-        key_combo = "{0}_{1}_{2}_{3}".format(message['host'].replace(" ", "_").replace(".", "_"), message['from'].replace(" ", "_"), message['type'].replace(" ", "_"), message['status'].replace(" ", "_"))
+        key_combo = "{0}_{1}_{2}_{3}".format(
+            message['host'].replace(" ", "_").replace(".", "_"),
+            message['from'].replace(" ", "_").replace(".", "_").replace("/", "_"),
+            message['type'].replace(" ", "_"),
+            message['status'].replace(" ", "_")
+        )
 
         # Open history message in file
         with open_history_message_file(HISTORY_DIR, "{0}_{1}.{2}".format(HISTORY_MESSAGE_IN_PREFIX, key_combo, HISTORY_MESSAGE_SUFFIX)) as history_in_file:
