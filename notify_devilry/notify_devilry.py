@@ -236,7 +236,7 @@ if __name__ == "__main__":
         check_json_key("status", message)
 
         # Check if enabled in config
-        if config_dict['notify_devilry']['enabled'] != "True":
+        if config_dict["notify_devilry"]["enabled"] != "True":
             logger.warning("notify_devilry not enabled in config, exiting")
             sys.exit(1)
 
