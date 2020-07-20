@@ -245,10 +245,10 @@ if __name__ == "__main__":
 
         # Use some key combination to detect similiar messages and rate limit them
         key_combo = "{0}_{1}_{2}_{3}".format(
-            message['host'].replace(" ", "_").replace(".", "_"),
+            message['host'].replace(" ", "_").replace(".", "_").replace("/", "_"),
             message['from'].replace(" ", "_").replace(".", "_").replace("/", "_"),
-            message['type'].replace(" ", "_"),
-            message['status'].replace(" ", "_")
+            message['type'].replace(" ", "_").replace(".", "_").replace("/", "_"),
+            message['status'].replace(" ", "_").replace(".", "_").replace("/", "_")
         )
 
         # Open history message in file
