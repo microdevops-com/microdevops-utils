@@ -334,7 +334,7 @@ if __name__ == "__main__":
                 # Check match filter and skip item if not matched
                 for match_item_key, match_item_val in notify_item['match'].items():
                     
-                    if message[match_item_key] != match_item_val:
+                    if match_item_key not in message or message[match_item_key] != match_item_val:
                         
                         should_continue = True
                         logger.info("Match filter matched all keys for notify item '{0}'".format(notify_item_name))
