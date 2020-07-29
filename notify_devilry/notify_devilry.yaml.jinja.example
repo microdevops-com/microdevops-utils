@@ -1,26 +1,25 @@
-notify_devilry:
-  enabled: True # should be set to True on config setup
-  env:
-    https_proxy: 'http://user:pass@proxy.example.com:8888' # set env vars before sending
-  telegram:
-    'Chat Alias 1':
-      token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-      chat_id: '-xxxxxxxxx'
-    'Chat Alias 2':
-      token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-      chat_id: '-xxxxxxxxx'
-  notify:
-    default: # notify rule #1, uniq name needed to save message sending history per notify rules
-      match:
-        type: 'disk alert' # multiple keys allowed, message is sent only if every kv pair == the same in message
-      telegram:
-        - 'Chat Alias 1' # list of chats to send
+enabled: True # should be set to True on config setup
+env:
+  https_proxy: 'http://user:pass@proxy.example.com:8888' # set env vars before sending
+telegram:
+  'Chat Alias 1':
+    token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    chat_id: '-xxxxxxxxx'
+  'Chat Alias 2':
+    token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    chat_id: '-xxxxxxxxx'
+notify:
+  default: # notify rule #1, uniq name needed to save message sending history per notify rules
+    match:
+      type: 'disk alert' # multiple keys allowed, message is sent only if every kv pair == the same in message
+    telegram:
+      - 'Chat Alias 1' # list of chats to send
 {% if ((100000 < current_time) and (current_time < 190000)) %}
-    working_hours: # notify rule #2, jinja code allows to render rules by conditions, no key matching (sends everything), but only within working hours
-      telegram:
-        - 'Chat Alias 2'
-      rate_limit: # limit sending similiar messages based on sending history, 1+ rule needed
-        - 60 # second message only if 60+ minutes passed from last sending and 1 message sent
-        - 240 # third if 240+ minutes and 2 messages sent
-        - 480 # fourth and further if 480+ minutes and 3+ messages sent
+  working_hours: # notify rule #2, jinja code allows to render rules by conditions, no key matching (sends everything), but only within working hours
+    telegram:
+      - 'Chat Alias 2'
+    rate_limit: # limit sending similiar messages based on sending history, 1+ rule needed
+      - 60 # second message only if 60+ minutes passed from last sending and 1 message sent
+      - 240 # third if 240+ minutes and 2 messages sent
+      - 480 # fourth and further if 480+ minutes and 3+ messages sent
 {% endif %}

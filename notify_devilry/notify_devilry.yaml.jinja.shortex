@@ -1,14 +1,13 @@
-notify_devilry:
-  enabled: True
-  telegram:
-    'Chat Alias 1':
-      token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-      chat_id: '-xxxxxxxxx'
-  notify:
-    default:
-      telegram:
-        - 'Chat Alias 1'
-      rate_limit:
-        - 60
-        - 240
-        - 480
+enabled: True
+telegram:
+  'Chat Alias 1':
+    token: 'xxxxxxxxx:xxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    chat_id: '-xxxxxxxxx'
+notify:
+  default:
+    telegram:
+      - 'Chat Alias 1'
+    rate_limit:
+      - 60
+      - 240
+      - 480
