@@ -12,7 +12,7 @@ There was a typo in the word `delivery`, but it remains as a part of the name no
   - Transform notification key values, e.g. to increase or decrease severity for specific resources or clients.
   - Rate limit notifications (useful for human destinations to avoid noise in chats).
   - Suppress notifications.
-  - Send notifications to several destinations.
+  - Send notifications to several destinations including other rules.
 - YAML config is rendered with Jinja2 each message, for example to modify flow for non working hours.
 
 All `sysadmws-utils` components use `notify_devilry` to send notifications.
