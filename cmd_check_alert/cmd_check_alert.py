@@ -11,7 +11,6 @@ import sys
 import time
 import json
 import subprocess
-from collections import OrderedDict
 
 # notify_devilry.py mandatory data
 # '{"host": "'$HOSTNAME'", "from": "notify_devilry_test.sh", "type": "notify devilry test", "status": "OK"}'
@@ -99,7 +98,7 @@ def run_checks(checks_data):
 def send_check_results(notify_path, check_results):
     for name in check_results:
         if check_results[name]['retcode'] != 0 or force_send:
-            check_result_ordered_list =  [('host', _hostname), 
+            check_result_list =  [('host', _hostname), 
                                           ('from', _filename),
                                           ('type', _type + name),
                                           ('at', check_results[name]['at']), 
@@ -109,10 +108,10 @@ def send_check_results(notify_path, check_results):
                                           ('retcode', check_results[name]['retcode']),
                                           ('stdout', check_results[name]['stdout']),
                                           ('stderr', check_results[name]['stderr'])]
-            stdin_dict = OrderedDict()
+            stdin_dict = {}
 
             # clear empty values
-            for kv in check_result_ordered_list:
+            for kv in check_result_list:
                 key, value = kv
                 if value:
                     stdin_dict.update({key: value})
