@@ -1,0 +1,18 @@
+# This file is reread on every check, no need to reload the daemon on resources changes
+enabled: True
+clients:
+  Client1:
+    token: aaaaaaaaaaaaaaaaaaaaa # each client is identified by token, all tokens should be unique
+    timeout: 1 # default heartbeat timeout for client, if host sender has no its own timeout
+    severity: major # optional, default severity for client, critical if not set per client or per resource
+    resources: {} # each client should have resource dict to check heartbeats, empty dict if no resources to check
+  Client2:
+    token: bbbbbbbbbbbbbbbbbbbbb
+    timeout: 1
+    resources:
+      host1.example.com:
+        severity: minor # optional
+        environment: infra # optional
+        service: database # optional
+        location: host2.example.com # optional
+      host2.example.com: {} # empty dict if nothing special for this resource

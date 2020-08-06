@@ -1,0 +1,2 @@
+# heartbeat_mesh/sender
+* * * * * /opt/sysadmws/heartbeat_mesh/sender.py
