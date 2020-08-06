@@ -33,10 +33,10 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/logrotate_db_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup \
-             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/unit_status_alert \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cmd_check_alert \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cloudflare \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/heartbeat_mesh \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
     cp LICENSE \
@@ -60,8 +60,11 @@ make_deb_v1:
     # notify_devilry
     cp notify_devilry/notify_devilry.py \
        notify_devilry/notify_devilry_test.sh \
-       notify_devilry/notify_devilry.yaml.jinja.example \
-       notify_devilry/notify_devilry.yaml.jinja.shortex \
+       notify_devilry/notify_devilry_critical.sh \
+       notify_devilry/notify_devilry_ok.sh \
+       notify_devilry/notify_devilry.yaml.example \
+       notify_devilry/notify_devilry.yaml.minimal \
+       notify_devilry/README.md \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/notify_devilry
     # disk_alert
     cp disk_alert/disk_alert.sh \
@@ -82,11 +85,8 @@ make_deb_v1:
     # mikrotik_backup
     cp mikrotik_backup/mikrotik_backup.sh \
        mikrotik_backup/mikrotik_backup.conf.example \
+       mikrotik_backup/README.md \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mikrotik_backup
-    # unit_status_alert
-    cp unit_status_alert/unit_status_alert.sh \
-       unit_status_alert/unit_status_alert@.service \
-       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/unit_status_alert
     # rsnapshot_backup
     cp rsnapshot_backup/rsnapshot_backup.awk \
        rsnapshot_backup/rsnapshot_backup.sh \
@@ -112,16 +112,24 @@ make_deb_v1:
        rsnapshot_backup/mongodb_db_list.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/rsnapshot_backup
     # cmd_check_alert
-    cp cmd_check_alert/cmd_check_alert.sh \
-       cmd_check_alert/cmd_check_alert.py \
+    cp cmd_check_alert/cmd_check_alert.py \
        cmd_check_alert/cmd_check_alert.cron \
-       cmd_check_alert/cmd_check_alert.conf.json.example \
+       cmd_check_alert/cmd_check_alert.yaml.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cmd_check_alert
     # cloudflare
     cp cloudflare/dns_records_backup.sh \
        cloudflare/pagerules_backup.sh \
        cloudflare/pagerules_import.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cloudflare
+    # heartbeat_mesh
+    cp heartbeat_mesh/receiver.py \
+       heartbeat_mesh/receiver.service \
+       heartbeat_mesh/receiver.yaml.example \
+       heartbeat_mesh/sender.cron \
+       heartbeat_mesh/sender.py \
+       heartbeat_mesh/sender.yaml.example \
+       heartbeat_mesh/README.md \
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/heartbeat_mesh
     # misc
     cp misc/mysql_dump_all_dbs_to_files.sh \
        misc/postgresql_dump_all_dbs_to_files.sh \
