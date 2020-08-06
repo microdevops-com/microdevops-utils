@@ -22,17 +22,21 @@ function report {
 	# Compose response
 	local rsp
 	rsp+='{'
-	rsp+="\"host\":\"$(hostname -f)\"," 
-	rsp+="\"from\":\"mysql_replica_checker.sh\"," 
-	rsp+="\"type\":\"mysql replica status\","
-	rsp+="\"status\":\"WARNING\"," 
-	rsp+="\"date time\":\"$(date +'%F %T')\","
+	rsp+="\"severity\":\"minor\"," 
+	rsp+="\"service\":\"database\"," 
+	rsp+="\"resource\":\"$(hostname -f):mysql\"," 
+	rsp+="\"event\":\"mysql_replica_checker_error\"," 
+	rsp+="\"group\":\"mysql_replica_checker\"," 
+	rsp+="\"origin\":\"mysql_replica_checker.sh\"," 
+	rsp+="\"text\":\"Mysql replication error detected\"," 
+	rsp+="\"attributes\":{" 
 	rsp+=${master:+"\"master\":\"${master}\","}
 	if [[ -n ${data} ]]; then
 		rsp+="${data}"
 	fi
 	rsp+=${free_space:+"\"relay log free space\":\"${free_space}\","}
 	rsp+=${relay_log_size:+"\"log size\":\"$(bc <<<"scale=2; ${relay_log_size:=0} / 1024 / 1024" )Mb\""}
+	rsp+='}'
 	rsp+='}'
 
 	# Send response
