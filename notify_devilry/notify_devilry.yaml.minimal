@@ -1,0 +1,64 @@
+enabled: True
+
+defaults:
+  environment: infra
+  client: Alias 1
+  location: Some Datacenter
+
+alerta:
+
+  Alias 1:
+    url: https://alerta.example.com/api/alert
+    api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+telegram:
+
+  Alias 1:
+    token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    chat_id: -xxxxxxxxxxxxx
+    sound:
+      - fatal
+      - security
+      - critical
+      - major
+
+chains:
+
+  entrypoint:
+    - name: entrypoint
+      entrypoint: True
+      jump:
+        - alerta_chain
+        - telegram_chain
+
+  alerta_chain:
+    - name: Alias 1
+      send:
+        alerta:
+          - Alias 1
+
+  telegram_chain:
+    - name: skip positive
+      match:
+        severity:
+          not_in:
+            - fatal
+            - security
+            - critical
+            - major
+            - minor
+            - warning
+            - informational
+        force_send:
+          in:
+            - false
+      suppress: True
+      chain_break: True
+    - name: Alias 1
+      rate_limit:
+        - 60
+        - 240
+        - 480
+      send:
+        telegram:
+          - Alias 1

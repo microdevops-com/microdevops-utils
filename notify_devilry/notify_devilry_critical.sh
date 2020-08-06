@@ -11,9 +11,9 @@ echo '{
 	"service": "server",
 	"resource": "'$HOSTNAME'",
 	"event": "notify_devilry_critical",
-	"group": "software",
 	"value": "critical",
-	"text": "critical test alarm sent with notify_devilry_critical.sh",
+	"group": "notify_devilry",
+	"text": "Severity critical test alarm sent with notify_devilry_critical.sh",
 	"origin": "notify_devilry_critical.sh",
 	"timeout": 300,
 	"correlate": ["notify_devilry_ok"]
