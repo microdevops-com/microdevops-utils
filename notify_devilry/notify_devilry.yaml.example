@@ -5,7 +5,7 @@ env:
 
 defaults:
   environment: infra
-  client: Alias 1
+  client: Client 1
   location: Some Datacenter
 
 alerta:
@@ -118,7 +118,7 @@ current_date = 19700101 on 1970-01-01.
       match:
         client:
           in:
-            - Alias 1
+            - Client 1
       rate_limit: # limit sending similiar messages based on sending history, 1+ rule needed
         - 60 # second message only if 60+ minutes passed from last sending and 1 message sent
         - 240 # third if 240+ minutes and 2 messages sent

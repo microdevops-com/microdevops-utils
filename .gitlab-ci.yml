@@ -64,6 +64,7 @@ make_deb_v1:
        notify_devilry/notify_devilry_ok.sh \
        notify_devilry/notify_devilry.yaml.example \
        notify_devilry/notify_devilry.yaml.minimal \
+       notify_devilry/notify_devilry.yaml.clients \
        notify_devilry/README.md \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/notify_devilry
     # disk_alert

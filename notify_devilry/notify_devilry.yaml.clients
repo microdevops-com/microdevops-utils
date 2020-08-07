@@ -22,6 +22,15 @@ telegram:
       - critical
       - major
 
+  Alias 2:
+    token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    chat_id: -xxxxxxxxxxxxx
+    sound:
+      - fatal
+      - security
+      - critical
+      - major
+
 chains:
 
   entrypoint:
@@ -62,3 +71,11 @@ chains:
       send:
         telegram:
           - Alias 1
+    - name: Alias 2
+      rate_limit:
+        - 60
+        - 240
+        - 480
+      send:
+        telegram:
+          - Alias 2
