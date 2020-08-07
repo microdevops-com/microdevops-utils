@@ -50,6 +50,7 @@ SELF_GROUP = "notify_devilry"
 SELF_ORIGIN = "notify_devilry.py"
 ALERTA_RETRIES = 3
 ALERTA_RETRY_SLEEP = 2
+ALERTA_URLOPEN_TIMEOUT = 5
 SEVERITY_MINOR = "minor"
 
 # Custom Exceptions
@@ -119,7 +120,7 @@ def send_alerta(url, api_key, msg):
     url_req = Request(url)
     url_req.add_header("Content-Type", "application/json")
     url_req.add_header("Authorization", "Key {api_key}".format(api_key=api_key))
-    url_obj = urlopen(url_req, url_data)
+    url_obj = urlopen(url_req, url_data, ALERTA_URLOPEN_TIMEOUT)
     url_result = url_obj.read()
     logger.info("Sending to Alerta API result: {0}".format(url_result))
 
@@ -174,7 +175,7 @@ def send_telegram(token, chat_id, sound, msg):
 
 # Universal send method
 # Alerta bug found:
-# If you send several consecutive immidiate alerts with the same severity, env, resource, event - it will 500 and 200 after some time.
+# If you send several consecutive immediate alerts with the same severity, env, resource, event - it will 500 and 200 after some time.
 # So retry - is a good workaround.
 # Retrying module is not generally available, so done without it.
 def send_message(sending_method, sending_method_item_settings, message):
@@ -184,12 +185,36 @@ def send_message(sending_method, sending_method_item_settings, message):
         for retry in range(ALERTA_RETRIES):
             try:
                 send_alerta(url, api_key, message)
-            except:
+            except Exception as e:
                 # Retry if not last retry
                 if retry < (ALERTA_RETRIES - 1):
                     logger.error("send_alerta exception catch, retry {retry}".format(retry=retry + 1))
                     time.sleep(ALERTA_RETRY_SLEEP)
                 else:
+                    # Send exception
+                    logger.error("send_alerta exception catch, all retries failed")
+                    if "exception" in sending_method_item_settings:
+                        logger.info("Sending exception")
+                        exception_message = {
+                            "severity": SEVERITY_MINOR,
+                            "service": "server",
+                            "resource": socket.gethostname(),
+                            "event": "notify_devilry_alerta_send_error",
+                            "value": str(type(e).__name__),
+                            "group": SELF_GROUP,
+                            "origin": SELF_ORIGIN,
+                            "text": str(e),
+                            "attributes": {
+                                "alerta url": sending_method_item_settings["url"]
+                            }
+                        }
+                        exception_message = apply_defaults(exception_message)
+                        for s_method in SENDING_METHODS:
+                            if s_method in sending_method_item_settings["exception"]:
+                                for al in sending_method_item_settings["exception"][s_method]:
+                                    al_settings = config[s_method][al] 
+                                    send_message(s_method, al_settings, exception_message)
+                    # And raise
                     raise
             else:
                 break
@@ -254,8 +279,40 @@ def open_history_message_file(d, f):
     return history_file
 
 # Misc funcs
+
 def safe_file_name(name):
     return name.replace(" ", "_").replace(".", "_").replace("/", "_")
+
+def apply_defaults(msg):
+    # Those keys are referenced to render templates, so add empty values instead of None
+    if "value" not in msg:
+        msg["value"] = ""
+    if "service" not in msg:
+        msg["service"] = ""
+    if "group" not in msg:
+        msg["group"] = ""
+    if "origin" not in msg:
+        msg["origin"] = ""
+    if "text" not in msg:
+        msg["text"] = ""
+    # Defaults
+    if "type" not in msg:
+        msg["type"] = "sysadmws-utils"
+    if "environment" not in msg and "environment" in config["defaults"]:
+        msg["environment"] = config["defaults"]["environment"]
+    if "client" not in msg:
+        if "client" in config["defaults"]:
+            msg["client"] = config["defaults"]["client"]
+        else:
+            msg["client"] = ""
+    if "attributes" not in msg:
+        msg["attributes"] = {}
+    if "location" not in msg["attributes"] and "location" in config["defaults"]:
+        msg["attributes"]["location"] = config["defaults"]["location"]
+    if "datetime" not in msg["attributes"]:
+        msg["attributes"]["datetime"] = subprocess.check_output(["date", "+%F %T %z %Z"]).rstrip()
+    msg["force_send"] = force_send
+    return msg
 
 if __name__ == "__main__":
 
@@ -344,31 +401,7 @@ if __name__ == "__main__":
         check_json_key("event", message)
 
         # Add fixed keys and defaults
-        if "value" not in message:
-            message["value"] = ""
-        if "service" not in message:
-            message["service"] = ""
-        if "group" not in message:
-            message["group"] = ""
-        if "origin" not in message:
-            message["origin"] = ""
-        if "text" not in message:
-            message["text"] = ""
-        if "client" not in message:
-            message["client"] = ""
-        if "type" not in message:
-            message["type"] = "sysadmws-utils"
-        if "environment" not in message and "environment" in config["defaults"]:
-            message["environment"] = config["defaults"]["environment"]
-        if "client" not in message and "client" in config["defaults"]:
-            message["client"] = config["defaults"]["client"]
-        if "attributes" not in message:
-            message["attributes"] = {}
-        if "location" not in message["attributes"] and "location" in config["defaults"]:
-            message["attributes"]["location"] = config["defaults"]["location"]
-        if "datetime" not in message["attributes"]:
-            message["attributes"]["datetime"] = subprocess.check_output(["date", "+%F %T %z %Z"]).rstrip()
-        message["force_send"] = force_send
+        message = apply_defaults(message)
         
         # Log after changes
         logger.info("Message after changes:")
