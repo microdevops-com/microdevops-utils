@@ -13,6 +13,9 @@ alerta:
   Alias 1:
     url: https://alerta.example.com/api/alert
     api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    exception: # sending to alerta may fail for many reasons like firewall rule lack, send telegram message with this exception
+      telegram:
+        - Alias 2
 
   Alias 2:
     url: https://alerta.example.com/api/alert

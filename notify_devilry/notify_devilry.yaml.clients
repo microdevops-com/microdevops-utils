@@ -10,6 +10,9 @@ alerta:
   Alias 1:
     url: https://alerta.example.com/api/alert
     api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    exception:
+      telegram:
+        - Alias 2
 
 telegram:
 
