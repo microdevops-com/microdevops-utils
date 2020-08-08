@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/opt/sysadmws/misc/shebang_python_switcher.sh
 # -*- coding: utf-8 -*-
 
 import sys
