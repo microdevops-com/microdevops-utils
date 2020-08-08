@@ -36,13 +36,13 @@ current_date = 19700101 on 1970-01-01.
   cmd1: # this check should be ok
     cmd: echo test stdout && >&2 echo test stderr && sleep 5 && true
     service: server
-    resource: srv1.example.com:cmd1
+    resource: srv1.example.com:resource1
   cmd2: # this check should be minor severity and killed by 15 secs default timeout with retcode -9
     cmd: echo test stdout && >&2 echo test stderr && sleep 60 && true
     service: server
-    resource: srv1.example.com:cmd2
+    resource: srv1.example.com:resource2
   cmd3: # this check should be major severity with retcode 1
     cmd: echo test stdout && >&2 echo test stderr && false
     severity: major
     service: server
-    resource: srv1.example.com:cmd3
+    resource: srv1.example.com:resource3

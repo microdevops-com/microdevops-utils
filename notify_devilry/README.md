@@ -46,7 +46,7 @@ _*_ - mandatory keys
   - `trace`
   - `unknown`
 - `client` - could be used to choose different `alerta` destinations with different per customer keys, different `chat_id`s in `telegram`, default from config will apply if ommited
-- `environment`\* - default from config will apply if ommited
+- `environment` - default from config will apply if ommited
   - `prod`
   - `staging`
   - `dev`
@@ -55,6 +55,7 @@ _*_ - mandatory keys
 - `service` (list in `alerta`, string - here) and `resource`\*
   - `server`
     - `srv1.example.com`
+  - `disk`
     - `srv1.example.com:/`
     - `srv1.example.com:/mnt/partition`
   - `database`

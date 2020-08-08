@@ -48,6 +48,7 @@ UT_NOW = int(time.time())
 MAX_INDENT = 100
 SELF_GROUP = "notify_devilry"
 SELF_ORIGIN = "notify_devilry.py"
+SELF_SERVICE = "notify_devilry"
 ALERTA_RETRIES = 3
 ALERTA_RETRY_SLEEP = 2
 ALERTA_URLOPEN_TIMEOUT = 5
@@ -197,7 +198,7 @@ def send_message(sending_method, sending_method_item_settings, message):
                         logger.info("Sending exception")
                         exception_message = {
                             "severity": SEVERITY_MINOR,
-                            "service": "server",
+                            "service": SELF_SERVICE,
                             "resource": socket.gethostname(),
                             "event": "notify_devilry_alerta_send_error",
                             "value": str(type(e).__name__),
@@ -382,7 +383,7 @@ if __name__ == "__main__":
             logger.error("load_json failed, sending error")
             message = {
                 "severity": SEVERITY_MINOR,
-                "service": "server",
+                "service": SELF_SERVICE,
                 "resource": socket.gethostname(),
                 "event": "notify_devilry_msg_read_failure",
                 "value": str(type(e).__name__),

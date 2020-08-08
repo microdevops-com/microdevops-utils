@@ -8,7 +8,7 @@ HOSTNAME=$(hostname -f)
 # Send test
 echo '{
 	"severity": "critical",
-	"service": "server",
+	"service": "notify_devilry",
 	"resource": "'$HOSTNAME'",
 	"event": "notify_devilry_critical",
 	"value": "critical",
