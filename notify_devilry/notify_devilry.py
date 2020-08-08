@@ -311,7 +311,7 @@ def apply_defaults(msg):
     if "location" not in msg["attributes"] and "location" in config["defaults"]:
         msg["attributes"]["location"] = config["defaults"]["location"]
     if "datetime" not in msg["attributes"]:
-        msg["attributes"]["datetime"] = subprocess.check_output(["date", "+%F %T %z %Z"]).rstrip()
+        msg["attributes"]["datetime"] = subprocess.check_output(["date", "+%F %T %z %Z"]).decode().rstrip()
     msg["force_send"] = force_send
     return msg
 

@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
                 if "payload" in config["receivers"][receiver]:
                     for payload in config["receivers"][receiver]["payload"]:
-                        heartbeat["payload"][payload["name"]] = subprocess.check_output(payload["cmd"])
+                        heartbeat["payload"][payload["name"]] = subprocess.check_output(payload["cmd"]).decode().rstrip()
 
                 logger.info("Heartbeat data for receiver {receiver}:".format(receiver=receiver))
                 logger.info(heartbeat)
