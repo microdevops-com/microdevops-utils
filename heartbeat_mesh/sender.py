@@ -114,7 +114,7 @@ if __name__ == "__main__":
             zmqsocket.connect("tcp://{receiver}:{port}".format(receiver=dr_receiver, port=dr_port))
 
             logger.info("Sending 0MQ message")
-            zmqsocket.send(message)
+            zmqsocket.send_string(message)
 
             logger.info("Closing receiver {receiver}:{port} 0MQ".format(receiver=dr_receiver, port=dr_port))
             zmqsocket.close()
