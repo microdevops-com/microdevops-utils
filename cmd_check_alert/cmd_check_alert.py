@@ -179,6 +179,8 @@ if __name__ == "__main__":
                 process.wait()
                 raise
             retcode = process.poll()
+            stdout = stdout.decode()
+            stderr = stderr.decode()
             logger.info("Check retcode: {retcode}".format(retcode=retcode))
             logger.info("Check stdout:")
             logger.info(stdout)
