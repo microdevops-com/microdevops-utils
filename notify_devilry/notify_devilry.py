@@ -51,7 +51,7 @@ SELF_ORIGIN = "notify_devilry.py"
 SELF_SERVICE = "notify_devilry"
 ALERTA_RETRIES = 3
 ALERTA_RETRY_SLEEP = 2
-ALERTA_URLOPEN_TIMEOUT = 5
+ALERTA_URLOPEN_TIMEOUT = 30
 SEVERITY_MINOR = "minor"
 
 # Custom Exceptions
