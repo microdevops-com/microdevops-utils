@@ -216,7 +216,6 @@ done
 # Check df inodes
 df -P -i | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
 	USEP=$(echo $output | awk '{ print $1}' | cut -d'%' -f1 )
-	echo $USEP
 	PARTITION=$(echo $output | awk '{ print $2 }' )
 	# Get thresholds
 	if [[ _${DISK_ALERT_INODE_CRITICAL[$PARTITION]} != "_" ]]; then
