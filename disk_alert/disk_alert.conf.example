@@ -1,5 +1,5 @@
-# Lines to grep from df
-#DISK_ALERT_FILTER="^Filesystem|tmpfs|cdrom|none|/snap"
+# Lines to grep from df, default is:
+#DISK_ALERT_FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup"
 
 # Set type of disk usage check: by % of usage or by MB free space left
 # By default = PERCENT
@@ -11,7 +11,7 @@
 # Used for linear regression prediction
 #DISK_ALERT_HISTORY_SIZE="2016"
 
-# Default critical usage % threshold
+# Default critical space usage % threshold
 #DISK_ALERT_DEFAULT_PERCENT_CRITICAL="95"
 
 # Default free space critical MB threshold
@@ -21,7 +21,7 @@
 # If predicted time to 100% is 24 hours ((60 * 60 * 24) = 86400) we send message
 #DISK_ALERT_DEFAULT_PREDICT_CRITICAL="86400"
 
-# Individual critical usage % threshold
+# Individual critical spce usage % threshold
 #declare -A DISK_ALERT_PERCENT_CRITICAL
 #DISK_ALERT_PERCENT_CRITICAL["/mount/point"]="95"
 
@@ -32,3 +32,12 @@
 # Individual critical predicted seconds threshold
 #declare -A DISK_ALERT_PREDICT_CRITICAL
 #DISK_ALERT_PREDICT_CRITICAL["/mount/point"]="86400"
+
+# Inodes are checked only by % of usage
+
+# Default critical inode usage % threshold
+#DISK_ALERT_DEFAULT_INODE_CRITICAL="95"
+
+# Individual critical inode usage % threshold
+#declare -A DISK_ALERT_INODE_CRITICAL
+#DISK_ALERT_INODE_CRITICAL["/mount/point"]="95"
