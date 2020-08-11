@@ -13,7 +13,7 @@ echo '{
 	"event": "notify_devilry_test",
 	"value": "test",
 	"group": "notify_devilry",
-	"text": "Severity informational test alarm sent with notify_devilry_test.sh",
+	"text": "Severity informational test alert sent with notify_devilry_test.sh",
 	"origin": "notify_devilry_test.sh",
 	"timeout": 300
 }' | /opt/sysadmws/notify_devilry/notify_devilry.py --debug --force-send

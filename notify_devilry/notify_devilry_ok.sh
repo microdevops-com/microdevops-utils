@@ -13,7 +13,7 @@ echo '{
 	"event": "notify_devilry_ok",
 	"value": "ok",
 	"group": "notify_devilry",
-	"text": "Severity ok test alarm sent with notify_devilry_ok.sh",
+	"text": "Severity ok test alert sent with notify_devilry_ok.sh",
 	"origin": "notify_devilry_ok.sh",
 	"timeout": 300,
 	"correlate": ["notify_devilry_critical"]
