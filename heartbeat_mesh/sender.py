@@ -26,7 +26,7 @@ CONFIG_FILE = "sender.yaml"
 LOG_DIR = "/opt/sysadmws/heartbeat_mesh/log"
 LOG_FILE = "sender.log"
 LOGO = "💔 ➔ ✉"
-ZMQ_LINGER = 1000 # try to send heartbeat for ZMQ_LINGER ms
+ZMQ_LINGER = 10000 # try to send heartbeat for ZMQ_LINGER ms
 DEFAULT_PORT = 15987
 TMP_DIR = "/tmp"
 
@@ -204,7 +204,7 @@ if __name__ == "__main__":
                 zmqsocket.connect("tcp://{receiver}:{port}".format(receiver=receiver, port=config["receivers"][receiver]["port"] if "port" in config["receivers"][receiver] else DEFAULT_PORT))
 
                 logger.info("Sending 0MQ message")
-                zmqsocket.send(message)
+                zmqsocket.send_string(message)
 
                 logger.info("Closing receiver {receiver} 0MQ".format(receiver=receiver))
                 zmqsocket.close()
