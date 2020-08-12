@@ -4,7 +4,7 @@ if [[ -e /etc/os-release ]]; then
 fi
 
 if [[ "${UBUNTU_CODENAME}" = "focal" ]]; then
-	/usr/bin/env python3 "$@"
+	exec /usr/bin/env python3 "$@"
 else
-	/usr/bin/env python "$@"
+	exec /usr/bin/env python "$@"
 fi
