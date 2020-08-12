@@ -5,10 +5,6 @@ import os
 import zmq
 import sys
 import time
-try:
-    import json
-except ImportError:
-    import simplejson as json
 import socket
 import subprocess
 import yaml
@@ -105,16 +101,14 @@ if __name__ == "__main__":
             logger.info("Heartbeat data for receiver {receiver}:{port}:".format(receiver=dr_receiver, port=dr_port))
             logger.info(heartbeat)
 
-            message = json.dumps(heartbeat)
-
             logger.info("Connecting receiver {receiver}:{port} 0MQ".format(receiver=dr_receiver, port=dr_port))
             context = zmq.Context()
-            zmqsocket = context.socket(zmq.PAIR)
+            zmqsocket = context.socket(zmq.PUSH)
             zmqsocket.setsockopt(zmq.LINGER, ZMQ_LINGER)
             zmqsocket.connect("tcp://{receiver}:{port}".format(receiver=dr_receiver, port=dr_port))
 
             logger.info("Sending 0MQ message")
-            zmqsocket.send_string(message)
+            zmqsocket.send_json(heartbeat)
 
             logger.info("Closing receiver {receiver}:{port} 0MQ".format(receiver=dr_receiver, port=dr_port))
             zmqsocket.close()
@@ -194,17 +188,15 @@ if __name__ == "__main__":
                 logger.info("Heartbeat data for receiver {receiver}:".format(receiver=receiver))
                 logger.info(heartbeat)
 
-                message = json.dumps(heartbeat)
-
                 # 0MQ send message
                 logger.info("Connecting receiver {receiver} 0MQ".format(receiver=receiver))
                 context = zmq.Context()
-                zmqsocket = context.socket(zmq.PAIR)
+                zmqsocket = context.socket(zmq.PUSH)
                 zmqsocket.setsockopt(zmq.LINGER, ZMQ_LINGER)
                 zmqsocket.connect("tcp://{receiver}:{port}".format(receiver=receiver, port=config["receivers"][receiver]["port"] if "port" in config["receivers"][receiver] else DEFAULT_PORT))
 
                 logger.info("Sending 0MQ message")
-                zmqsocket.send_string(message)
+                zmqsocket.send_json(heartbeat)
 
                 logger.info("Closing receiver {receiver} 0MQ".format(receiver=receiver))
                 zmqsocket.close()

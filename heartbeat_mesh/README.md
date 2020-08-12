@@ -4,7 +4,7 @@ receiver.py is a service to receive haertbeats sent by sender.py and send notifi
 It writes heartbeat data with sender payload to history and current files. These files are just for logging purposes and could be used by external components.
 They are not needed for receiver and could be disabled.
 
-Heartbeats are sent using zmq.PAIR socket.
+Heartbeats are sent using zmq.PUSH socket and received using zmq.PULL socket.
 
 Receiver gives grace period after start for senders to send their heartbeats.
 

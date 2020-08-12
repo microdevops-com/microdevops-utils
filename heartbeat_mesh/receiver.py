@@ -14,6 +14,7 @@ import zmq
 import systemd.daemon
 import errno
 import socket
+import signal
 # subprocess.run python < 3.5 workaround
 # https://stackoverflow.com/a/40590445
 try:
@@ -41,6 +42,11 @@ except ImportError:
             raise subprocess.CalledProcessError(
                 retcode, process.args, output=stdout, stderr=stderr)
         return retcode, stdout, stderr
+import threading
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 
 # Constants
 WORK_DIR = "/opt/sysadmws/heartbeat_mesh"
@@ -52,8 +58,7 @@ LOG_FILE = "receiver.log"
 LOGO = "💔 ➔ ✉"
 NAME = "heartbeat_mesh/receiver"
 CHECK_INTERVAL = 60 # senders should send heartbeats each CHECK_INTERVAL seconds
-TIMEOUT_JITTER = 2 # jitter for timeout if timeout and send interval are equal
-ZMQ_RCVTIMEO = CHECK_INTERVAL * 1000
+TIMEOUT_JITTER = 15 # jitter for timeout if timeout and send interval are equal
 GRACE_PERIOD = CHECK_INTERVAL + 10 # seconds all alive resources have to send their heartbeats
 NOTIFY_DEVILRY_CMD = "/opt/sysadmws/notify_devilry/notify_devilry.py"
 DEFAULT_PORT = 15987
@@ -69,6 +74,10 @@ SELF_SERVICE = "heartbeat"
 SELF_GROUP = "heartbeat_mesh"
 SELF_HOSTNAME = socket.gethostname()
 SELF_ORIGIN = "heartbeat_mesh/receiver.py"
+NOTIFY_DEVILRY_SLEEP = 1
+FREQUENT_LOOP_SLEEP = CHECK_INTERVAL
+RARE_LOOP_SLEEP = 60 * 30 # 30 minutes
+QUEUE_THRESHOLD = 1000 # max number of notifies in queue before critical exit
 
 # Funcs
 
@@ -92,154 +101,107 @@ def send_notify_devilry(notify):
         run_cmd = run_cmd + " --force-send"
     run(run_cmd, input=notify_data, shell=True, stdout=FNULL)
 
-def do_checks():
+# This thread does rare checks, e.g. heartbeat ok and others
+def rare_checks_thread():
 
-    logger.info("Newest heartbeats:")
-    logger.info(newest_heartbeats)
-    logger.info("Oldest heartbeats:")
-    logger.info(oldest_heartbeats)
+    logger.info("rare_checks_thread() started but sleeping first for grace period {secs} seconds".format(secs=GRACE_PERIOD))
+    time.sleep(GRACE_PERIOD)
 
-    # Check no activity at all for 2x check intervals
-    if any((int((datetime.utcnow() - newest_heartbeats[resource]).total_seconds()) < (CHECK_INTERVAL * 2)) for resource in newest_heartbeats):
+    while True:
 
-        # Prepare notify data
-        notify = {}
-        notify["severity"] = SEVERITY_OK
-        notify["service"] = SELF_SERVICE
-        notify["resource"] = SELF_HOSTNAME
-        notify["event"] = "heartbeat_mesh_receiver_activity_ok"
-        notify["value"] = "ok"
-        notify["group"] = SELF_GROUP
-        notify["text"] = "Heartbeats are being received"
-        notify["origin"] = SELF_ORIGIN
-        notify["correlate"] = ["heartbeat_mesh_receiver_activity_lost"]
-        
-        # Send notify_devilry
-        send_notify_devilry(notify)
+        # Check iteration start time
+        loop_start = int(time.time())
 
-    else:
-        
-        # Prepare notify data
-        notify = {}
-        notify["severity"] = SEVERITY_WARNING
-        notify["service"] = SELF_SERVICE
-        notify["resource"] = SELF_HOSTNAME
-        notify["event"] = "heartbeat_mesh_receiver_activity_lost"
-        notify["value"] = "lost"
-        notify["group"] = SELF_GROUP
-        notify["text"] = "No heartbeats registered on receiver host for two check intervals"
-        notify["origin"] = SELF_ORIGIN
-        notify["correlate"] = ["heartbeat_mesh_receiver_activity_ok"]
-        
-        # Send notify_devilry
-        send_notify_devilry(notify)
+        logger.info("Doing rare checks")
 
-    logger.info("Currently registered heartbeat resources and their data:")
+        logger.info("Currently registered heartbeat resources and their data:")
 
-    for resource in heartbeats:
+        # Loop heartbeats
+        for resource in heartbeats:
 
-        logger.info(heartbeats[resource])
-        heartbeat_age_secs = int((datetime.utcnow() - datetime.strptime(heartbeats[resource]["utc"], "%Y-%m-%d %H:%M:%S")).total_seconds())
-        logger.info("Heartbeat age in seconds: {secs}".format(secs=heartbeat_age_secs))
-        
-        hb_timeout_to_use = 60 * (int(heartbeats[resource]["timeout"]) if heartbeats[resource]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[resource]["token"]]]["timeout"]))
-        logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
-        
-        # Notify active/stale heartbeats among currently registered in receiver
-
-        # Notify keys
-        notify_client = token_to_client[heartbeats[resource]["token"]]
-        # severity
-        if resource in config["clients"][notify_client]["resources"] and "severity" in config["clients"][notify_client]["resources"][resource]:
-            notify_severity = config["clients"][notify_client]["resources"][resource]["severity"]
-        elif "severity" in config["clients"][notify_client]:
-            notify_severity = config["clients"][notify_client]["severity"]
-        else:
-            notify_severity = SEVERITY_CRITICAL
-        # environment
-        if resource in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][resource]:
-            notify_environment = config["clients"][notify_client]["resources"][resource]["environment"]
-        else:
-            notify_environment = None
-        # service
-        if resource in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][resource]:
-            notify_service = config["clients"][notify_client]["resources"][resource]["service"]
-        else:
-            notify_service = SELF_SERVICE
-        # location
-        if resource in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][resource]:
-            notify_location = config["clients"][notify_client]["resources"][resource]["location"]
-        else:
-            notify_location = None
-
-        # Prepare notify data
-        notify = {}
-        if heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
-            notify["severity"] = notify_severity
-            notify["event"] = "heartbeat_mesh_heartbeat_timeout"
-            notify["text"] = "Resource heartbeat timed out"
-            notify["correlate"] = ["heartbeat_mesh_heartbeat_ok"]
-        else:
-            notify["severity"] = SEVERITY_OK
-            notify["event"] = "heartbeat_mesh_heartbeat_ok"
-            notify["text"] = "Resource heartbeat ok"
-            notify["correlate"] = ["heartbeat_mesh_heartbeat_timeout"]
-        if notify_environment is not None:
-            notify["environment"] = notify_environment
-        notify["service"] = notify_service
-        notify["resource"] = resource
-        notify["value"] = heartbeat_age_secs
-        notify["group"] = SELF_GROUP
-        notify["origin"] = SELF_ORIGIN
-        notify["attributes"] = {}
-        notify["attributes"]["receiver"] = SELF_HOSTNAME
-        notify["attributes"]["timeout"] = hb_timeout_to_use
-        if notify_location is not None:
-            notify["attributes"]["location"] = notify_location
-        notify["client"] = notify_client
-        
-        # Send notify_devilry
-        send_notify_devilry(notify)
-    
-        # Heartbeats among currently registered in receiver exist/missing in client resources for more than a day
-        if int((datetime.utcnow() - oldest_heartbeats[resource]).total_seconds()) > 60 * 60 * 24:
-
-            # Notify keys
-            notify_client = token_to_client[heartbeats[resource]["token"]]
-            # severity
-            if "severity" in config["clients"][notify_client]:
-                notify_severity = config["clients"][notify_client]["severity"]
-            else:
-                notify_severity = SEVERITY_CRITICAL
-
-            # Prepare notify data
-            notify = {}
-            if resource not in config["clients"][token_to_client[heartbeats[resource]["token"]]]["resources"]:
-                notify["severity"] = notify_severity
-                notify["event"] = "heartbeat_mesh_heartbeat_config_missing"
-                notify["text"] = "Heartbeat registered more than 24h without resource listing in config"
-                notify["correlate"] = ["heartbeat_mesh_heartbeat_config_exist"]
-            else:
-                notify["severity"] = SEVERITY_OK
-                notify["event"] = "heartbeat_mesh_heartbeat_config_exist"
-                notify["text"] = "Heartbeat registered more than 24h withresource listing in config"
-                notify["correlate"] = ["heartbeat_mesh_heartbeat_config_missing"]
-            notify["service"] = SELF_SERVICE
-            notify["resource"] = resource
-            notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
-            notify["group"] = SELF_GROUP
-            notify["origin"] = SELF_ORIGIN
-            notify["attributes"] = {}
-            notify["attributes"]["receiver"] = SELF_HOSTNAME
-            notify["client"] = notify_client
+            logger.info(heartbeats[resource])
+            heartbeat_age_secs = int((datetime.utcnow() - datetime.strptime(heartbeats[resource]["utc"], "%Y-%m-%d %H:%M:%S")).total_seconds())
+            logger.info("Heartbeat age in seconds: {secs}".format(secs=heartbeat_age_secs))
             
-            # Send notify_devilry
-            send_notify_devilry(notify)
-    
-    # Check grace period for other checks
-    if int((datetime.now() - START_TIME).total_seconds()) > GRACE_PERIOD:
-        logger.info("Grace period {gp} seconds passed".format(gp=GRACE_PERIOD))
+            hb_timeout_to_use = 60 * (int(heartbeats[resource]["timeout"]) if heartbeats[resource]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[resource]["token"]]]["timeout"]))
+            logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
+            
+            # Notify active heartbeats among currently registered in receiver
+            if heartbeat_age_secs <= hb_timeout_to_use + TIMEOUT_JITTER:
 
+                # Notify keys
+                notify_client = token_to_client[heartbeats[resource]["token"]]
+                # environment
+                if resource in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][resource]:
+                    notify_environment = config["clients"][notify_client]["resources"][resource]["environment"]
+                else:
+                    notify_environment = None
+                # service
+                if resource in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][resource]:
+                    notify_service = config["clients"][notify_client]["resources"][resource]["service"]
+                else:
+                    notify_service = SELF_SERVICE
+                # location
+                if resource in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][resource]:
+                    notify_location = config["clients"][notify_client]["resources"][resource]["location"]
+                else:
+                    notify_location = None
+
+                # Prepare notify data
+                notify = {}
+                notify["severity"] = SEVERITY_OK
+                notify["event"] = "heartbeat_mesh_heartbeat_ok"
+                notify["text"] = "Resource heartbeat ok"
+                notify["correlate"] = ["heartbeat_mesh_heartbeat_timeout"]
+                if notify_environment is not None:
+                    notify["environment"] = notify_environment
+                notify["service"] = notify_service
+                notify["resource"] = resource
+                notify["value"] = heartbeat_age_secs
+                notify["group"] = SELF_GROUP
+                notify["origin"] = SELF_ORIGIN
+                notify["attributes"] = {}
+                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                notify["attributes"]["timeout"] = hb_timeout_to_use
+                if notify_location is not None:
+                    notify["attributes"]["location"] = notify_location
+                notify["client"] = notify_client
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+        
+            # Heartbeats among currently registered in receiver exist/missing in client resources for more than a day
+            if int((datetime.utcnow() - oldest_heartbeats[resource]).total_seconds()) > 60 * 60 * 24:
+
+                # Notify keys
+                notify_client = token_to_client[heartbeats[resource]["token"]]
+
+                # Prepare notify data
+                notify = {}
+                if resource not in config["clients"][token_to_client[heartbeats[resource]["token"]]]["resources"]:
+                    notify["severity"] = SEVERITY_WARNING
+                    notify["event"] = "heartbeat_mesh_heartbeat_config_missing"
+                    notify["text"] = "Heartbeat registered more than 24h without resource listing in config"
+                    notify["correlate"] = ["heartbeat_mesh_heartbeat_config_exist"]
+                else:
+                    notify["severity"] = SEVERITY_OK
+                    notify["event"] = "heartbeat_mesh_heartbeat_config_exist"
+                    notify["text"] = "Heartbeat registered more than 24h with resource listing in config"
+                    notify["correlate"] = ["heartbeat_mesh_heartbeat_config_missing"]
+                notify["service"] = SELF_SERVICE
+                notify["resource"] = resource
+                notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
+                notify["group"] = SELF_GROUP
+                notify["origin"] = SELF_ORIGIN
+                notify["attributes"] = {}
+                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                notify["client"] = notify_client
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+        
         logger.info("Checking heartbeats for client resources")
 
         for client in config["clients"]:
@@ -298,13 +260,168 @@ def do_checks():
                     notify["attributes"]["location"] = notify_location
                 notify["client"] = notify_client
             
-                # Send notify_devilry
-                send_notify_devilry(notify)
-    
-    else:
-        logger.info("Grace period {gp} seconds not yet passed".format(gp=GRACE_PERIOD))
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+        
+        # Get seconds needed to sleep
+        sleep_secs = RARE_LOOP_SLEEP - (int(time.time()) - loop_start)
 
-    return int(time.time())
+        # Sleep until frequent timeout finishes
+        logger.info("Rare thread is going to sleep for {sec} seconds".format(sec=sleep_secs))
+        time.sleep(sleep_secs)
+
+# This thread does frequent checks, e.g. heartbeat timeout
+def frequent_checks_thread():
+    
+    logger.info("frequent_checks_thread() started")
+    
+    while True:
+        
+        # Check iteration start time
+        loop_start = int(time.time())
+        
+        logger.info("Doing frequent checks")
+
+        # Check grace period these checks
+        if int((datetime.now() - START_TIME).total_seconds()) > GRACE_PERIOD:
+            logger.info("Grace period {gp} seconds passed".format(gp=GRACE_PERIOD))
+
+            # Check no activity at all for 2x check intervals
+            if any((int((datetime.utcnow() - newest_heartbeats[resource]).total_seconds()) < (CHECK_INTERVAL * 2)) for resource in newest_heartbeats):
+
+                # Prepare notify data
+                notify = {}
+                notify["severity"] = SEVERITY_OK
+                notify["service"] = SELF_SERVICE
+                notify["resource"] = SELF_HOSTNAME
+                notify["event"] = "heartbeat_mesh_receiver_activity_ok"
+                notify["value"] = "ok"
+                notify["group"] = SELF_GROUP
+                notify["text"] = "Heartbeats are being received"
+                notify["origin"] = SELF_ORIGIN
+                notify["correlate"] = ["heartbeat_mesh_receiver_activity_lost"]
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+
+            else:
+                
+                # Prepare notify data
+                notify = {}
+                notify["severity"] = SEVERITY_WARNING
+                notify["service"] = SELF_SERVICE
+                notify["resource"] = SELF_HOSTNAME
+                notify["event"] = "heartbeat_mesh_receiver_activity_lost"
+                notify["value"] = "lost"
+                notify["group"] = SELF_GROUP
+                notify["text"] = "No heartbeats registered on receiver host for more than two check intervals"
+                notify["origin"] = SELF_ORIGIN
+                notify["correlate"] = ["heartbeat_mesh_receiver_activity_ok"]
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+
+        else:
+            logger.info("Grace period {gp} seconds not yet passed".format(gp=GRACE_PERIOD))
+
+        logger.info("Currently registered heartbeat resources and their data:")
+
+        # Loop heartbeats
+        for resource in heartbeats:
+            
+            heartbeat_age_secs = int((datetime.utcnow() - datetime.strptime(heartbeats[resource]["utc"], "%Y-%m-%d %H:%M:%S")).total_seconds())
+            logger.info("Heartbeat age in seconds: {secs}".format(secs=heartbeat_age_secs))
+            
+            hb_timeout_to_use = 60 * (int(heartbeats[resource]["timeout"]) if heartbeats[resource]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[resource]["token"]]]["timeout"]))
+            logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
+            
+            # Notify stale heartbeats among currently registered in receiver
+            if heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
+
+                # Notify keys
+                notify_client = token_to_client[heartbeats[resource]["token"]]
+                # severity
+                if resource in config["clients"][notify_client]["resources"] and "severity" in config["clients"][notify_client]["resources"][resource]:
+                    notify_severity = config["clients"][notify_client]["resources"][resource]["severity"]
+                elif "severity" in config["clients"][notify_client]:
+                    notify_severity = config["clients"][notify_client]["severity"]
+                else:
+                    notify_severity = SEVERITY_CRITICAL
+                # environment
+                if resource in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][resource]:
+                    notify_environment = config["clients"][notify_client]["resources"][resource]["environment"]
+                else:
+                    notify_environment = None
+                # service
+                if resource in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][resource]:
+                    notify_service = config["clients"][notify_client]["resources"][resource]["service"]
+                else:
+                    notify_service = SELF_SERVICE
+                # location
+                if resource in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][resource]:
+                    notify_location = config["clients"][notify_client]["resources"][resource]["location"]
+                else:
+                    notify_location = None
+
+                # Prepare notify data
+                notify = {}
+                notify["severity"] = notify_severity
+                notify["event"] = "heartbeat_mesh_heartbeat_timeout"
+                notify["text"] = "Resource heartbeat timed out"
+                notify["correlate"] = ["heartbeat_mesh_heartbeat_ok"]
+                if notify_environment is not None:
+                    notify["environment"] = notify_environment
+                notify["service"] = notify_service
+                notify["resource"] = resource
+                notify["value"] = heartbeat_age_secs
+                notify["group"] = SELF_GROUP
+                notify["origin"] = SELF_ORIGIN
+                notify["attributes"] = {}
+                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                notify["attributes"]["timeout"] = hb_timeout_to_use
+                if notify_location is not None:
+                    notify["attributes"]["location"] = notify_location
+                notify["client"] = notify_client
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+
+        # Get seconds needed to sleep
+        sleep_secs = FREQUENT_LOOP_SLEEP - (int(time.time()) - loop_start)
+
+        # Sleep until frequent timeout finishes
+        logger.info("Frequent thread is going to sleep for {sec} seconds".format(sec=sleep_secs))
+        time.sleep(sleep_secs)
+
+def notify_thread():
+    logger.info("notify_thread() started")
+    while True:
+        notify = notify_queue.get()
+        logger.info("Got notify from queue, queue size: {size}".format(size=notify_queue.qsize()))
+        # Check queue size, no sense to send notifies if greater or equal than threshold, send only queue size error and exit
+        if notify_queue.qsize() >= QUEUE_THRESHOLD:
+            # Prepare notify data
+            notify = {}
+            notify["severity"] = SEVERITY_CRITICAL
+            notify["service"] = SELF_SERVICE
+            notify["resource"] = SELF_HOSTNAME
+            notify["event"] = "heartbeat_mesh_receiver_queue_threshold_reached"
+            notify["value"] = notify_queue.qsize()
+            notify["group"] = SELF_GROUP
+            notify["text"] = "Receiver notifications queue size reached threshold {threshold}, receiver exited abnormally".format(threshold=QUEUE_THRESHOLD)
+            notify["origin"] = SELF_ORIGIN
+            logger.error("Queue size {size} became bigger than threshold {threshold}, exiting".format(size=notify_queue.qsize(), threshold=QUEUE_THRESHOLD))
+            send_notify_devilry(notify)
+            os.kill(os.getpid(), signal.SIGUSR1)
+        else:
+            # Send notify_devilry
+            send_notify_devilry(notify)
+        # Sleep not to overwhelm services
+        time.sleep(NOTIFY_DEVILRY_SLEEP)
 
 # Main
 
@@ -359,13 +476,6 @@ if __name__ == "__main__":
             sys.exit(1)
 
         logger.info("Starting {name} on port {port}".format(name=NAME, port=args.port))
-        
-        # Start 0MQ
-        logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
-        context = zmq.Context()
-        zmqsocket = context.socket(zmq.PAIR)
-        zmqsocket.setsockopt(zmq.RCVTIMEO, ZMQ_RCVTIMEO)
-        zmqsocket.bind("tcp://{iface}:{port}".format(iface=args.iface, port=args.port))
 
         # Transpone clients to token dict
         token_to_client = {}
@@ -377,53 +487,164 @@ if __name__ == "__main__":
             # Add token
             token_to_client[config["clients"][client]["token"]] = client
 
-        systemd.daemon.notify('READY=1')
-
+        # Global vars
         heartbeats = {}
         oldest_heartbeats = {}
         newest_heartbeats = {}
         checks_last_time = int(time.time())
+        
+        # Start 0MQ
+        logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
+        context = zmq.Context()
+        zmqsocket = context.socket(zmq.PULL)
+        zmqsocket.bind("tcp://{iface}:{port}".format(iface=args.iface, port=args.port))
+
+        # Setup notify queue
+        notify_queue = queue.Queue()
+
+        # Setup notify_thread. No need to have a pool of threads for notify_devilry as telegram and alerta cant accept to many messages.
+        notify_thread = threading.Thread(target=notify_thread)
+        # According to docs daemon thread are abruptly stopped at shutdown, but their resources are not useful so it is ok. Daemon threads are stopped on main shutdown.
+        notify_thread.setDaemon(True)
+        notify_thread.start()
+        logger.info("Started notify thread")
+        
+        # Setup frequent_checks_thread.
+        notify_thread = threading.Thread(target=frequent_checks_thread)
+        notify_thread.setDaemon(True)
+        notify_thread.start()
+        logger.info("Started frequent checks thread")
+        
+        # Setup rare_checks_thread.
+        notify_thread = threading.Thread(target=rare_checks_thread)
+        notify_thread.setDaemon(True)
+        notify_thread.start()
+        logger.info("Started rare checks thread")
+        
+        # SystemD notify
+        systemd.daemon.notify('READY=1')
 
         while True:
 
             # Each zmq message could fail
             try:
 
-                try:
+                # Receive zmq message
+                heartbeat = zmqsocket.recv_json()
+                logger.info("Heartbeat received: {heartbeat}".format(heartbeat=heartbeat))
+                
+                # Check token and continue only if client for token found
+                if "token" in heartbeat and heartbeat["token"] in token_to_client:
 
-                    # Receive zmq message
-                    message = zmqsocket.recv()
-                    heartbeat = json.loads(message)
-                    logger.info("Heartbeat received: {heartbeat}".format(heartbeat=heartbeat))
+                    # Process heartbeat removal if special key sent by sender
+                    if "deregister" in heartbeat and heartbeat["deregister"]:
+                        
+                        logger.info("Deregistration heartbeat for resource {resource} received".format(resource=heartbeat["resource"]))
+
+                        # Remove resource from dicts
+                        heartbeats.pop(heartbeat["resource"], None)
+                        newest_heartbeats.pop(heartbeat["resource"], None)
+                        oldest_heartbeats.pop(heartbeat["resource"], None)
+                        logger.info("Host {resource} removed from dicts".format(resource=heartbeat["resource"]))
+
+                        # Remove files
+                        file_name = "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json")
+                        hb_history_dir = "{0}/{1}".format(HEARTBEATS_HISTORY_DIR, token_to_client[heartbeat["token"]].lower())
+                        hb_dir = "{0}/{1}".format(HEARTBEATS_DIR, token_to_client[heartbeat["token"]].lower())
+                        if not args.no_heartbeat_files:
+                            if os.path.exists(hb_history_dir + "/" + file_name):
+                                os.remove(hb_history_dir + "/" + file_name)
+                                logger.info("Heartbeat history file {dir}/{file_name} removed".format(dir=hb_history_dir, file_name=file_name))
+                            if os.path.exists(hb_dir + "/" + file_name):
+                                os.remove(hb_dir + "/" + file_name)
+                                logger.info("Heartbeat file {dir}/{file_name} removed".format(dir=hb_dir, file_name=file_name))
+
+                        # Send notify about deregistration
+                        
+                        # Notify keys
+                        notify_client = token_to_client[heartbeat["token"]]
+                        # environment
+                        if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
+                            notify_environment = config["clients"][notify_client]["resources"][heartbeat["resource"]]["environment"]
+                        else:
+                            notify_environment = None
+                        # service
+                        if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
+                            notify_service = config["clients"][notify_client]["resources"][heartbeat["resource"]]["service"]
+                        else:
+                            notify_service = SELF_SERVICE
+                        # location
+                        if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
+                            notify_location = config["clients"][notify_client]["resources"][heartbeat["resource"]]["location"]
+                        else:
+                            notify_location = None
+
+                        # Prepare notify data
+                        notify = {}
+                        notify["severity"] = SEVERITY_INFORMATIONAL
+                        if notify_environment is not None:
+                            notify["environment"] = notify_environment
+                        notify["service"] = notify_service
+                        notify["resource"] = heartbeat["resource"]
+                        notify["event"] = "heartbeat_mesh_heartbeat_deregistered"
+                        notify["value"] = "deregistered"
+                        notify["group"] = SELF_GROUP
+                        notify["text"] = "Resource heartbeat deregistered"
+                        notify["origin"] = SELF_ORIGIN
+                        notify["attributes"] = {}
+                        notify["attributes"]["receiver"] = SELF_HOSTNAME
+                        if notify_location is not None:
+                            notify["attributes"]["location"] = notify_location
+                        notify["client"] = notify_client
+                        
+                        # Put notify to queue
+                        notify_queue.put(notify)
+                        logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+
+                        # No other logic on deregister heartbeat
+                        continue
+
+                    # Construct data
+                    utc_now = datetime.utcnow()
+                    heartbeats[heartbeat["resource"]] = {
+                        "utc": utc_now.strftime("%F %T"),
+                        "resource": heartbeat["resource"],
+                        "token": heartbeat["token"],
+                        "payload": heartbeat["payload"] if "payload" in heartbeat else None,
+                        "timeout": heartbeat["timeout"] if "timeout" in heartbeat else None
+                    }
+
+                    # Get json keys
+                    logger.info("Heartbeat utc: {utc}".format(utc=heartbeats[heartbeat["resource"]]["utc"]))
+                    logger.info("Heartbeat resource: {resource}".format(resource=heartbeats[heartbeat["resource"]]["resource"]))
+                    logger.info("Heartbeat token: {token}".format(token=heartbeats[heartbeat["resource"]]["token"]))
+                    logger.info("Heartbeat timeout: {timeout}".format(timeout=heartbeats[heartbeat["resource"]]["timeout"]))
+                    logger.info("Heartbeat payload: {payload}".format(payload=heartbeats[heartbeat["resource"]]["payload"]))
+
+                    file_name = "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json")
+                    hb_history_dir = "{0}/{1}".format(HEARTBEATS_HISTORY_DIR, token_to_client[heartbeats[heartbeat["resource"]]["token"]].lower())
+                    hb_dir = "{0}/{1}".format(HEARTBEATS_DIR, token_to_client[heartbeats[heartbeat["resource"]]["token"]].lower())
+
+                    # Save history
+                    if not args.no_heartbeat_files:
+                        with open_file(hb_history_dir, file_name, "a+") as heartbeat_file:
+                            json.dump(heartbeats[heartbeat["resource"]], heartbeat_file)
+                            heartbeat_file.write("\n")
+                            logger.info("Heartbeat appended to the history file: {dir}/{file_name}".format(dir=hb_history_dir, file_name=file_name))
                     
-                    # Check token and continue only if client for token found
-                    if "token" in heartbeat and heartbeat["token"] in token_to_client:
+                    # Save current
+                    if not args.no_heartbeat_files:
+                        with open_file(hb_dir, "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json"), "w+") as heartbeat_file:
+                            json.dump(heartbeats[heartbeat["resource"]], heartbeat_file)
+                            logger.info("Heartbeat written to the file: {dir}/{file_name}".format(dir=hb_dir, file_name=file_name))
 
-                        # Process heartbeat removal if special key sent by sender
-                        if "deregister" in heartbeat and heartbeat["deregister"]:
-                            
-                            logger.info("Deregistration heartbeat for resource {resource} received".format(resource=heartbeat["resource"]))
+                    # Send notify after grace period
+                    if int((datetime.now() - START_TIME).total_seconds()) > GRACE_PERIOD:
+                        logger.info("Grace period {gp} seconds passed".format(gp=GRACE_PERIOD))
 
-                            # Remove resource from dicts
-                            heartbeats.pop(heartbeat["resource"], None)
-                            newest_heartbeats.pop(heartbeat["resource"], None)
-                            oldest_heartbeats.pop(heartbeat["resource"], None)
-                            logger.info("Host {resource} removed from dicts".format(resource=heartbeat["resource"]))
+                        # If new resource
+                        if heartbeat["resource"] not in newest_heartbeats:
 
-                            # Remove files
-                            file_name = "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json")
-                            hb_history_dir = "{0}/{1}".format(HEARTBEATS_HISTORY_DIR, token_to_client[heartbeat["token"]].lower())
-                            hb_dir = "{0}/{1}".format(HEARTBEATS_DIR, token_to_client[heartbeat["token"]].lower())
-                            if not args.no_heartbeat_files:
-                                if os.path.exists(hb_history_dir + "/" + file_name):
-                                    os.remove(hb_history_dir + "/" + file_name)
-                                    logger.info("Heartbeat history file {dir}/{file_name} removed".format(dir=hb_history_dir, file_name=file_name))
-                                if os.path.exists(hb_dir + "/" + file_name):
-                                    os.remove(hb_dir + "/" + file_name)
-                                    logger.info("Heartbeat file {dir}/{file_name} removed".format(dir=hb_dir, file_name=file_name))
-
-                            # Send notify about deregistration
-                            
                             # Notify keys
                             notify_client = token_to_client[heartbeat["token"]]
                             # environment
@@ -449,10 +670,10 @@ if __name__ == "__main__":
                                 notify["environment"] = notify_environment
                             notify["service"] = notify_service
                             notify["resource"] = heartbeat["resource"]
-                            notify["event"] = "heartbeat_mesh_heartbeat_deregistered"
-                            notify["value"] = "deregistered"
+                            notify["event"] = "heartbeat_mesh_heartbeat_new"
+                            notify["value"] = "registered"
                             notify["group"] = SELF_GROUP
-                            notify["text"] = "Resource heartbeat deregistered"
+                            notify["text"] = "New resource heartbeat registered"
                             notify["origin"] = SELF_ORIGIN
                             notify["attributes"] = {}
                             notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -460,53 +681,24 @@ if __name__ == "__main__":
                                 notify["attributes"]["location"] = notify_location
                             notify["client"] = notify_client
                             
-                            # Send notify_devilry
-                            send_notify_devilry(notify)
-
-                            continue
-
-                        # Construct data
-                        utc_now = datetime.utcnow()
-                        heartbeats[heartbeat["resource"]] = {
-                            "utc": utc_now.strftime("%F %T"),
-                            "resource": heartbeat["resource"],
-                            "token": heartbeat["token"],
-                            "payload": heartbeat["payload"] if "payload" in heartbeat else None,
-                            "timeout": heartbeat["timeout"] if "timeout" in heartbeat else None
-                        }
-
-                        # Get json keys
-                        logger.info("Heartbeat utc: {utc}".format(utc=heartbeats[heartbeat["resource"]]["utc"]))
-                        logger.info("Heartbeat resource: {resource}".format(resource=heartbeats[heartbeat["resource"]]["resource"]))
-                        logger.info("Heartbeat token: {token}".format(token=heartbeats[heartbeat["resource"]]["token"]))
-                        logger.info("Heartbeat timeout: {timeout}".format(timeout=heartbeats[heartbeat["resource"]]["timeout"]))
-                        logger.info("Heartbeat payload: {payload}".format(payload=heartbeats[heartbeat["resource"]]["payload"]))
-
-                        file_name = "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json")
-                        hb_history_dir = "{0}/{1}".format(HEARTBEATS_HISTORY_DIR, token_to_client[heartbeats[heartbeat["resource"]]["token"]].lower())
-                        hb_dir = "{0}/{1}".format(HEARTBEATS_DIR, token_to_client[heartbeats[heartbeat["resource"]]["token"]].lower())
-
-                        # Save history
-                        if not args.no_heartbeat_files:
-                            with open_file(hb_history_dir, file_name, "a+") as heartbeat_file:
-                                json.dump(heartbeats[heartbeat["resource"]], heartbeat_file)
-                                heartbeat_file.write("\n")
-                                logger.info("Heartbeat appended to the history file: {dir}/{file_name}".format(dir=hb_history_dir, file_name=file_name))
+                            # Put notify to queue
+                            notify_queue.put(notify)
+                            logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+                    
+                        # If newest heartbeat is stale and we receive new heartbeat - comeback
+                        if heartbeat["resource"] in newest_heartbeats:
                         
-                        # Save current
-                        if not args.no_heartbeat_files:
-                            with open_file(hb_dir, "{0}.{1}".format(heartbeat["resource"].replace(" ", "_").replace(".", "_"), "json"), "w+") as heartbeat_file:
-                                json.dump(heartbeats[heartbeat["resource"]], heartbeat_file)
-                                logger.info("Heartbeat written to the file: {dir}/{file_name}".format(dir=hb_dir, file_name=file_name))
+                            newest_heartbeat_age_secs = int((datetime.utcnow() - newest_heartbeats[heartbeat["resource"]]).total_seconds())
+                            logger.info("Newest heartbeat age in seconds: {secs}".format(secs=newest_heartbeat_age_secs))
+                            
+                            hb_timeout_to_use = 60 * (int(heartbeats[heartbeat["resource"]]["timeout"]) if heartbeats[heartbeat["resource"]]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[heartbeat["resource"]]["token"]]]["timeout"]))
+                            logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
 
-                        # Send notify after grace period
-                        if int((datetime.now() - START_TIME).total_seconds()) > GRACE_PERIOD:
+                            # Check if previous hb was stale
+                            if newest_heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
 
-                            # If new resource
-                            if heartbeat["resource"] not in newest_heartbeats:
+                                # Send info comeback
 
-                                # Send notify about deregistration
-                                
                                 # Notify keys
                                 notify_client = token_to_client[heartbeat["token"]]
                                 # environment
@@ -532,110 +724,64 @@ if __name__ == "__main__":
                                     notify["environment"] = notify_environment
                                 notify["service"] = notify_service
                                 notify["resource"] = heartbeat["resource"]
-                                notify["event"] = "heartbeat_mesh_heartbeat_new"
-                                notify["value"] = "registered"
+                                notify["event"] = "heartbeat_mesh_heartbeat_comeback"
+                                notify["value"] = "comeback"
                                 notify["group"] = SELF_GROUP
-                                notify["text"] = "New resource heartbeat registered"
+                                notify["text"] = "Heartbeat comeback registered after timeout"
                                 notify["origin"] = SELF_ORIGIN
                                 notify["attributes"] = {}
                                 notify["attributes"]["receiver"] = SELF_HOSTNAME
+                                notify["attributes"]["timeout"] = hb_timeout_to_use
                                 if notify_location is not None:
                                     notify["attributes"]["location"] = notify_location
                                 notify["client"] = notify_client
                                 
-                                # Send notify_devilry
-                                send_notify_devilry(notify)
-                        
-                            # If newest heartbeat is stale and we receive new heartbeat
-                            if heartbeat["resource"] in newest_heartbeats:
-                            
-                                newest_heartbeat_age_secs = int((datetime.utcnow() - newest_heartbeats[heartbeat["resource"]]).total_seconds())
-                                hb_timeout_to_use = 60 * (int(heartbeats[heartbeat["resource"]]["timeout"]) if heartbeats[heartbeat["resource"]]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[heartbeat["resource"]]["token"]]]["timeout"]))
+                                # Put notify to queue
+                                notify_queue.put(notify)
+                                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+                                
+                                # And clean previous timeout
 
-                                if newest_heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
-
-                                    # Notify keys
-                                    notify_client = token_to_client[heartbeat["token"]]
-                                    # environment
-                                    if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
-                                        notify_environment = config["clients"][notify_client]["resources"][heartbeat["resource"]]["environment"]
-                                    else:
-                                        notify_environment = None
-                                    # service
-                                    if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
-                                        notify_service = config["clients"][notify_client]["resources"][heartbeat["resource"]]["service"]
-                                    else:
-                                        notify_service = SELF_SERVICE
-                                    # location
-                                    if heartbeat["resource"] in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][heartbeat["resource"]]:
-                                        notify_location = config["clients"][notify_client]["resources"][heartbeat["resource"]]["location"]
-                                    else:
-                                        notify_location = None
-
-                                    # Prepare notify data
-                                    notify = {}
-                                    notify["severity"] = SEVERITY_INFORMATIONAL
-                                    if notify_environment is not None:
-                                        notify["environment"] = notify_environment
-                                    notify["service"] = notify_service
-                                    notify["resource"] = heartbeat["resource"]
-                                    notify["event"] = "heartbeat_mesh_heartbeat_comeback"
-                                    notify["value"] = "comeback"
-                                    notify["group"] = SELF_GROUP
-                                    notify["text"] = "New heartbeat comeback registered after timeout"
-                                    notify["origin"] = SELF_ORIGIN
-                                    notify["attributes"] = {}
-                                    notify["attributes"]["receiver"] = SELF_HOSTNAME
-                                    notify["attributes"]["timeout"] = hb_timeout_to_use
-                                    if notify_location is not None:
-                                        notify["attributes"]["location"] = notify_location
-                                    notify["client"] = notify_client
-                                    
-                                    # Send notify_devilry
-                                    send_notify_devilry(notify)
-                        
-                        # Save oldest (first) heartbeat
-                        if heartbeat["resource"] not in oldest_heartbeats:
-                            oldest_heartbeats[heartbeat["resource"]] = utc_now
-
-                        # Save newest (last) heartbeat
-                        newest_heartbeats[heartbeat["resource"]] = utc_now
-
-                    else:
-                        if "token" in heartbeat:
-                            logger.warning("Heartbeat resource: {resource}, token: {token} - token not found, ignoring ".format(resource=heartbeat["resource"], token=heartbeat["token"]))
-                        else:
-                            logger.warning("Heartbeat resource: {resource} has no token, ignoring ".format(resource=heartbeat["resource"]))
-
-                    # Reload config and do checks on each message and save last time of checks
-                    # But only if check_interval secs from previous checks
-                    if (int(time.time()) - checks_last_time) >= CHECK_INTERVAL: 
-                        logger.info("Loading YAML config {work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE))
-                        try:
-                            old_config = config
-                            with open("{work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE), 'r') as yaml_file:
-                                config = yaml.load(yaml_file, Loader=yaml.SafeLoader)
-                        except:
-                            config = old_config
-                        logger.info("Doing heartbeat checks")
-                        checks_last_time = do_checks()
-                    else:
-                        logger.info("Not doing heartbeat checks, waiting {n} seconds".format(n=(CHECK_INTERVAL - (int(time.time()) - checks_last_time))))
+                                # Prepare notify data
+                                notify = {}
+                                notify["severity"] = SEVERITY_OK
+                                notify["event"] = "heartbeat_mesh_heartbeat_ok"
+                                notify["text"] = "Resource heartbeat ok"
+                                notify["correlate"] = ["heartbeat_mesh_heartbeat_timeout"]
+                                if notify_environment is not None:
+                                    notify["environment"] = notify_environment
+                                notify["service"] = notify_service
+                                notify["resource"] = heartbeat["resource"]
+                                notify["value"] = 0
+                                notify["group"] = SELF_GROUP
+                                notify["origin"] = SELF_ORIGIN
+                                notify["attributes"] = {}
+                                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                                notify["attributes"]["timeout"] = hb_timeout_to_use
+                                if notify_location is not None:
+                                    notify["attributes"]["location"] = notify_location
+                                notify["client"] = notify_client
+                                
+                                # Put notify to queue
+                                notify_queue.put(notify)
+                                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
                     
-                except zmq.error.Again as e:
-                    
-                    # Reload config and do checks on recv timeout and save last time of checks
-                    logger.info("Loading YAML config {work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE))
-                    try:
-                        old_config = config
-                        with open("{work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE), 'r') as yaml_file:
-                            config = yaml.load(yaml_file, Loader=yaml.SafeLoader)
-                    except:
-                        config = old_config
-                    logger.info("Timeout on receiving heartbeat, doing heartbeat checks")
-                    checks_last_time = do_checks()
-                    logger.info("Done with checks after timeout on receiving heartbeat, looping")
-            
+                    else:
+                        logger.info("Grace period {gp} seconds not yet passed".format(gp=GRACE_PERIOD))
+
+                    # Save oldest (first) heartbeat
+                    if heartbeat["resource"] not in oldest_heartbeats:
+                        oldest_heartbeats[heartbeat["resource"]] = utc_now
+
+                    # Save newest (last) heartbeat
+                    newest_heartbeats[heartbeat["resource"]] = utc_now
+
+                else:
+                    if "token" in heartbeat:
+                        logger.warning("Heartbeat resource: {resource}, token: {token} - token not found, ignoring ".format(resource=heartbeat["resource"], token=heartbeat["token"]))
+                    else:
+                        logger.warning("Heartbeat resource: {resource} has no token, ignoring ".format(resource=heartbeat["resource"]))
+
             # Reroute catched exception to log
             except Exception as e:
                 logger.exception(e)
