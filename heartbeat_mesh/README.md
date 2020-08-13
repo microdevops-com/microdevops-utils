@@ -24,7 +24,7 @@ Receiver performs checks and sends these event notifications:
 - heartbeat_mesh_heartbeat_comeback - Heartbeat comeback registered after timeout
 
 # sender.py
-receiver.py is a small script run by cron to send heartbeats to receivers.
+sender.py is a small script run by cron to send heartbeats to receivers.
 
 Many receivers could be used. If receiver is not available - it is skipped and no error reported.
 
