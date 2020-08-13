@@ -189,7 +189,7 @@ def send_message(sending_method, sending_method_item_settings, message):
             except Exception as e:
                 # Retry if not last retry
                 if retry < (ALERTA_RETRIES - 1):
-                    logger.error("send_alerta exception catch, retry {retry}".format(retry=retry + 1))
+                    logger.info("send_alerta exception catch, retry {retry}".format(retry=retry + 1))
                     time.sleep(ALERTA_RETRY_SLEEP)
                 else:
                     # Send exception
