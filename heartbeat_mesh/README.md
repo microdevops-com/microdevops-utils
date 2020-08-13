@@ -32,7 +32,7 @@ Sender should send heartbeats more often than timeout value to be considered ali
 
 Sender could add payload, such as host uptime, with heartbeats.
 
-Most common usage is to moniror server (host) availability, but you can use any arbitrary name as resource definition in separate config and automate heartbeats for some service:
+Most common usage is to monitor server (host) availability, but you can use any arbitrary name as resource definition in separate config and automate heartbeats for some service:
 ```
 systemctl is-active --quiet service && sender.py --config service.yaml
 ```
