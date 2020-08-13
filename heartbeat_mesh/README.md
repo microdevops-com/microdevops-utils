@@ -21,7 +21,7 @@ Receiver performs checks and sends these event notifications:
 - heartbeat_mesh_heartbeat_registered - Heartbeats registered for resource from config
 - heartbeat_mesh_heartbeat_deregistered - Resource heartbeat deregistered
 - heartbeat_mesh_heartbeat_new - New resource heartbeat registered
-- heartbeat_mesh_heartbeat_comeback - New heartbeat comeback registered after timeout
+- heartbeat_mesh_heartbeat_comeback - Heartbeat comeback registered after timeout
 
 # sender.py
 receiver.py is a small script run by cron to send heartbeats to receivers.
