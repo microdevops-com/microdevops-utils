@@ -66,6 +66,21 @@ chains:
             - false
       suppress: True
       chain_break: True
+    - name: skip heartbeat flood
+      match:
+        event:
+          in:
+            - heartbeat_mesh_heartbeat_ok
+            - heartbeat_mesh_heartbeat_config_missing
+            - heartbeat_mesh_heartbeat_config_exist
+            - heartbeat_mesh_heartbeat_not_registered
+            - heartbeat_mesh_heartbeat_registered
+            - heartbeat_mesh_receiver_activity_ok
+        force_send:
+          in:
+            - false
+      suppress: True
+      chain_break: True
     - name: Alias 1
       rate_limit:
         - 60

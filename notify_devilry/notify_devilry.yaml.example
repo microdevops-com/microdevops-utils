@@ -105,6 +105,21 @@ chains:
             - false
       suppress: True
       chain_break: True
+    - name: skip heartbeat flood
+      match:
+        event:
+          in:
+            - heartbeat_mesh_heartbeat_ok
+            - heartbeat_mesh_heartbeat_config_missing
+            - heartbeat_mesh_heartbeat_config_exist
+            - heartbeat_mesh_heartbeat_not_registered
+            - heartbeat_mesh_heartbeat_registered
+            - heartbeat_mesh_receiver_activity_ok
+        force_send:
+          in:
+            - false
+      suppress: True
+      chain_break: True
 {#
 Config could be templated by Jinja2 code.
 current_time and current_date are added as vars in server local time zone.
