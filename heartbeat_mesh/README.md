@@ -10,7 +10,7 @@ Receiver gives grace period after start for senders to send their heartbeats.
 
 Sender should send heartbeat with token to authorize and identify client, otherwise heartbeat is ignored.
 
-Sender performs checks and sends these event notifications:
+Receiver performs checks and sends these event notifications:
 - heartbeat_mesh_receiver_activity_ok - Heartbeats are being received
 - heartbeat_mesh_receiver_activity_lost - No heartbeats registered on receiver host for two check intervals
 - heartbeat_mesh_heartbeat_timeout - Resource heartbeat timed out
