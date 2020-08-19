@@ -171,35 +171,55 @@ def rare_checks_thread():
                 notify_queue.put(notify)
                 logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
         
-            # Heartbeats among currently registered in receiver exist/missing in client resources for more than a day
+            # Heartbeats among currently registered in receiver exist in config
+            if resource in config["clients"][token_to_client[heartbeats[resource]["token"]]]["resources"]:
 
-            # Notify keys
-            notify_client = token_to_client[heartbeats[resource]["token"]]
+                # Notify keys
+                notify_client = token_to_client[heartbeats[resource]["token"]]
 
-            # Prepare notify data
-            notify = {}
-            if resource not in config["clients"][token_to_client[heartbeats[resource]["token"]]]["resources"] and int((datetime.utcnow() - oldest_heartbeats[resource]).total_seconds()) > 60 * 60 * 24:
-                notify["severity"] = SEVERITY_WARNING
-                notify["event"] = "heartbeat_mesh_heartbeat_config_missing"
-                notify["text"] = "Heartbeat registered more than 24h without resource listing in config"
-                notify["correlate"] = ["heartbeat_mesh_heartbeat_config_exist"]
-            else:
+                # Prepare notify data
+                notify = {}
                 notify["severity"] = SEVERITY_OK
                 notify["event"] = "heartbeat_mesh_heartbeat_config_exist"
                 notify["text"] = "Heartbeat registered more than 24h with resource listing in config"
                 notify["correlate"] = ["heartbeat_mesh_heartbeat_config_missing"]
-            notify["service"] = SELF_SERVICE
-            notify["resource"] = resource
-            notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
-            notify["group"] = SELF_GROUP
-            notify["origin"] = SELF_ORIGIN
-            notify["attributes"] = {}
-            notify["attributes"]["receiver"] = SELF_HOSTNAME
-            notify["client"] = notify_client
-            
-            # Put notify to queue
-            notify_queue.put(notify)
-            logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+                notify["service"] = SELF_SERVICE
+                notify["resource"] = resource
+                notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
+                notify["group"] = SELF_GROUP
+                notify["origin"] = SELF_ORIGIN
+                notify["attributes"] = {}
+                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                notify["client"] = notify_client
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+        
+            # Else if heartbeats among currently registered in receiver missing in client resources for more than a day
+            elif int((datetime.utcnow() - oldest_heartbeats[resource]).total_seconds()) > 60 * 60 * 24:
+
+                # Notify keys
+                notify_client = token_to_client[heartbeats[resource]["token"]]
+
+                # Prepare notify data
+                notify = {}
+                notify["severity"] = SEVERITY_WARNING
+                notify["event"] = "heartbeat_mesh_heartbeat_config_missing"
+                notify["text"] = "Heartbeat registered more than 24h without resource listing in config"
+                notify["correlate"] = ["heartbeat_mesh_heartbeat_config_exist"]
+                notify["service"] = SELF_SERVICE
+                notify["resource"] = resource
+                notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
+                notify["group"] = SELF_GROUP
+                notify["origin"] = SELF_ORIGIN
+                notify["attributes"] = {}
+                notify["attributes"]["receiver"] = SELF_HOSTNAME
+                notify["client"] = notify_client
+                
+                # Put notify to queue
+                notify_queue.put(notify)
+                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
         
         logger.info("Checking heartbeats for client resources")
 
