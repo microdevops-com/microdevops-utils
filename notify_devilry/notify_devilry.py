@@ -371,8 +371,8 @@ if __name__ == "__main__":
 
         # Check if enabled in config
         if "enabled" not in config or config["enabled"] != True:
-            logger.error("{name} not enabled in config, exiting".format(name=NAME))
-            sys.exit(1)
+            logger.info("{name} not enabled in config, exiting".format(name=NAME))
+            sys.exit(0)
 
         logger.info("Starting {name}".format(name=NAME))
 
