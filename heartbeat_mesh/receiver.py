@@ -286,8 +286,8 @@ def frequent_checks_thread():
         if int((datetime.now() - START_TIME).total_seconds()) > GRACE_PERIOD:
             logger.info("Grace period {gp} seconds passed".format(gp=GRACE_PERIOD))
 
-            # Check no activity at all for 2x check intervals
-            if any((int((datetime.utcnow() - newest_heartbeats[resource]).total_seconds()) < (CHECK_INTERVAL * 2)) for resource in newest_heartbeats):
+            # Check any fresh activity for check interval + jitter
+            if any((int((datetime.utcnow() - newest_heartbeats[resource]).total_seconds()) < (CHECK_INTERVAL + TIMEOUT_JITTER)) for resource in newest_heartbeats):
 
                 # Prepare notify data
                 notify = {}
@@ -315,7 +315,7 @@ def frequent_checks_thread():
                 notify["event"] = "heartbeat_mesh_receiver_activity_lost"
                 notify["value"] = "lost"
                 notify["group"] = SELF_GROUP
-                notify["text"] = "No heartbeats registered on receiver host for more than two check intervals"
+                notify["text"] = "No heartbeats registered on receiver host for more than check interval + jitter"
                 notify["origin"] = SELF_ORIGIN
                 notify["correlate"] = ["heartbeat_mesh_receiver_activity_ok"]
                 
@@ -328,66 +328,71 @@ def frequent_checks_thread():
 
         logger.info("Currently registered heartbeat resources and their data:")
 
-        # Loop heartbeats
-        for resource in heartbeats:
-            
-            heartbeat_age_secs = int((datetime.utcnow() - datetime.strptime(heartbeats[resource]["utc"], "%Y-%m-%d %H:%M:%S")).total_seconds())
-            logger.info("Heartbeat age in seconds: {secs}".format(secs=heartbeat_age_secs))
-            
-            hb_timeout_to_use = 60 * (int(heartbeats[resource]["timeout"]) if heartbeats[resource]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[resource]["token"]]]["timeout"]))
-            logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
-            
-            # Notify stale heartbeats among currently registered in receiver
-            if heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
+        # Once again check if we are not in a condition of lost activity, do not send individual alerts if there is no any heartbeat fresher than check interval + jitter.
+        # This false blocks alerts in a situation when all heartbeats truly lost by their fauls, but will prevent from alert storm if fault is on the receiver side.
+        # So there must be any alive resources for other resources to be alerted.
+        if any((int((datetime.utcnow() - newest_heartbeats[resource]).total_seconds()) < (CHECK_INTERVAL + TIMEOUT_JITTER)) for resource in newest_heartbeats):
 
-                # Notify keys
-                notify_client = token_to_client[heartbeats[resource]["token"]]
-                # severity
-                if resource in config["clients"][notify_client]["resources"] and "severity" in config["clients"][notify_client]["resources"][resource]:
-                    notify_severity = config["clients"][notify_client]["resources"][resource]["severity"]
-                elif "severity" in config["clients"][notify_client]:
-                    notify_severity = config["clients"][notify_client]["severity"]
-                else:
-                    notify_severity = SEVERITY_CRITICAL
-                # environment
-                if resource in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][resource]:
-                    notify_environment = config["clients"][notify_client]["resources"][resource]["environment"]
-                else:
-                    notify_environment = None
-                # service
-                if resource in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][resource]:
-                    notify_service = config["clients"][notify_client]["resources"][resource]["service"]
-                else:
-                    notify_service = SELF_SERVICE
-                # location
-                if resource in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][resource]:
-                    notify_location = config["clients"][notify_client]["resources"][resource]["location"]
-                else:
-                    notify_location = None
-
-                # Prepare notify data
-                notify = {}
-                notify["severity"] = notify_severity
-                notify["event"] = "heartbeat_mesh_heartbeat_timeout"
-                notify["text"] = "Resource heartbeat timed out"
-                notify["correlate"] = ["heartbeat_mesh_heartbeat_ok"]
-                if notify_environment is not None:
-                    notify["environment"] = notify_environment
-                notify["service"] = notify_service
-                notify["resource"] = resource
-                notify["value"] = heartbeat_age_secs
-                notify["group"] = SELF_GROUP
-                notify["origin"] = SELF_ORIGIN
-                notify["attributes"] = {}
-                notify["attributes"]["receiver"] = SELF_HOSTNAME
-                notify["attributes"]["timeout"] = hb_timeout_to_use
-                if notify_location is not None:
-                    notify["attributes"]["location"] = notify_location
-                notify["client"] = notify_client
+            # Loop heartbeats
+            for resource in heartbeats:
                 
-                # Put notify to queue
-                notify_queue.put(notify)
-                logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
+                heartbeat_age_secs = int((datetime.utcnow() - datetime.strptime(heartbeats[resource]["utc"], "%Y-%m-%d %H:%M:%S")).total_seconds())
+                logger.info("Heartbeat age in seconds: {secs}".format(secs=heartbeat_age_secs))
+                
+                hb_timeout_to_use = 60 * (int(heartbeats[resource]["timeout"]) if heartbeats[resource]["timeout"] is not None else int(config["clients"][token_to_client[heartbeats[resource]["token"]]]["timeout"]))
+                logger.info("Heartbeat timeout in seconds: {secs}".format(secs=hb_timeout_to_use))
+                
+                # Notify stale heartbeats among currently registered in receiver
+                if heartbeat_age_secs > hb_timeout_to_use + TIMEOUT_JITTER:
+
+                    # Notify keys
+                    notify_client = token_to_client[heartbeats[resource]["token"]]
+                    # severity
+                    if resource in config["clients"][notify_client]["resources"] and "severity" in config["clients"][notify_client]["resources"][resource]:
+                        notify_severity = config["clients"][notify_client]["resources"][resource]["severity"]
+                    elif "severity" in config["clients"][notify_client]:
+                        notify_severity = config["clients"][notify_client]["severity"]
+                    else:
+                        notify_severity = SEVERITY_CRITICAL
+                    # environment
+                    if resource in config["clients"][notify_client]["resources"] and "environment" in config["clients"][notify_client]["resources"][resource]:
+                        notify_environment = config["clients"][notify_client]["resources"][resource]["environment"]
+                    else:
+                        notify_environment = None
+                    # service
+                    if resource in config["clients"][notify_client]["resources"] and "service" in config["clients"][notify_client]["resources"][resource]:
+                        notify_service = config["clients"][notify_client]["resources"][resource]["service"]
+                    else:
+                        notify_service = SELF_SERVICE
+                    # location
+                    if resource in config["clients"][notify_client]["resources"] and "location" in config["clients"][notify_client]["resources"][resource]:
+                        notify_location = config["clients"][notify_client]["resources"][resource]["location"]
+                    else:
+                        notify_location = None
+
+                    # Prepare notify data
+                    notify = {}
+                    notify["severity"] = notify_severity
+                    notify["event"] = "heartbeat_mesh_heartbeat_timeout"
+                    notify["text"] = "Resource heartbeat timed out"
+                    notify["correlate"] = ["heartbeat_mesh_heartbeat_ok"]
+                    if notify_environment is not None:
+                        notify["environment"] = notify_environment
+                    notify["service"] = notify_service
+                    notify["resource"] = resource
+                    notify["value"] = heartbeat_age_secs
+                    notify["group"] = SELF_GROUP
+                    notify["origin"] = SELF_ORIGIN
+                    notify["attributes"] = {}
+                    notify["attributes"]["receiver"] = SELF_HOSTNAME
+                    notify["attributes"]["timeout"] = hb_timeout_to_use
+                    if notify_location is not None:
+                        notify["attributes"]["location"] = notify_location
+                    notify["client"] = notify_client
+                    
+                    # Put notify to queue
+                    notify_queue.put(notify)
+                    logger.info("Put notify to queue, queue size: {size}".format(size=notify_queue.qsize()))
 
         # Get seconds needed to sleep
         sleep_secs = FREQUENT_LOOP_SLEEP - (int(time.time()) - loop_start)
