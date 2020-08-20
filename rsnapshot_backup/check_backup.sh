@@ -92,7 +92,7 @@ if [ -f $CONF_FILE ]; then
 					# AWK interprets slashes as special sequences, so we double slash them
 					CHECK_PATH=$(echo ${CHECK} | jq -r '.path' | sed -e 's#\\#\\\\#g')
 					# No data need to be read by awk, so send just null
-					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_dot_backup.awk \
+					echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/check_dot_backup.awk \
 						-v show_notices=$1 \
 						-v row_number=${ROW_NUMBER} \
 						-v row_enabled=${ROW_ENABLED} \
@@ -126,7 +126,7 @@ if [ -f $CONF_FILE ]; then
 					CHECK_S3_BUCKET=$(echo ${CHECK} | jq -r '.s3_bucket')
 					CHECK_S3_PATH=$(echo ${CHECK} | jq -r '.s3_path')
 					# No data need to be read by awk, so send just null
-					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_s3_dot_backup.awk \
+					echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/check_s3_dot_backup.awk \
 						-v show_notices=$1 \
 						-v row_number=${ROW_NUMBER} \
 						-v row_enabled=${ROW_ENABLED} \
@@ -164,7 +164,7 @@ if [ -f $CONF_FILE ]; then
 					CHECK_FILES_TOTAL=$(echo ${CHECK} | jq -r '.files_total')
 					CHECK_FILES_MASK=$(echo ${CHECK} | jq -r '.files_mask' | sed -e 's#\\#\\\\#g')
 					# No data need to be read by awk, so send just null
-					echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/check_file_age.awk \
+					echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/check_file_age.awk \
 						-v show_notices=$1 \
 						-v row_number=${ROW_NUMBER} \
 						-v row_enabled=${ROW_ENABLED} \
@@ -228,7 +228,7 @@ if [ -f $CONF_FILE ]; then
 								# Check for db name in empty db list and if not only then run script
 								if ! grep -q -e "^${DB_NAME}$" /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp; then
 									# No data need to be read by awk, so send just null
-									echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/${AWK_SCRIPT} \
+									echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/${AWK_SCRIPT} \
 										-v show_notices=$1 \
 										-v row_db_sub_name=${DB_NAME} \
 										-v row_number=${ROW_NUMBER} \
@@ -263,7 +263,7 @@ if [ -f $CONF_FILE ]; then
 						fi
 					else
 						# No data need to be read by awk, so send just null
-						echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/${AWK_SCRIPT} \
+						echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/${AWK_SCRIPT} \
 							-v show_notices=$1 \
 							-v row_db_sub_name=${ROW_SOURCE} \
 							-v row_number=${ROW_NUMBER} \
