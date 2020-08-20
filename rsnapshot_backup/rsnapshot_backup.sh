@@ -100,7 +100,7 @@ if [ -f $CONF_FILE ]; then
 			fi
 		fi
 		# No data need to be read by awk, so send just null
-		echo "null" | awk -f /opt/sysadmws/rsnapshot_backup/rsnapshot_backup.awk \
+		echo "null" | awk -b -f /opt/sysadmws/rsnapshot_backup/rsnapshot_backup.awk \
 			-v rsnapshot_type=$1 \
 			-v verbosity=$3 \
 			-v row_number=${ROW_NUMBER} \
