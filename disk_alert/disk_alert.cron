@@ -1,2 +1,2 @@
-# Disk Alert
+# disk_alert
 */5 * * * *	root	/opt/sysadmws/disk_alert/disk_alert.sh

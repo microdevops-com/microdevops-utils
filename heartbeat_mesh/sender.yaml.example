@@ -1,0 +1,16 @@
+enabled: True
+tpm_file_check: False # optional, try to write and then read random data to tmp file in /tmp before sending heartbeat, helps to detect unresponsive disks, True by default
+receivers:
+  receiver1.example.com: # receiver hostname to connect to
+    port: 15987 # optional, receiver port, 15987 by default
+    token: aaaaaaaaaaaaaaaaaaaaa # auth token
+    resource: myhostname1.example.com # optional, hostname by default
+    timeout: 5 # optional, timeout override from per client default on receiver side
+    uptime_payload: False # optional, send host uptime in payload, True by default
+    payload: # optional, add other arbitrary payload to the heartbeat
+      - name: test1
+        cmd: ["echo", "1", "2", "3"]
+      - name: test2
+        cmd: ["echo", "1", "2", "3"]
+  receiver2.example.com:
+    token: aaaaaaaaaaaaaaaaaaaaa

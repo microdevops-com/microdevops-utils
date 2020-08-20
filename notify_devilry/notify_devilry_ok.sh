@@ -7,13 +7,14 @@ HOSTNAME=$(hostname -f)
 
 # Send test
 echo '{
-	"severity": "informational",
+	"severity": "ok",
 	"service": "notify_devilry",
 	"resource": "'$HOSTNAME'",
-	"event": "notify_devilry_test",
-	"value": "test",
+	"event": "notify_devilry_ok",
+	"value": "ok",
 	"group": "notify_devilry",
-	"text": "Severity informational test alert sent with notify_devilry_test.sh",
-	"origin": "notify_devilry_test.sh",
-	"timeout": 300
+	"text": "Severity ok test alert sent with notify_devilry_ok.sh",
+	"origin": "notify_devilry_ok.sh",
+	"timeout": 300,
+	"correlate": ["notify_devilry_critical"]
 }' | /opt/sysadmws/notify_devilry/notify_devilry.py --debug --force-send

@@ -1,0 +1,11 @@
+[Unit]
+Description=Sysadmin Workshop Heartbeat Mesh Receiver Service
+
+[Service]
+ExecStart=/opt/sysadmws/heartbeat_mesh/receiver.py
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+Type=notify
+
+[Install]
+WantedBy=default.target

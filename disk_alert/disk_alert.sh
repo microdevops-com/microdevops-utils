@@ -8,6 +8,7 @@ DATE=$(date '+%F %T')
 declare -A DISK_ALERT_PERCENT_CRITICAL
 declare -A DISK_ALERT_FREE_SPACE_CRITICAL
 declare -A DISK_ALERT_PREDICT_CRITICAL
+declare -A DISK_ALERT_INODE_CRITICAL
 # Seconds since unix epoch
 TIMESTAMP=$(date '+%s')
 
@@ -20,7 +21,7 @@ fi
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
 	FILTER=$DISK_ALERT_FILTER
 else
-	FILTER="^Filesystem|tmpfs|cdrom|none"
+	FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs"
 fi
 #
 if [[ _$DISK_ALERT_USAGE_CHECK == "_PERCENT" ]]; then
@@ -73,12 +74,72 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	if [[ $USAGE_CHECK == "PERCENT" ]]; then
 		# Critical percent message
 		if [[ $USEP -ge $CRITICAL ]]; then
-			echo '{"host": "'$HOSTNAME'", "from": "disk_alert.sh", "type": "disk used space percent", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$CRITICAL'%"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+			echo '{
+				"severity": "major",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_percentage_usage_high",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "Disk usage high percentage detected",
+				"value": "'$USEP'%",
+				"correlate": ["disk_alert_percentage_usage_ok"],
+				"attributes": {
+					"free space": "'$FREESP'MB",
+					"threshold": "'$CRITICAL'%"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+		else
+			echo '{
+				"severity": "ok",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_percentage_usage_ok",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "Disk usage ok percentage detected",
+				"value": "'$USEP'%",
+				"correlate": ["disk_alert_percentage_usage_high"],
+				"attributes": {
+					"free space": "'$FREESP'MB",
+					"threshold": "'$CRITICAL'%"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
 	elif [[ $USAGE_CHECK == "FREE_SPACE" ]]; then
 		# Critical free space message
 		if [[ $FREESP -le $FREE_SPACE_CRITICAL ]]; then
-			echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk free space MB", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "threshold": "'$FREE_SPACE_CRITICAL'MB"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+			echo '{
+				"severity": "major",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_free_space_low",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "Low disk free space in MB detected",
+				"value": "'$FREESP'MB",
+				"correlate": ["disk_alert_free_space_ok"],
+				"attributes": {
+					"use": "'$USEP'%",
+					"threshold": "'$FREE_SPACE_CRITICAL'MB"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+		else
+			echo '{
+				"severity": "ok",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_free_space_ok",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "Enough disk free space in MB detected",
+				"value": "'$FREESP'MB",
+				"correlate": ["disk_alert_free_space_low"],
+				"attributes": {
+					"use": "'$USEP'%",
+					"threshold": "'$FREE_SPACE_CRITICAL'MB"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
 	fi
 	# Add partition usage history by seconds from unix epoch
@@ -106,10 +167,99 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	fi
 	# Critical predict message
 	if [[ $PREDICT_SECONDS != "None" ]]; then
-		if [[ $PREDICT_SECONDS -lt $PREDICT_CRITICAL ]]; then
-			if [[ $PREDICT_SECONDS -gt 0 ]]; then
-				echo '{"host": "'$HOSTNAME'", "from": "disk_alert", "type": "disk used space predict", "status": "CRITICAL", "date time": "'$DATE'", "partition": "'$PARTITION'", "free space": "'$FREESP'MB", "use": "'$USEP'%", "angle": "'$P_ANGLE'", "shift": "'$P_SHIFT'", "quality": "'$P_QUALITY'", "predict seconds": "'$PREDICT_SECONDS'", "predict hms": "'$P_HMS'", "predict threshold": "'$PREDICT_CRITICAL'"}' | /opt/sysadmws/notify_devilry/notify_devilry.py
-			fi
+		if [[ $PREDICT_SECONDS -lt $PREDICT_CRITICAL && $PREDICT_SECONDS -gt 0 ]]; then
+			echo '{
+				"severity": "warning",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_predict_usage_full",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "Full usage of disk predicted within threshold",
+				"value": "'$PREDICT_SECONDS's",
+				"correlate": ["disk_alert_predict_usage_ok"],
+				"attributes": {
+					"use": "'$USEP'%",
+					"free space": "'$FREESP'MB",
+					"angle": "'$P_ANGLE'",
+					"shift": "'$P_SHIFT'",
+					"quality": "'$P_QUALITY'",
+					"predict hms": "'$P_HMS'",
+					"predict threshold": "'$PREDICT_CRITICAL'"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+		else
+			echo '{
+				"severity": "ok",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_predict_usage_ok",
+				"group": "disk_alert",
+				"origin": "disk_alert.sh",
+				"text": "No full usage of disk predicted within threshold",
+				"value": "'$PREDICT_SECONDS's",
+				"correlate": ["disk_alert_predict_usage_full"],
+				"attributes": {
+					"use": "'$USEP'%",
+					"free space": "'$FREESP'MB",
+					"angle": "'$P_ANGLE'",
+					"shift": "'$P_SHIFT'",
+					"quality": "'$P_QUALITY'",
+					"predict hms": "'$P_HMS'",
+					"predict threshold": "'$PREDICT_CRITICAL'"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
+	fi
+done
+
+# Check df inodes
+df -P -i | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
+	USEP=$(echo $output | awk '{ print $1}' | cut -d'%' -f1 )
+	PARTITION=$(echo $output | awk '{ print $2 }' )
+	# Skip partitions without inodes
+	if [[ _$USEP = _- ]]; then
+		continue
+	fi
+	# Get thresholds
+	if [[ _${DISK_ALERT_INODE_CRITICAL[$PARTITION]} != "_" ]]; then
+		CRITICAL=${DISK_ALERT_INODE_CRITICAL[$PARTITION]}
+	elif [[ _$DISK_ALERT_DEFAULT_INODE_CRITICAL != "_" ]]; then
+		CRITICAL=$DISK_ALERT_DEFAULT_INODE_CRITICAL
+	else
+		CRITICAL="95"
+	fi
+	#
+	# Critical percent message
+	if [[ $USEP -ge $CRITICAL ]]; then
+		echo '{
+			"severity": "major",
+			"service": "disk",
+			"resource": "'$HOSTNAME':'$PARTITION'",
+			"event": "disk_alert_inode_usage_high",
+			"group": "disk_alert",
+			"origin": "disk_alert.sh",
+			"text": "Inode usage high percentage detected",
+			"value": "'$USEP'%",
+			"correlate": ["disk_alert_inode_usage_ok"],
+			"attributes": {
+				"threshold": "'$CRITICAL'%"
+			}
+		}' | /opt/sysadmws/notify_devilry/notify_devilry.py
+	else
+		echo '{
+			"severity": "ok",
+			"service": "disk",
+			"resource": "'$HOSTNAME':'$PARTITION'",
+			"event": "disk_alert_inode_usage_ok",
+			"group": "disk_alert",
+			"origin": "disk_alert.sh",
+			"text": "Inode usage ok percentage detected",
+			"value": "'$USEP'%",
+			"correlate": ["disk_alert_inode_usage_high"],
+			"attributes": {
+				"threshold": "'$CRITICAL'%"
+			}
+		}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 	fi
 done

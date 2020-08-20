@@ -1,0 +1,155 @@
+enabled: True # should be set to True on config setup
+
+env:
+  https_proxy: 'http://user:pass@proxy.example.com:8888' # set env vars before sending
+
+defaults:
+  environment: infra
+  client: Client 1
+  location: Some Datacenter
+
+alerta:
+
+  Alias 1:
+    url: https://alerta.example.com/api/alert
+    api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    exception: # sending to alerta may fail for many reasons like firewall rule lack, send telegram message with this exception
+      telegram:
+        - Alias 2
+
+  Alias 2:
+    url: https://alerta.example.com/api/alert
+    api_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+telegram:
+
+  Alias 1:
+    token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    chat_id: -xxxxxxxxxxxxx
+    sound:
+      - fatal
+      - security
+      - critical
+      - major
+
+  Alias 2:
+    token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    chat_id: -xxxxxxxxxxxxx
+
+  Alias 3:
+    token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    chat_id: -xxxxxxxxxxxxx
+
+chains:
+
+  entrypoint:
+    - name: entrypoint
+      entrypoint: True
+      jump:
+      - transformations
+
+  transformations:
+    - name: important server severity # catch important server resource and set fatal severity instead of lower
+      match:
+        resource:
+          in:
+            - srv1.example.com
+        severity:
+          in:
+            - critical
+            - major
+            - minor
+      set:
+        severity: fatal
+    - name: test # catch test in value and set value to TEST
+      match:
+        value:
+          in:
+            - test
+      set:
+        value: TEST
+    - name: jump # duplicate notification to chains
+      jump:
+        - alerta_chain
+        - telegram_chain
+
+  alerta_chain:
+    - name: Alias 1 # if client == Client 1, send alert to Alias 1 alias and stop processing next rules in this chain
+      match:
+        client:
+          in:
+            - Client 1
+      send:
+        alerta:
+          - Alias 1
+      chain_break: True
+    - name: Alias 2 # send alert to Alias 2 alias for all other clients
+      send:
+        alerta:
+          - Alias 2
+
+  telegram_chain:
+    - name: skip positive # pass only specific severities to telegram, suppress others but those that sent with force_send and stop processing next rules in this chain
+      match:
+        severity:
+          not_in:
+            - fatal
+            - security
+            - critical
+            - major
+            - minor
+            - warning
+            - informational
+        force_send:
+          in:
+            - false
+      suppress: True
+      chain_break: True
+    - name: skip heartbeat flood
+      match:
+        event:
+          in:
+            - heartbeat_mesh_heartbeat_ok
+            - heartbeat_mesh_heartbeat_config_missing
+            - heartbeat_mesh_heartbeat_config_exist
+            - heartbeat_mesh_heartbeat_not_registered
+            - heartbeat_mesh_heartbeat_registered
+            - heartbeat_mesh_receiver_activity_ok
+        force_send:
+          in:
+            - false
+      suppress: True
+      chain_break: True
+{#
+Config could be templated by Jinja2 code.
+current_time and current_date are added as vars in server local time zone.
+current_time = 100000 at 10:00:00.
+current_date = 19700101 on 1970-01-01.
+#}
+{% if 100000 < current_time and current_time < 190000 %}
+    - name: Alias 3 WH # send message to Alias 3 only in working hours
+      send:
+        telegram:
+          - Alias 3
+{% endif %}
+    - name: Alias 1 # if client == Client 1, apply rate limit and send message to client telegram alias, stop processing next rules in this chain
+      match:
+        client:
+          in:
+            - Client 1
+      rate_limit: # limit sending similiar messages based on sending history, 1+ rule needed
+        - 60 # second message only if 60+ minutes passed from last sending and 1 message sent
+        - 240 # third if 240+ minutes and 2 messages sent
+        - 480 # fourth and further if 480+ minutes and 3+ messages sent
+      send:
+        telegram:
+          - Alias 1
+      chain_break: True
+    - name: Alias 2 # apply rate limit and send message to Alias 2 alias for all other clients
+      rate_limit:
+        - 60
+        - 240
+        - 480
+      send:
+        telegram:
+          - Alias 2
