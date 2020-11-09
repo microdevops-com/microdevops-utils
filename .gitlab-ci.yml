@@ -151,8 +151,6 @@ make_deb_v1:
     export NEW_VERSION=$((CUR_VERSION+1))
     # Prepare control
     cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" -e "s#__SIZE__#$SIZE#" > builds/v1/deb/sysadmws-utils-v1/DEBIAN/control
-    # Postinst
-    cp -f deb/postinst builds/v1/deb/sysadmws-utils-v1/DEBIAN/postinst
     # Make deb
     ( cd builds/v1/deb && fakeroot dpkg-deb -b sysadmws-utils-v1 )
 
