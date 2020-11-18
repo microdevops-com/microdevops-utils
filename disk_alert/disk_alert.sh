@@ -159,11 +159,11 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	else
 		# Get predict seconds value
 		export PYTHONIOENCODING=utf8
-		P_ANGLE=$(echo "$LR" | python -c "import sys, json; print json.load(sys.stdin)['angle']")
-		P_SHIFT=$(echo "$LR" | python -c "import sys, json; print json.load(sys.stdin)['shift']")
-		P_QUALITY=$(echo "$LR" | python -c "import sys, json; print json.load(sys.stdin)['quality']")
-		PREDICT_SECONDS=$(echo "$LR" | python -c "import sys, json; print json.load(sys.stdin)['predict seconds']")
-		P_HMS=$(echo "$LR" | python -c "import sys, json; print json.load(sys.stdin)['predict hms']")
+                P_ANGLE=$(echo "$LR" | python -c "import sys, json; print(json.load(sys.stdin)['angle'])")
+                P_SHIFT=$(echo "$LR" | python -c "import sys, json; print(json.load(sys.stdin)['shift'])")
+                P_QUALITY=$(echo "$LR" | python -c "import sys, json; print(json.load(sys.stdin)['quality'])")
+                PREDICT_SECONDS=$(echo "$LR" | python -c "import sys, json; print(json.load(sys.stdin)['predict seconds'])")
+                P_HMS=$(echo "$LR" | python -c "import sys, json; print(json.load(sys.stdin)['predict hms'])")
 	fi
 	# Critical predict message
 	if [[ $PREDICT_SECONDS != "None" ]]; then
