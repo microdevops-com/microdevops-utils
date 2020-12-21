@@ -6,7 +6,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ###     Set some variables
 MY_ADMIN=$(which mysqladmin)
 MY_CLIENT=$(which mysql)
-MY_CRED="--defaults-file=/etc/mysql/debian.cnf"
+MY_CRED="[ -f /etc/mysql/debian.cnf ] && --defaults-file=/etc/mysql/debian.cnf || [ -f /root/.my.cnf ] && --defaults-file=/root/.my.cnf"
 MY_QUERY="show full processlist\G"
 CUR_DATE_TIME=$(date +"%F %T")
 
