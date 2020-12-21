@@ -6,6 +6,7 @@ function report {
 	local master=${2}
 	local relay_log=${3}	
 	local relay_log_size=${4}
+	local stat=${5}
 
 	# Try getting the Master hostname, if the ip is given
 	local pat="[0-9]{1,3}(\.[0-9]{1,3}){3}"
@@ -22,13 +23,18 @@ function report {
 	# Compose response
 	local rsp
 	rsp+='{'
-	rsp+="\"severity\":\"minor\"," 
+	[[ ${stat} = "negative" ]] && rsp+="\"severity\":\"minor\"," 
+	[[ ${stat} = "positive" ]] && rsp+="\"severity\":\"ok\"," 
 	rsp+="\"service\":\"database\"," 
 	rsp+="\"resource\":\"$(hostname -f):mysql\"," 
-	rsp+="\"event\":\"mysql_replica_checker_error\"," 
+	[[ ${stat} = "negative" ]] && rsp+="\"event\":\"mysql_replica_checker_error\"," 
+	[[ ${stat} = "positive" ]] && rsp+="\"event\":\"mysql_replica_checker_ok\"," 
 	rsp+="\"group\":\"mysql_replica_checker\"," 
 	rsp+="\"origin\":\"mysql_replica_checker.sh\"," 
-	rsp+="\"text\":\"Mysql replication error detected\"," 
+	[[ ${stat} = "negative" ]] && rsp+="\"text\":\"Mysql replication error detected\"," 
+	[[ ${stat} = "positive" ]] && rsp+="\"text\":\"Mysql replication ok detected\"," 
+	[[ ${stat} = "negative" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_ok\"]," 
+	[[ ${stat} = "positive" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_error\"]," 
 	rsp+="\"attributes\":{" 
 	rsp+=${master:+"\"master\":\"${master}\","}
 	if [[ -n ${data} ]]; then
@@ -50,7 +56,6 @@ if ! type mysqld &> /dev/null || ! type mysql &> /dev/null; then
 	exit 0
 fi 
 
-	
 # Try to load config file 
 CONFIG="$(dirname "$0")/mysql_replica_checker.conf"
 if [[ -f "$CONFIG" ]]; then
@@ -141,5 +146,7 @@ fi
 
 # Send notify only if err_msg
 if [[ "${err_msg}" ]]; then
-	report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}"
+	report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}" "negative"
+else
+	report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}" "positive"
 fi
