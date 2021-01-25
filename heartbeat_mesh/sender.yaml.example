@@ -14,3 +14,12 @@ receivers:
         cmd: ["echo", "1", "2", "3"]
   receiver2.example.com:
     token: aaaaaaaaaaaaaaaaaaaaa
+
+# Windows config
+enabled: true
+tpm_file_check: false # doesn't work on Windows
+receivers:
+  receiver1.example.com:
+    resource: myhostname1.example.com
+    uptime_payload: false # doesn't work on Windows
+    token: aaaaaaaaaaaaaaaaaaaaa

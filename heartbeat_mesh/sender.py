@@ -17,14 +17,14 @@ except ImportError:
     ARGPARSE = False
 
 # Constants
-WORK_DIR = "/opt/sysadmws/heartbeat_mesh"
+WORK_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh"
 CONFIG_FILE = "sender.yaml"
-LOG_DIR = "/opt/sysadmws/heartbeat_mesh/log"
+LOG_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\log" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh/log"
 LOG_FILE = "sender.log"
 LOGO = "💔 ➔ ✉"
 ZMQ_LINGER = 10000 # try to send heartbeat for ZMQ_LINGER ms
 DEFAULT_PORT = 15987
-TMP_DIR = "/tmp"
+TMP_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\tmp" if os.name == "nt" else "/tmp"
 
 # Main
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
         logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
 
         # Do write-read checks
-        if not ("tpm_file_check" in config and config["tpm_file_check"] == "False"):
+        if not ("tpm_file_check" in config and config["tpm_file_check"] == False):
             # Get random (uuid)
             with open('/proc/sys/kernel/random/uuid', 'r') as f:
                 uuid = f.readline().rstrip()
