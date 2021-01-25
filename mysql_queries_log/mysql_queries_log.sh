@@ -6,9 +6,17 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ###     Set some variables
 MY_ADMIN=$(which mysqladmin)
 MY_CLIENT=$(which mysql)
-MY_CRED="[ -f /etc/mysql/debian.cnf ] && --defaults-file=/etc/mysql/debian.cnf || [ -f /root/.my.cnf ] && --defaults-file=/root/.my.cnf"
 MY_QUERY="show full processlist\G"
 CUR_DATE_TIME=$(date +"%F %T")
+
+if [ -f /etc/mysql/debian.cnf ] ; then 
+        MY_CRED="--defaults-file=/etc/mysql/debian.cnf" 
+elif [ -f /root/.my.cnf ] ; then
+	MY_CRED="--defaults-file=/root/.my.cnf"
+else
+	echo "Mysql defaults file NOT FOUND!"
+	exit 1
+fi
 
 ###     Detect is mysql service alive
 MY_CHECK=$("$MY_ADMIN" "$MY_CRED" ping 2>/dev/null | grep alive)
