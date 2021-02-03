@@ -101,21 +101,23 @@ relay_log_size=$(grep -oP "Relay_Log_Space:\s+\K(\d+)" <<<"${sql_resp}")	# num (
 last_io_err=$(grep -oP "Last_IO_Error:\s+\K(.+)" <<<"${sql_resp}")		# srt with spaces
 last_sql_err=$(grep -oP "Last_SQL_Error:\s+\K(.+)" <<<"${sql_resp}")		# str with spaces
 
+errors_in=''
+
 # Run some checks
 
 # Check For Last Error 
 if [[ "${last_errno}" != 0 ]]; then
-	err_msg+="\"last errno\":\"${last_errno}\","
+	errors_in+="last-errno "
 fi
 
 # Check if IO thread is running
 if [[ "${io_is_running}" != "Yes" ]]; then
-	err_msg+="\"slave io running\":\"${io_is_running}\","
+	errors_in+="slave-io-running "
 fi
 
 # Check for SQL thread
 if [[ "${sql_is_running}" != "Yes" ]]; then
-	err_msg+="\"slave sql running\":\"$sql_is_running\","
+	errors_in+="slave-sql-running "
 fi
 
 # Check how slow the slave is (preset delay + sql_delay)
@@ -126,27 +128,30 @@ fi
 
 # Handle NULL
 if [[ "${seconds_behind}" == "NULL" ]]; then
-	err_msg+="\"seconds behind master\":\"${seconds_behind}\","
+	errors_in+="seconds-behind-master "
+
 # Handle threshold+delay 
 elif [[ "${seconds_behind}" -ge "$(( ${BEHIND_MASTER_THR} + ${sql_delay} ))" ]]; then
 	if [[ "${sql_delay}" -gt 0 ]]; then
-		err_msg="\"sql delay\":\"${sql_delay}\","
+		errors_in="sql-delay "
 	fi
-	err_msg+="\"threshold\":\"${BEHIND_MASTER_THR}\","
-	err_msg+="\"seconds behind master\":\"${seconds_behind}\"," 
+	errors_in+="seconds-behind-master "
 fi
 
-# Add last_err_msg to msg
+# Add last_errors_in to msg
 if [[ "${last_io_err}" ]]; then
-	err_msg+="\"last io error\":\"${last_io_err}\","
+	errors_in+="last-io-error "
 fi
 if [[ "${last_sql_err}" ]]; then
-	err_msg+="\"last sql error\":\"${last_sql_err}\","
+	errors_in+="last-sql-error "
 fi
 
-# Send notify only if err_msg
-if [[ "${err_msg}" ]]; then
-	report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}" "negative"
+message=$(echo "\"last-errno\"": "\"${last_errno}\"", "\"slave-io-running\"": "\"${io_is_running}\"", "\"slave-sql-running\"": "\"${sql_is_running}\"", "\"sql-delay\"": "\"${sql_delay}\"", "\"sql-delay-thr\"": "\"${BEHIND_MASTER_THR}\"", "\"seconds-behind-master\"": "\"${seconds_behind}\"", "\"last-io-error\"": "\"${last_io_err:="no"}\"", "\"last-sql-error\"": "\"${last_sql_err:="no"}\"", "\"errors found in\"": "\"${errors_in:="no errors"}\", ")
+
+# Send notify only if errors_in
+if [[ "${errors_in}" ]]; then
+	report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "negative"
 else
-	report "${err_msg}" "${master}" "${relay_log}" "${relay_log_size}" "positive"
+	report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "positive"
 fi
+
