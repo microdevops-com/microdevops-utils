@@ -85,9 +85,9 @@ _*_ - mandatory keys
   - `notify_devilry`
   - `cmd_check_alert`
 - `origin`
-  - `heartbeat_mesh`
-  - `disk_alert`
-  - `mysql_replica_checker`
+  - `heartbeat_mesh/receiver.py`
+  - `disk_alert.sh`
+  - `mysql_replica_checker.sh`
   - `website_checker`
 - `attributes` - any key value pair with additional data
   - `datetime`: `1970-01-01 00:00:00 +0000 UTC`
