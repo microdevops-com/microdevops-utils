@@ -22,25 +22,20 @@ if [ -f $CONF_FILE ]; then
 				LOCAL_SUBPATHS=("/etc"
 				"/home"
 				"/root"
-				"/var/log"
 				"/var/spool/cron"
 				"/usr/local"
-				"/lib/ufw"
 				"/opt/sysadmws")
 			elif [[ "$LOCAL_PATH" = "DEBIAN" ]]; then
 				LOCAL_SUBPATHS=("/etc"
 				"/home"
 				"/root"
-				"/var/log"
 				"/var/spool/cron"
 				"/usr/local"
-				"/lib/ufw"
 				"/opt/sysadmws")
 			elif [[ "$LOCAL_PATH" = "CENTOS" ]]; then
 				LOCAL_SUBPATHS=("/etc"
 				"/home"
 				"/root"
-				"/var/log"
 				"/var/spool/cron"
 				"/usr/local"
 				"/opt/sysadmws")
