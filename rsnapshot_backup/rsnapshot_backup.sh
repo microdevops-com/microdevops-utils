@@ -2,14 +2,14 @@
 
 # Check AWK version
 if [ `awk --version | head -1 | sed -e 's/GNU Awk //' -e 's/\..*//'` -lt 4 ]; then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: AWK version above or equal 4 is required"
 	exit 1
 fi
 
 # Check run syntax
 if [ "$1" = "" ]; then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: Use rsnapshot_backup.sh TYPE [JSON LIST ITEM NUMBER | HOST] [VERBOSITY]"
 	echo -e >&2 "ERROR: TYPE = sync, hourly, daily, weekly, monthly (sync_first enabled)"
 	echo -e >&2 "ERROR: JSON LIST ITEM NUMBER = run sync only for item N in the config file"
@@ -20,22 +20,25 @@ if [ "$1" = "" ]; then
 fi
 if [ "$1" != "sync" ]; then
 	if [ "$2" != "" ]; then
-		date '+%F %T ' | tr -d '\n'
+		date '+%F %T ' | tr -d '\n' >&2
 		echo -e >&2 "ERROR: JSON LIST ITEM NUMBER or HOST can only be used with sync TYPE"
 		exit 1
 	fi
 fi
+
+date '+%F %T ' | tr -d '\n' >&2
+echo >&2 "NOTICE: Hostname: $(hostname -f)"
 
 # Exit if lock exists (prevent multiple execution)
 LOCK_DIR=/opt/sysadmws/rsnapshot_backup/rsnapshot_backup.lock
 
 if mkdir "$LOCK_DIR"
 then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "NOTICE: Successfully acquired lock on $LOCK_DIR"
 	trap 'rm -rf "$LOCK_DIR"' 0
 else
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: Cannot acquire lock, giving up on $LOCK_DIR"
 	exit 1
 fi
@@ -92,7 +95,7 @@ if [ -f $CONF_FILE ]; then
 		# For rotation items (!= sync) - do a rotation only once per path (ROW_PATH)
 		if [ "$1" != "sync" ]; then
 			if [ "_${ROTATIONS[${ROW_PATH}]}" == "_done" ]; then
-				date '+%F %T ' | tr -d '\n'
+				date '+%F %T ' | tr -d '\n' >&2
 				echo -e >&2 "NOTICE: Rotation for ${ROW_PATH} has been already made, skipping"
 				continue
 			else
@@ -133,16 +136,16 @@ if [ -f $CONF_FILE ]; then
 		fi
 	done
 	if [ "`cat $ERROR_COUNT_FILE`" != "0" ]; then
-		date '+%F %T ' | tr -d '\n'
-		echo -n "RESULT: Errors occuried: "
-		cat $ERROR_COUNT_FILE
+		date '+%F %T ' | tr -d '\n' >&2
+		echo -n >&2 "RESULT: Errors occuried: "
+		cat >&2 $ERROR_COUNT_FILE
 		GRAND_EXIT=1
 	fi
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "NOTICE: Script finished"
 	exit $GRAND_EXIT
 else
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "WARNING: There is no $CONF_FILE config file on backup server"
         exit 1
 fi	

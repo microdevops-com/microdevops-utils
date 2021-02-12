@@ -2,33 +2,33 @@
 
 # Check AWK version
 if [ `awk --version | head -1 | sed -e 's/GNU Awk //' -e 's/\..*//'` -lt 4 ]; then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: AWK version above or equal 4 is required"
 	exit 1
 fi
 
 # Check run syntax
 if [ "$1" != "0" ] && [ "$1" != "1" ] && [ "$1" != "2" ]; then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: Use $0 0|1|2 [HOSTNAME]"
 	echo -e >&2 "ERROR: 0 to show only basic notices, 1 to show all notices and stats, 2 to show basic notices and stats"
 	echo -e >&2 "ERROR: HOSTNAME is optional to check specific host backups only"
 	exit 1
 fi
 
-date '+%F %T ' | tr -d '\n'
-echo "NOTICE: Hostname: $(hostname -f)"
+date '+%F %T ' | tr -d '\n' >&2
+echo >&2 "NOTICE: Hostname: $(hostname -f)"
 
 # Exit if lock exists (prevent multiple execution)
 LOCK_DIR=/opt/sysadmws/rsnapshot_backup/check_backup.lock
 
 if mkdir "$LOCK_DIR"
 then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "NOTICE: Successfully acquired lock on $LOCK_DIR"
 	trap 'rm -rf "$LOCK_DIR"' 0
 else
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "ERROR: Cannot acquire lock, giving up on $LOCK_DIR"
 	exit 1
 fi
@@ -42,10 +42,34 @@ echo "0" > $ERROR_COUNT_FILE
 
 # Check no-compress files
 if find /opt/sysadmws/rsnapshot_backup -name 'no-compress_*' | grep -q no-compress; then
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "WARNING: rsnapshot_backup/no-compress_ files found, consider adding --no-compress param and clean those files out"
 	GRAND_EXIT=1
 fi 
+
+# Check for empty (only one disabled item) config end exit normally if found
+if [ -f $CONF_FILE ]; then
+	ROW_NUMBER=0
+	ROWS_ENABLED=0
+	# Loop over conf file items
+	IFS=$'\n' # Separate only by newlines
+	for CONF_ROW in $(cat ${CONF_FILE} | jq -c '.[]'); do
+		# Get values from JSON
+		ROW_NUMBER=$((ROW_NUMBER+1))
+		ROW_ENABLED=$(echo ${CONF_ROW} | jq -r '.enabled')
+		if [[ "${ROW_ENABLED}" == "true" ]]; then
+			ROWS_ENABLED=$((ROWS_ENABLED+1))
+		fi
+	done
+	if [[ ${ROW_NUMBER} == 1 && ${ROWS_ENABLED} == 0 ]]; then
+		date '+%F %T ' | tr -d '\n' >&2
+		echo -e >&2 "NOTICE: Empty config (only one disabled item) detected, and it is ok"
+		date '+%F %T ' | tr -d '\n' >&2
+		echo -e >&2 "NOTICE: Script finished"
+		exit 0
+	fi
+fi
+exit
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
@@ -220,7 +244,7 @@ if [ -f $CONF_FILE ]; then
 					# Expand db_list.txt for ALL
 					if [ "${ROW_SOURCE}" == "ALL" ]; then
 						if [ ! -f "${ROW_PATH}/.sync/rsnapshot/var/backups/${DB_LIST_PATH}" ]; then
-							date '+%F %T ' | tr -d '\n'
+							date '+%F %T ' | tr -d '\n' >&2
 							echo -e >&2 "ERROR: ${ROW_PATH}/.sync/rsnapshot/var/backups/${DB_LIST_PATH} not found on ALL source"
 							GRAND_EXIT=1
 						else
@@ -296,7 +320,7 @@ if [ -f $CONF_FILE ]; then
 					fi
 					rm -f /opt/sysadmws/rsnapshot_backup/check_backup_check_empty_db.tmp
 				else
-					date '+%F %T ' | tr -d '\n'
+					date '+%F %T ' | tr -d '\n' >&2
 					echo -e >&2 "ERROR: Check script for type ${CHECK_TYPE} not found on config item ${ROW_NUMBER}"
 					awk '{ print $1 + 1}' \
 						< /opt/sysadmws/rsnapshot_backup/check_backup_error_count.txt \
@@ -310,25 +334,25 @@ if [ -f $CONF_FILE ]; then
 		fi
 	done
 	if [ "`cat $OK_COUNT_FILE`" == "0" ] && [ "`cat $ERROR_COUNT_FILE`" == "0" ]; then
-		date '+%F %T ' | tr -d '\n'
-		echo "WARNING: Zero checks made"
+		date '+%F %T ' | tr -d '\n' >&2
+		echo >&2 "WARNING: Zero checks made"
 		GRAND_EXIT=1
 	else
-		date '+%F %T ' | tr -d '\n'
-		echo -n "RESULT: Successful checks made: "
-		cat $OK_COUNT_FILE
+		date '+%F %T ' | tr -d '\n' >&2
+		echo -n >&2 "RESULT: Successful checks made: "
+		cat >&2 $OK_COUNT_FILE
 		if [ "`cat $ERROR_COUNT_FILE`" != "0" ]; then
-			date '+%F %T ' | tr -d '\n'
-			echo -n "RESULT: Errors during checks: "
-			cat $ERROR_COUNT_FILE
+			date '+%F %T ' | tr -d '\n' >&2
+			echo -n >&2 "RESULT: Errors during checks: "
+			cat >&2 $ERROR_COUNT_FILE
 			GRAND_EXIT=1
 		fi
 	fi
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "NOTICE: Script finished"
 	exit $GRAND_EXIT
 else
-	date '+%F %T ' | tr -d '\n'
+	date '+%F %T ' | tr -d '\n' >&2
 	echo -e >&2 "WARNING: There is no $CONF_FILE config file on backup server"
         exit 1
 fi	
