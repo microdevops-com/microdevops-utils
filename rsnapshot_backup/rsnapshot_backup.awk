@@ -452,11 +452,11 @@ function print_timestamp() {
                         dblist_part = "su - postgres -c \"cat /tmp/rsnapshot_backup_postgresql_query1.sql | psql --no-align -t template1\" > /var/backups/postgresql/db_list.txt";
                 }
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && " dblist_part " && { for db in `cat /var/backups/postgresql/db_list.txt`; do ( [ -f /var/backups/postgresql/$db.gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose $db 2>/dev/null\" | gzip > /var/backups/postgresql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " globals_part " && ( [ -f /var/backups/postgresql/" backup_src ".gz ] || su - postgres -c \"pg_dump --create " clean_part " --verbose " backup_src " 2>/dev/null\" | gzip > /var/backups/postgresql/" backup_src ".gz ) '";
 		}
-		print_timestamp(); print("NOTICE: Running remote dump");
+		print_timestamp(); print("NOTICE: Running remote dump:");
 		err = system(make_dump_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
@@ -604,11 +604,11 @@ function print_timestamp() {
 			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema > /var/backups/mysql/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases $db " mysqldump_args " | gzip > /var/backups/mysql/$db.gz ); done } '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases $db " mysqldump_args " | gzip > /var/backups/mysql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --lock-tables=false " events_part " --databases " backup_src " " mysqldump_args " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases " backup_src " " mysqldump_args " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
 		}
-		print_timestamp(); print("NOTICE: Running remote dump");
+		print_timestamp(); print("NOTICE: Running remote dump:");
 		err = system(make_dump_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
@@ -766,11 +766,11 @@ function print_timestamp() {
 			dblist_part = "/tmp/mongodb_db_list.sh " mongo_args " | grep -v -e local > /var/backups/mongodb/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mongodb/db_list.txt`; do ( [ -f /var/backups/mongodb/$db.tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db $db && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/$db.tar.gz $db && rm -rf /var/backups/mongodb/$db; } ); done } '";
 		} else {
-			make_dump_cmd = "ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " chmod_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mongodb/" backup_src ".tar.gz ] || { mongodump " mongo_args " --quiet --out /var/backups/mongodb --dumpDbUsersAndRoles --db " backup_src " && cd /var/backups/mongodb && tar zcvf /var/backups/mongodb/" backup_src ".tar.gz " backup_src " && rm -rf /var/backups/mongodb/" backup_src "; } ) '";
 		}
-		print_timestamp(); print("NOTICE: Running remote dump");
+		print_timestamp(); print("NOTICE: Running remote dump:");
 		err = system(make_dump_cmd);
 		if (err != 0) {
 			print_timestamp(); print("ERROR: Remote dump failed on config item " row_number ", skipping to next line");
