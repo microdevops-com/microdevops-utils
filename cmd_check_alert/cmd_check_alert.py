@@ -260,7 +260,7 @@ if __name__ == "__main__":
             check_threads.pop(name)
         
         # Shuffle checks to avoid same checks to be killed by global time limit
-        check_list = config["checks"].items()
+        check_list = list(config["checks"].items())
         random.shuffle(check_list)
 
         time_limit_warning = False
