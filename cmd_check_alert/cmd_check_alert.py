@@ -128,6 +128,7 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Run check commands and send their alert notifications to notify_devilry.")
         parser.add_argument("--debug", dest="debug", help="enable debug", action="store_true")
         parser.add_argument("--force-send", dest="force_send", help="force sending to notify_devilry", action="store_true")
+        parser.add_argument("--yaml", dest="yaml", help="use file FILE relative to {work_dir} instead of default {config}".format(work_dir=WORK_DIR, config=CONFIG_FILE), nargs=1, metavar=("FILE"))
         args = parser.parse_args()
     
         # Enable debug
@@ -144,8 +145,11 @@ if __name__ == "__main__":
         logger.info(LOGO)
 
         # Load YAML config
-        logger.info("Loading YAML config {work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE))
-        config = load_yaml_config(WORK_DIR, CONFIG_FILE)
+        if args.yaml is not None:
+            config_file = args.yaml[0]
+        else:
+            config_file = CONFIG_FILE
+        config = load_yaml_config(WORK_DIR, config_file)
 
         # Check if enabled in config
         if config["enabled"] != True:
