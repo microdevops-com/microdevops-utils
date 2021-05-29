@@ -20,7 +20,9 @@ current_date = 19700101 on 1970-01-01.
 {# this check will only run between 10:00 and 11:00, we don't need to check domain expiry 24 hours per day #}
 {% if 100000 < current_time and current_time < 110000 %}
   example.com domain: # name of check, used only for identification
+    #disabled: True # optional, to disable specific check from config management
     cmd: /opt/sensu-plugins-ruby/embedded/bin/check-whois-domain-expiration.rb -d example.com -w 30 -c 7 # cmd to run
+    timeout: 15 # timeout before kill of check, optional
     severity: major # optional
     severity_per_retcode: # optional, useful for sensu-plugins, send severity based on check retcode (exit code)
       1: major

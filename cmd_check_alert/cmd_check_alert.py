@@ -276,6 +276,11 @@ if __name__ == "__main__":
             # Any check could fail
             try:
 
+                # Skip disabled checks
+                if "disabled" in check and check["disabled"]:
+                    logger.info("Check {name} did not run because it is disabled".format(name=check_name))
+                    continue
+
                 # Resource definition in checks should be unique per environment, otherwise check makes no sense and events overwrite each other, check this
                 env_to_check = check["environment"] if "environment" in check else "__NO_ENV"
                 if env_to_check not in resources_per_env_used:
