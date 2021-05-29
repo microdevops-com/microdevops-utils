@@ -184,7 +184,7 @@ add_repo_deb_v1:
       - master
   script: |
     export GNUPGHOME=/opt/sysadmws/gnupg/.gnupg
-    killall -q gpg-agent || true; gpg-agent --daemon --allow-preset-passphrase
+    pkill gpg-agent || true; gpg-agent --daemon --allow-preset-passphrase
     sleep 3
     /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS E5337B7B1B6C8A420A48AB069BA912449F148CFB
     /usr/lib/gnupg2/gpg-preset-passphrase -v -c --preset -P $GPG_PASS 846876C563DD34B899FCD3C61F7C554D9AEDE1C2
