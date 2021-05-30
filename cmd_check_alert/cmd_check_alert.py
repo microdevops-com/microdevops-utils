@@ -198,6 +198,8 @@ if __name__ == "__main__":
             else:
                 if "severity_per_retcode" in check and retcode in check["severity_per_retcode"]:
                     notify["severity"] = check["severity_per_retcode"][retcode]
+                elif "severity_per_retcode" in check and str(retcode) in check["severity_per_retcode"]:
+                    notify["severity"] = check["severity_per_retcode"][str(retcode)]
                 else:
                     notify["severity"] = check["severity"] if "severity" in check else config["defaults"]["severity"]
             notify["resource"] = check["resource"].replace("__hostname__", SELF_HOSTNAME)
