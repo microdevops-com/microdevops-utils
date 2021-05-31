@@ -169,8 +169,12 @@ if __name__ == "__main__":
         def run_check(name, cmd, check):
             logger.info("Running check {name} with command {cmd}".format(name=name, cmd=cmd))
 
+            # custom PATH env for cases when cron runs with poor PATH
+            check_env = os.environ.copy()
+            check_env["PATH"] = "/usr/local/sbin:/usr/sbin:/sbin:/snap/bin:" + check_env["PATH"]
+
             # preexec_fn sets independent process group for check cmd children, all them could be killed together
-            process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash")
+            process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", env=check_env)
 
             # Save process to global dict for further killing
             check_procs[name] = process
