@@ -170,7 +170,7 @@ if __name__ == "__main__":
             logger.info("Running check {name} with command {cmd}".format(name=name, cmd=cmd))
 
             # preexec_fn sets independent process group for check cmd children, all them could be killed together
-            process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash")
 
             # Save process to global dict for further killing
             check_procs[name] = process
