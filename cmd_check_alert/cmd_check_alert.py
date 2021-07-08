@@ -223,6 +223,7 @@ if __name__ == "__main__":
             notify["attributes"]["check name"] = name
             notify["attributes"]["check cmd"] = check["cmd"]
             notify["attributes"]["check retcode"] = str(retcode)
+            notify["attributes"]["check host"] = SELF_HOSTNAME
             if name in timedout_checks:
                 notify["attributes"]["check killed after timeout"] = str(timedout_checks[name])
             notify["text"] = "stdout:\n{stdout}\nstderr:\n{stderr}".format(stdout=stdout, stderr=stderr)
