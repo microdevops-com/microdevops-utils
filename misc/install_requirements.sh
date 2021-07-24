@@ -26,6 +26,12 @@ if [[ "${ID_LIKE}" = "rhel fedora" ]]; then
 		yum install -y python2-pyyaml python2-zmq python2-jinja2
 	elif [[ "${VERSION_ID}" = "8" ]]; then
 		yum install -y python3-pyyaml python3-zmq python3-jinja2
+		if alternatives --display python | grep -q "python - status is auto"; then
+			alternatives --set python /usr/bin/python3
+			echo python set to /usr/bin/python3
+		else
+			echo python already set
+		fi
 	else
 		echo "Unknown CentOS version detected"
 	fi
