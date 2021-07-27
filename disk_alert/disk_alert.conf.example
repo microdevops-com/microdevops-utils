@@ -13,31 +13,43 @@
 
 # Default critical space usage % threshold
 #DISK_ALERT_DEFAULT_PERCENT_CRITICAL="95"
+#DISK_ALERT_DEFAULT_PERCENT_WARNING="90"
 
 # Default free space critical MB threshold
 #DISK_ALERT_DEFAULT_FREE_SPACE_CRITICAL="1024"
+#DISK_ALERT_DEFAULT_FREE_SPACE_WARNING="2048"
 
 # Default critical predicted seconds threshold
 # If predicted time to 100% is 24 hours ((60 * 60 * 24) = 86400) we send message
-#DISK_ALERT_DEFAULT_PREDICT_CRITICAL="86400"
+#DISK_ALERT_DEFAULT_PREDICT_CRITICAL="3600"
+#DISK_ALERT_DEFAULT_PREDICT_WARNING="86400"
 
 # Individual critical spce usage % threshold
 #declare -A DISK_ALERT_PERCENT_CRITICAL
+#declare -A DISK_ALERT_PERCENT_WARNING
 #DISK_ALERT_PERCENT_CRITICAL["/mount/point"]="95"
+#DISK_ALERT_PERCENT_WARNING["/mount/point"]="90"
 
 # Individual free space critical MB threshold
 #declare -A DISK_ALERT_FREE_SPACE_CRITICAL
+#declare -A DISK_ALERT_FREE_SPACE_WARNING
 #DISK_ALERT_FREE_SPACE_CRITICAL["/mount/point"]="1024"
+#DISK_ALERT_FREE_SPACE_WARNING["/mount/point"]="2048"
 
 # Individual critical predicted seconds threshold
 #declare -A DISK_ALERT_PREDICT_CRITICAL
-#DISK_ALERT_PREDICT_CRITICAL["/mount/point"]="86400"
+#declare -A DISK_ALERT_PREDICT_WARNING
+#DISK_ALERT_PREDICT_CRITICAL["/mount/point"]="3600"
+#DISK_ALERT_PREDICT_WARNING["/mount/point"]="86400"
 
 # Inodes are checked only by % of usage
 
 # Default critical inode usage % threshold
 #DISK_ALERT_DEFAULT_INODE_CRITICAL="95"
+#DISK_ALERT_DEFAULT_INODE_WARNING="90"
 
 # Individual critical inode usage % threshold
 #declare -A DISK_ALERT_INODE_CRITICAL
+#declare -A DISK_ALERT_INODE_WARNING
 #DISK_ALERT_INODE_CRITICAL["/mount/point"]="95"
+#DISK_ALERT_INODE_WARNING["/mount/point"]="90"
