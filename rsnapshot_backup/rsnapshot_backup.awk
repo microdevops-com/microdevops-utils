@@ -619,9 +619,9 @@ function print_timestamp() {
 			dblist_part = "mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e \"SHOW DATABASES;\" | grep -v -e information_schema -e performance_schema > /var/backups/mysql/db_list.txt";
 		}
 		if (backup_src == "ALL") {
-			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases $db " mysqldump_args " | gzip > /var/backups/mysql/$db.gz ); done } '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && " dblist_part " && { for db in `cat /var/backups/mysql/db_list.txt`; do ( [ -f /var/backups/mysql/$db.gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases $db " mysqldump_args " --max_allowed_packet=1G | gzip > /var/backups/mysql/$db.gz ); done } '";
 		} else {
-			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases " backup_src " " mysqldump_args " | gzip > /var/backups/mysql/" backup_src ".gz ) '";
+			make_dump_cmd = "set -x && ssh " ssh_args " " connect_user "@" connect_hn " '" mkdir_part " && " lock_part " && " find_part " && ( [ -f /var/backups/mysql/" backup_src ".gz ] || mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables " events_part " --databases " backup_src " " mysqldump_args " --max_allowed_packet=1G | gzip > /var/backups/mysql/" backup_src ".gz ) '";
 		}
 		print_timestamp(); print("NOTICE: Running remote dump:");
 		err = system(make_dump_cmd);
