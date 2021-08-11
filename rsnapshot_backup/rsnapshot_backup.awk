@@ -102,6 +102,7 @@ function print_timestamp() {
 	mysql_noevents		= row_mysql_noevents;
 	native_txt_check	= row_native_txt_check;
 	native_10h_limit	= row_native_10h_limit;
+	before_backup_check	= row_before_backup_check;
 	exec_before_rsync	= row_exec_before_rsync;
 	exec_after_rsync	= row_exec_after_rsync;
 
@@ -224,6 +225,20 @@ function print_timestamp() {
 			print_timestamp(); print("NOTICE: Rsnapshot finished on config item " row_number);
 		}
 		next;
+	}
+
+	# Exec before_backup_check
+	if (before_backup_check != "") {
+		print_timestamp(); print("NOTICE: Executing local before_backup_check '" before_backup_check "' on config item " row_number);
+		# Get exit code of script
+		err = system(before_backup_check);
+		if (err == 0) {
+			print_timestamp(); print("NOTICE: Local execution of before_backup_check succeeded on config item " row_number);
+		} else {
+			print_timestamp(); print("ERROR: Local execution of before_backup_check failed on config item " row_number ", skipping to next line");
+			total_errors = total_errors + 1;
+			next
+		}
 	}
 
 	# Main

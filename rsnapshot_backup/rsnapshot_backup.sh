@@ -77,6 +77,7 @@ if [ -f $CONF_FILE ]; then
 		ROW_MYSQL_NOEVENTS=$(echo ${CONF_ROW} | jq -r '.mysql_noevents')
 		ROW_NATIVE_TXT_CHECK=$(echo ${CONF_ROW} | jq -r '.native_txt_check')
 		ROW_NATIVE_10H_LIMIT=$(echo ${CONF_ROW} | jq -r '.native_10h_limit')
+		ROW_BEFORE_BACKUP_CHECK=$(echo ${CONF_ROW} | jq -r '.before_backup_check')
 		ROW_EXEC_BEFORE_RSYNC=$(echo ${CONF_ROW} | jq -r '.exec_before_rsync')
 		ROW_EXEC_AFTER_RSYNC=$(echo ${CONF_ROW} | jq -r '.exec_after_rsync')
 		# If filter in $2 - skip everything but needed
@@ -128,6 +129,7 @@ if [ -f $CONF_FILE ]; then
 			-v row_mysql_noevents=${ROW_MYSQL_NOEVENTS} \
 			-v row_native_txt_check=${ROW_NATIVE_TXT_CHECK} \
 			-v row_native_10h_limit=${ROW_NATIVE_10H_LIMIT} \
+			-v row_before_backup_check=${ROW_BEFORE_BACKUP_CHECK} \
 			-v row_exec_before_rsync=${ROW_EXEC_BEFORE_RSYNC} \
 			-v row_exec_after_rsync=${ROW_EXEC_AFTER_RSYNC}
 		# Exit code depends on rows
