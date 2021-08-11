@@ -69,7 +69,6 @@ if [ -f $CONF_FILE ]; then
 		exit 0
 	fi
 fi
-exit
 
 if [ -f $CONF_FILE ]; then
 	ROW_NUMBER=0
