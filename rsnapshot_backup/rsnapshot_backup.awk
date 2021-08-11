@@ -228,7 +228,7 @@ function print_timestamp() {
 	}
 
 	# Exec before_backup_check
-	if (before_backup_check != "") {
+	if (before_backup_check != "null") {
 		print_timestamp(); print("NOTICE: Executing local before_backup_check '" before_backup_check "' on config item " row_number);
 		# Get exit code of script
 		err = system(before_backup_check);
