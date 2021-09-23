@@ -23,7 +23,7 @@ function report {
 	# Compose response
 	local rsp
 	rsp+='{'
-	[[ ${stat} = "negative" ]] && rsp+="\"severity\":\"minor\"," 
+	[[ ${stat} = "negative" ]] && rsp+="\"severity\":\"critical\"," 
 	[[ ${stat} = "positive" ]] && rsp+="\"severity\":\"ok\"," 
 	rsp+="\"service\":\"database\"," 
 	rsp+="\"resource\":\"$(hostname -f):mysql\"," 
