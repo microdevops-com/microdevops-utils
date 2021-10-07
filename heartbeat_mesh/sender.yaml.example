@@ -1,5 +1,5 @@
 enabled: True
-tpm_file_check: False # optional, try to write and then read random data to tmp file in /tmp before sending heartbeat, helps to detect unresponsive disks, True by default
+tmp_file_check: False # optional, try to write and then read random data to tmp file in /tmp before sending heartbeat, helps to detect unresponsive disks, True by default
 receivers:
   receiver1.example.com: # receiver hostname to connect to
     port: 15987 # optional, receiver port, 15987 by default
@@ -17,7 +17,7 @@ receivers:
 
 # Windows config
 enabled: true
-tpm_file_check: false # doesn't work on Windows
+tmp_file_check: false # doesn't work on Windows
 receivers:
   receiver1.example.com:
     resource: myhostname1.example.com

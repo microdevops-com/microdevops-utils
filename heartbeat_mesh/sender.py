@@ -127,7 +127,7 @@ if __name__ == "__main__":
         logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
 
         # Do write-read checks
-        if not ("tpm_file_check" in config and config["tpm_file_check"] == False):
+        if not ("tmp_file_check" in config and config["tmp_file_check"] == False):
             # Get random (uuid)
             with open('/proc/sys/kernel/random/uuid', 'r') as f:
                 uuid = f.readline().rstrip()
