@@ -4,9 +4,18 @@ limits:
   time: 300 # total time limit for all checks to avoid check queue infinite growth, use 300 seconds if runned every 5 minute
   threads: 5 # concurrant checks limit
 
-defaults:
-  timeout: 15 # default timeout before kill of check
-  severity: minor # default severity if severity or severity_per_retcode is not set in check
+defaults: # default values for checks below, all optional
+  timeout: 15
+  severity: major
+  severity_per_retcode:
+    1: major
+    2: critical
+  client: Client 1
+  environment: infra
+  service: Some
+  group: Some
+  location: Some
+  type: Some
 
 # Resource per environment should be unique in all checks, otherwise check events will overwrite each other.
 # If non unique pair exists, script will send special notification about that.

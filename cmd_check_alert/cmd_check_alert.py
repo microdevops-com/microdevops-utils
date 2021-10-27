@@ -200,12 +200,24 @@ if __name__ == "__main__":
             if retcode == 0:
                 notify["severity"] = SEVERITY_OK
             else:
+                # severity_per_retcode in check
                 if "severity_per_retcode" in check and retcode in check["severity_per_retcode"]:
                     notify["severity"] = check["severity_per_retcode"][retcode]
+                #  severity_per_retcode in check for str hack
                 elif "severity_per_retcode" in check and str(retcode) in check["severity_per_retcode"]:
                     notify["severity"] = check["severity_per_retcode"][str(retcode)]
+                # severity_per_retcode in defaults
+                elif "severity_per_retcode" in config["defaults"] and retcode in config["defaults"]["severity_per_retcode"]:
+                    notify["severity"] = config["defaults"]["severity_per_retcode"][retcode]
+                # severity_per_retcode in defaults for str hack
+                elif "severity_per_retcode" in config["defaults"] and str(retcode) in config["defaults"]["severity_per_retcode"]:
+                    notify["severity"] = config["defaults"]["severity_per_retcode"][str(retcode)]
+                # severity in check
+                elif "severity" in check:
+                    notify["severity"] = check["severity"]
+                # severity in defaults
                 else:
-                    notify["severity"] = check["severity"] if "severity" in check else config["defaults"]["severity"]
+                    notify["severity"] = config["defaults"]["severity"]
             notify["resource"] = check["resource"].replace("__hostname__", SELF_HOSTNAME)
             if name in timedout_checks:
                 notify["event"] = "cmd_check_alert_cmd_timeout"
@@ -218,7 +230,12 @@ if __name__ == "__main__":
                     notify["event"] = "cmd_check_alert_cmd_retcode_not_zero"
                     notify["correlate"] = ["cmd_check_alert_cmd_ok", "cmd_check_alert_cmd_timeout"]
             notify["value"] = str(retcode)
+
+            # default group
+            notify["group"] = config["defaults"]["group"] if "group" in config["defaults"] else SELF_GROUP
+            # override with in check
             notify["group"] = check["group"] if "group" in check else SELF_GROUP
+
             notify["attributes"] = {}
             notify["attributes"]["check name"] = name
             notify["attributes"]["check cmd"] = check["cmd"]
@@ -228,14 +245,39 @@ if __name__ == "__main__":
                 notify["attributes"]["check killed after timeout"] = str(timedout_checks[name])
             notify["text"] = "stdout:\n{stdout}\nstderr:\n{stderr}".format(stdout=stdout, stderr=stderr)
             notify["origin"] = SELF_ORIGIN
+
+            # default service
+            if "service" in config["defaults"]:
+                notify["service"] = config["defaults"]["service"]
+            # override with in check
             if "service" in check:
                 notify["service"] = check["service"]
+
+            # default type
+            if "type" in config["defaults"]:
+                notify["type"] = config["defaults"]["type"]
+            # override with in check
             if "type" in check:
                 notify["type"] = check["type"]
+
+            # default environment
+            if "environment" in config["defaults"]:
+                notify["environment"] = config["defaults"]["environment"]
+            # override with in check
             if "environment" in check:
                 notify["environment"] = check["environment"]
+
+            # default client
+            if "client" in config["defaults"]:
+                notify["client"] = config["defaults"]["client"]
+            # override with in check
             if "client" in check:
                 notify["client"] = check["client"]
+
+            # default client
+            if "location" in config["defaults"]:
+                notify["attributes"]["location"] = config["defaults"]["location"]
+            # override with in check
             if "location" in check:
                 notify["attributes"]["location"] = check["location"]
 
