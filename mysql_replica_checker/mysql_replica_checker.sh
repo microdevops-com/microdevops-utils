@@ -2,64 +2,66 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 function report {
-	local data=${1}
-	local master=${2}
-	local relay_log=${3}	
-	local relay_log_size=${4}
-	local stat=${5}
+    local data=${1}
+    local master=${2}
+    local relay_log=${3}
+    local relay_log_size=${4}
+    local stat=${5}
 
-	# Try getting the Master hostname, if the ip is given
-	local pat="[0-9]{1,3}(\.[0-9]{1,3}){3}"
-	if [[ ${master} ]] && [[ ${master} =~ ${pat} ]]; then
-		local master_fdqn=$(host -W 5 "${master}" 2>&1) && host_ok=1
-		if [[ ${host_ok} -eq 1 ]]; then master=${master_fdqn##*' '}; fi
-	fi
-	
-	# Check for free space
-	if [[ ${relay_log} ]]; then
-		local free_space=$(df -Ph "$(dirname "${relay_log}")" | awk 'END{print $4}' )
-	fi
-	
-	# Compose response
-	local rsp
-	rsp+='{'
-	[[ ${stat} = "negative" ]] && rsp+="\"severity\":\"critical\"," 
-	[[ ${stat} = "positive" ]] && rsp+="\"severity\":\"ok\"," 
-	rsp+="\"service\":\"database\"," 
-	rsp+="\"resource\":\"$(hostname -f):mysql\"," 
-	[[ ${stat} = "negative" ]] && rsp+="\"event\":\"mysql_replica_checker_error\"," 
-	[[ ${stat} = "positive" ]] && rsp+="\"event\":\"mysql_replica_checker_ok\"," 
-	rsp+="\"group\":\"mysql_replica_checker\"," 
-	rsp+="\"origin\":\"mysql_replica_checker.sh\"," 
-	[[ ${stat} = "negative" ]] && rsp+="\"text\":\"Mysql replication error detected\"," 
-	[[ ${stat} = "positive" ]] && rsp+="\"text\":\"Mysql replication ok detected\"," 
-	[[ ${stat} = "negative" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_ok\"]," 
-	[[ ${stat} = "positive" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_error\"]," 
-	rsp+="\"attributes\":{" 
-	rsp+=${master:+"\"master\":\"${master}\","}
-	if [[ -n ${data} ]]; then
-		rsp+="${data}"
-	fi
-	rsp+=${free_space:+"\"relay log free space\":\"${free_space}\","}
-	rsp+=${relay_log_size:+"\"log size\":\"$(bc <<<"scale=2; ${relay_log_size:=0} / 1024 / 1024" )Mb\""}
-	rsp+='}'
-	rsp+='}'
+    # Try getting the Master hostname, if the ip is given
+    local pat="[0-9]{1,3}(\.[0-9]{1,3}){3}"
+    if [[ ${master} ]] && [[ ${master} =~ ${pat} ]]; then
+        local master_fdqn
+        master_fdqn=$(host -W 5 "${master}" 2>&1) && host_ok=1
+        if [[ ${host_ok} -eq 1 ]]; then master=${master_fdqn##*' '}; fi
+    fi
 
-	# Send response
-	echo "${rsp}" | sed -e "s/,}/}/g" | /opt/sysadmws/notify_devilry/notify_devilry.py
-	exit 0
+    # Check for free space
+    if [[ ${relay_log} ]]; then
+        local free_space
+        free_space=$(df -Ph "$(dirname "${relay_log}")" | awk 'END{print $4}' )
+    fi
+
+    # Compose response
+    local rsp
+    rsp+='{'
+    [[ ${stat} = "negative" ]] && rsp+="\"severity\":\"critical\","
+    [[ ${stat} = "positive" ]] && rsp+="\"severity\":\"ok\","
+    rsp+="\"service\":\"database\","
+    rsp+="\"resource\":\"$(hostname -f):mysql\","
+    [[ ${stat} = "negative" ]] && rsp+="\"event\":\"mysql_replica_checker_error\","
+    [[ ${stat} = "positive" ]] && rsp+="\"event\":\"mysql_replica_checker_ok\","
+    rsp+="\"group\":\"mysql_replica_checker\","
+    rsp+="\"origin\":\"mysql_replica_checker.sh\","
+    [[ ${stat} = "negative" ]] && rsp+="\"text\":\"Mysql replication error detected\","
+    [[ ${stat} = "positive" ]] && rsp+="\"text\":\"Mysql replication ok detected\","
+    [[ ${stat} = "negative" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_ok\"],"
+    [[ ${stat} = "positive" ]] && rsp+="\"correlate\":[\"mysql_replica_checker_error\"],"
+    rsp+="\"attributes\":{"
+    rsp+=${master:+"\"master\":\"${master}\","}
+    if [[ -n ${data} ]]; then
+        rsp+="${data}"
+    fi
+    rsp+=${free_space:+"\"relay log free space\":\"${free_space}\","}
+    rsp+=${relay_log_size:+"\"log size\":\"$(bc <<<"scale=2; ${relay_log_size:=0} / 1024 / 1024" )Mb\""}
+    rsp+='}'
+    rsp+='}'
+
+    # Send response
+    echo "${rsp}" | sed -e "s/,}/}/g" | tr -d '\r\n' | /opt/sysadmws/notify_devilry/notify_devilry.py
+    exit 0
 }
 
 # Check if mysqld and mysql available in path or exit silently
 # We exit silently to suppress error messages from cron on servers without mysql
-if ! type mysqld &> /dev/null || ! type mysql &> /dev/null; then 
-	exit 0
-fi 
+if ! type mysqld &> /dev/null || ! type mysql &> /dev/null; then
+    exit 0
+fi
 
-# Try to load config file 
+# Try to load config file
 CONFIG="$(dirname "$0")/mysql_replica_checker.conf"
 if [[ -f "$CONFIG" ]]; then
-	. "$CONFIG"
+    . "$CONFIG"
 fi
 
 # Set MYSQL working variables
@@ -80,78 +82,78 @@ sql_resp=$("$MY_CLIENT" "$MY_CRED" -Be "$MY_QUERY" 2>&1)
 
 # Exit if not slave
 if [[ ! ${sql_resp} =~ "Slave" ]]; then
-	exit 0
+    exit 0
 fi
 
 # Parse MYSQL response
-master=$(grep -oP "Master_Host:\s+\K(.+)" <<<"${sql_resp}")			# str or num with dot 
+master="$(grep -oP "Master_Host:\s+\K(.+)" <<<"${sql_resp}")"                       # str or num with dot
 
 # Basic
-last_errno=$(grep -oP "Last_Errno:\s+\K(\S+)" <<<"${sql_resp}")			# ? num 
-seconds_behind=$(grep -oP "Seconds_Behind_Master:\s+\K(\S+)" <<<"${sql_resp}")	# NULL or num
-sql_delay=$(grep -oP "SQL_Delay:\s+\K(\d+)" <<<"${sql_resp}")			# num or not
-io_is_running=$(grep -oP "Slave_IO_Running:\s+\K(\w+)" <<<"${sql_resp}")	# str 
-sql_is_running=$(grep -oP "Slave_SQL_Running:\s+\K(\w+)" <<<"${sql_resp}")	# str
+last_errno="$(grep -oP "Last_Errno:\s+\K(\S+)" <<<"${sql_resp}")"                   # ? num
+seconds_behind="$(grep -oP "Seconds_Behind_Master:\s+\K(\S+)" <<<"${sql_resp}")"    # NULL or num
+sql_delay="$(grep -oP "SQL_Delay:\s+\K(\d+)" <<<"${sql_resp}")"                     # num or not
+io_is_running="$(grep -oP "Slave_IO_Running:\s+\K(\w+)" <<<"${sql_resp}")"          # str
+sql_is_running="$(grep -oP "Slave_SQL_Running:\s+\K(\w+)" <<<"${sql_resp}")"        # str
 
 # For free space check
-relay_log=$(grep -oP "relay_log\s+\K(\S+)" <<<"${sql_resp}")			# str (path)
-relay_log_size=$(grep -oP "Relay_Log_Space:\s+\K(\d+)" <<<"${sql_resp}")	# num (bits)
+relay_log="$(grep -oP "relay_log\s+\K(\S+)" <<<"${sql_resp}")"                      # str (path)
+relay_log_size="$(grep -oP "Relay_Log_Space:\s+\K(\d+)" <<<"${sql_resp}")"          # num (bits)
 
 # Extend err msg
-last_io_err=$(grep -oP "Last_IO_Error:\s+\K(.+)" <<<"${sql_resp}")		# srt with spaces
-last_sql_err=$(grep -oP "Last_SQL_Error:\s+\K(.+)" <<<"${sql_resp}")		# str with spaces
+last_io_err="$(grep -oP "Last_IO_Error:\s+\K(.+)" <<<"${sql_resp}")"                # srt with spaces
+last_sql_err="$(grep -oP "Last_SQL_Error:\s+\K(.+)" <<<"${sql_resp}")"              # str with spaces
 
 errors_in=''
 
 # Run some checks
 
-# Check For Last Error 
+# Check For Last Error
 if [[ "${last_errno}" != 0 ]]; then
-	errors_in+="last-errno "
+    errors_in+="last-errno "
 fi
 
 # Check if IO thread is running
 if [[ "${io_is_running}" != "Yes" ]]; then
-	errors_in+="slave-io-running "
+    errors_in+="slave-io-running "
 fi
 
 # Check for SQL thread
 if [[ "${sql_is_running}" != "Yes" ]]; then
-	errors_in+="slave-sql-running "
+    errors_in+="slave-sql-running "
 fi
 
 # Check how slow the slave is (preset delay + sql_delay)
 if [[ -z "${sql_delay}" ]]; then
-	# Set 0 if var is ''
-	sql_delay=0 
+    # Set 0 if var is ''
+    sql_delay=0
 fi
 
 # Handle NULL
 if [[ "${seconds_behind}" == "NULL" ]]; then
-	errors_in+="seconds-behind-master "
+    errors_in+="seconds-behind-master "
 
-# Handle threshold+delay 
+# Handle threshold+delay
 elif [[ "${seconds_behind}" -ge "$(( ${BEHIND_MASTER_THR} + ${sql_delay} ))" ]]; then
-	if [[ "${sql_delay}" -gt 0 ]]; then
-		errors_in="sql-delay "
-	fi
-	errors_in+="seconds-behind-master "
+    if [[ "${sql_delay}" -gt 0 ]]; then
+        errors_in="sql-delay "
+    fi
+    errors_in+="seconds-behind-master "
 fi
 
 # Add last_errors_in to msg
 if [[ "${last_io_err}" ]]; then
-	errors_in+="last-io-error "
+    errors_in+="last-io-error "
 fi
 if [[ "${last_sql_err}" ]]; then
-	errors_in+="last-sql-error "
+    errors_in+="last-sql-error "
 fi
 
 message=$(echo "\"last-errno\"": "\"${last_errno}\"", "\"slave-io-running\"": "\"${io_is_running}\"", "\"slave-sql-running\"": "\"${sql_is_running}\"", "\"sql-delay\"": "\"${sql_delay}\"", "\"sql-delay-thr\"": "\"${BEHIND_MASTER_THR}\"", "\"seconds-behind-master\"": "\"${seconds_behind}\"", "\"last-io-error\"": "\"${last_io_err:="no"}\"", "\"last-sql-error\"": "\"${last_sql_err:="no"}\"", "\"errors found in\"": "\"${errors_in:="no errors"}\", ")
 
-# Send notify only if errors_in
+# Send negative notify only if errors_in
 if [[ "${errors_in}" ]]; then
-	report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "negative"
+    report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "negative"
 else
-	report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "positive"
+    report "${message}" "${master}" "${relay_log}" "${relay_log_size}" "positive"
 fi
 
