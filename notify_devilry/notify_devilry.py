@@ -53,6 +53,7 @@ ALERTA_RETRIES = 3
 ALERTA_RETRY_SLEEP = 2
 ALERTA_URLOPEN_TIMEOUT = 30
 SEVERITY_MINOR = "minor"
+SEVERITY_CRITICAL = "critical"
 
 # Custom Exceptions
 class LoadJsonError(Exception):
@@ -382,7 +383,7 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error("load_json failed, sending error")
             message = {
-                "severity": SEVERITY_MINOR,
+                "severity": SEVERITY_CRITICAL,
                 "service": SELF_SERVICE,
                 "resource": socket.gethostname(),
                 "event": "notify_devilry_msg_read_failure",
