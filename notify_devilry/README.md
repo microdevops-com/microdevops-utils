@@ -17,13 +17,13 @@ There was a typo in the word `delivery`, but it remains as a part of the name no
 
 All `sysadmws-utils` components use `notify_devilry` to send notifications.
 
-`notify_devilry` mostly follows [alerta](https://docs.alerta.io/en/latest/server.html) [Design Principles](https://docs.alerta.io/en/latest/design.html)
-and [Conventions](https://docs.alerta.io/en/latest/conventions.html) to be compatible with `alerta` as one of possible API endpoints.
+`notify_devilry` mostly follows [alerta](https://docs.alerta.io/server.html) [Design Principles](https://docs.alerta.io/design.html)
+and [Conventions](https://docs.alerta.io/conventions.html) to be compatible with `alerta` as one of possible API endpoints.
 
 Local server notifications sources should send notifications as JSON via stdin.
 
 Remote destination services supported:
-- [alerta](https://docs.alerta.io/en/latest/server.html) - to bump alerts with notifications
+- [alerta](https://docs.alerta.io/server.html) - to bump alerts with notifications
 - [telegram](https://telegram.org) - to send notifications as messages to chats
 
 # Notification keys scheme with examples
@@ -101,14 +101,14 @@ _*_ - mandatory keys
 - `timeout` - override default alert timeout value
 - `type` - for `alerta`
   - `sysadmws-utils`
-- `correlate` - for `alerta` [Correlation](https://docs.alerta.io/en/latest/server.html#simple-correlation)
+- `correlate` - for `alerta` [Correlation](https://docs.alerta.io/server.html#simple-correlation)
   - [`notify_devilry_test`, `notify_devilry_critical`, `notify_devilry_ok`]
 - `force_send` - set to True if program run with `--force-send`, can be used in match filter
 
 # Rate limit
 `notify_devilry` can rate limit notifications with `rate_limit`.
 
-It has no practical sense for routing to `alerta` as it has its own [De-Duplication](https://docs.alerta.io/en/latest/server.html#de-duplication) mechanisms,
+It has no practical sense for routing to `alerta` as it has its own [De-Duplication](https://docs.alerta.io/server.html#de-duplication) mechanisms,
 but helps humans to receive less messages via chats.
 
 It uses `environment`, `resource`, `event` and `severity` notification keys to detect similiar notifications.
