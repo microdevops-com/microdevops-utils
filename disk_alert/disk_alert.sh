@@ -25,7 +25,7 @@ fi
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
 	FILTER=$DISK_ALERT_FILTER
 else
-	FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs"
+	FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs|^snapfuse"
 fi
 #
 if [[ _$DISK_ALERT_USAGE_CHECK == "_PERCENT" ]]; then
