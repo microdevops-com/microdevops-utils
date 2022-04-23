@@ -22,6 +22,7 @@ CONFIG_FILE = "sender.yaml"
 LOG_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\log" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh/log"
 LOG_FILE = "sender.log"
 LOGO = "💔 ➔ ✉"
+NAME = "heartbeat_mesh/sender"
 ZMQ_LINGER = 10000 # try to send heartbeat for ZMQ_LINGER ms
 DEFAULT_PORT = 15987
 TMP_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\tmp" if os.name == "nt" else "/tmp"
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         # Deregister
         if ARGPARSE and args.deregister:
             
-            logger.info("Starting heartbeat_mesh sender")
+            logger.info("Starting {name}".format(name=NAME))
             logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
 
             dr_resource, dr_receiver, dr_port, dr_token = args.deregister
@@ -118,8 +119,8 @@ if __name__ == "__main__":
 
         # Check if enabled in config
         if config["enabled"] != True:
-            logger.error("heartbeat_mesh sender not enabled in config, exiting")
-            sys.exit(1)
+            logger.info("{name} not enabled in config, exiting".format(name=NAME))
+            sys.exit(0)
 
         logger.info("Starting heartbeat_mesh sender")
 
@@ -211,4 +212,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception(e)
 
-    logger.info("Finished heartbeat_mesh sender")
+    logger.info("Finished {name}".format(name=NAME))
