@@ -38,22 +38,25 @@ function print_timestamp() {
 		host_path_arr[2] = "/home";
 		host_path_arr[3] = "/root";
 		host_path_arr[4] = "/var/spool/cron";
-		host_path_arr[5] = "/usr/local";
-		host_path_arr[6] = "/opt/sysadmws";
+		host_path_arr[5] = "/var/lib/dpkg";
+		host_path_arr[6] = "/usr/local";
+		host_path_arr[7] = "/opt/sysadmws";
 	} else if (host_path == "DEBIAN") {
 		host_path_arr[1] = "/etc";
 		host_path_arr[2] = "/home";
 		host_path_arr[3] = "/root";
 		host_path_arr[4] = "/var/spool/cron";
-		host_path_arr[5] = "/usr/local";
-		host_path_arr[6] = "/opt/sysadmws";
+		host_path_arr[5] = "/var/lib/dpkg";
+		host_path_arr[6] = "/usr/local";
+		host_path_arr[7] = "/opt/sysadmws";
 	} else if (host_path == "CENTOS") {
 		host_path_arr[1] = "/etc";
 		host_path_arr[2] = "/home";
 		host_path_arr[3] = "/root";
 		host_path_arr[4] = "/var/spool/cron";
-		host_path_arr[5] = "/usr/local";
-		host_path_arr[6] = "/opt/sysadmws";
+		host_path_arr[5] = "/var/lib/rpm";
+		host_path_arr[6] = "/usr/local";
+		host_path_arr[7] = "/opt/sysadmws";
 	} else {
 		host_path_arr[1] = host_path;
 	}
