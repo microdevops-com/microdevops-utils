@@ -40,7 +40,7 @@ current_date = 19700101 on 1970-01-01.
     environment: infra # optional, add environment key to alert
     service: dns # optional, add service key to alert
     resource: microdevops.com # mandatory, resource name
-    group: check-whois-domain-expiration # optional, group (of events actually), useful to group alerts by check types in alerta web ui, `cmd_check_alert` value used if not set
+    group: dns # optional, by default we use group to select host in alerta ui, but dns is not related to any host in this case
     location: Cloudflare # optional, add location key to alert
     type: sensu-plugins # optional, add type key to alert
 {% endif %}

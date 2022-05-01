@@ -71,7 +71,6 @@ SEVERITY_MINOR = "minor"
 SEVERITY_MAJOR = "major"
 SEVERITY_CRITICAL = "critical"
 SELF_SERVICE = "heartbeat"
-SELF_GROUP = "heartbeat_mesh"
 SELF_HOSTNAME = socket.gethostname()
 SELF_ORIGIN = "heartbeat_mesh/receiver.py"
 NOTIFY_DEVILRY_SLEEP = 1 # 0.5 results in errors
@@ -158,7 +157,7 @@ def rare_checks_thread():
                 notify["service"] = notify_service
                 notify["resource"] = resource
                 notify["value"] = heartbeat_age_secs
-                notify["group"] = SELF_GROUP
+                notify["group"] = resource
                 notify["origin"] = SELF_ORIGIN
                 notify["attributes"] = {}
                 notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -186,7 +185,7 @@ def rare_checks_thread():
                 notify["service"] = SELF_SERVICE
                 notify["resource"] = resource
                 notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
-                notify["group"] = SELF_GROUP
+                notify["group"] = resource
                 notify["origin"] = SELF_ORIGIN
                 notify["attributes"] = {}
                 notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -211,7 +210,7 @@ def rare_checks_thread():
                 notify["service"] = SELF_SERVICE
                 notify["resource"] = resource
                 notify["value"] = (datetime.utcnow() - oldest_heartbeats[resource]).days
-                notify["group"] = SELF_GROUP
+                notify["group"] = resource
                 notify["origin"] = SELF_ORIGIN
                 notify["attributes"] = {}
                 notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -271,7 +270,7 @@ def rare_checks_thread():
                     notify["environment"] = notify_environment
                 notify["service"] = notify_service
                 notify["resource"] = resource
-                notify["group"] = SELF_GROUP
+                notify["group"] = resource
                 notify["origin"] = SELF_ORIGIN
                 notify["attributes"] = {}
                 notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -316,7 +315,7 @@ def frequent_checks_thread():
                 notify["resource"] = SELF_HOSTNAME
                 notify["event"] = "heartbeat_mesh_receiver_activity_ok"
                 notify["value"] = "ok"
-                notify["group"] = SELF_GROUP
+                notify["group"] = SELF_HOSTNAME
                 notify["text"] = "Heartbeats are being received"
                 notify["origin"] = SELF_ORIGIN
                 notify["correlate"] = ["heartbeat_mesh_receiver_activity_lost"]
@@ -334,7 +333,7 @@ def frequent_checks_thread():
                 notify["resource"] = SELF_HOSTNAME
                 notify["event"] = "heartbeat_mesh_receiver_activity_lost"
                 notify["value"] = "lost"
-                notify["group"] = SELF_GROUP
+                notify["group"] = SELF_HOSTNAME
                 notify["text"] = "No heartbeats registered on receiver host for more than check interval + jitter"
                 notify["origin"] = SELF_ORIGIN
                 notify["correlate"] = ["heartbeat_mesh_receiver_activity_ok"]
@@ -401,7 +400,7 @@ def frequent_checks_thread():
                     notify["service"] = notify_service
                     notify["resource"] = resource
                     notify["value"] = heartbeat_age_secs
-                    notify["group"] = SELF_GROUP
+                    notify["group"] = resource
                     notify["origin"] = SELF_ORIGIN
                     notify["attributes"] = {}
                     notify["attributes"]["receiver"] = SELF_HOSTNAME
@@ -435,7 +434,7 @@ def notify_thread():
             notify["resource"] = SELF_HOSTNAME
             notify["event"] = "heartbeat_mesh_receiver_queue_threshold_reached"
             notify["value"] = notify_queue.qsize()
-            notify["group"] = SELF_GROUP
+            notify["group"] = SELF_HOSTNAME
             notify["text"] = "Receiver notifications queue size reached threshold {threshold}, receiver exited abnormally".format(threshold=QUEUE_THRESHOLD)
             notify["origin"] = SELF_ORIGIN
             logger.error("Queue size {size} became bigger than threshold {threshold}, exiting".format(size=notify_queue.qsize(), threshold=QUEUE_THRESHOLD))
@@ -612,7 +611,7 @@ if __name__ == "__main__":
                         notify["resource"] = heartbeat["resource"]
                         notify["event"] = "heartbeat_mesh_heartbeat_deregistered"
                         notify["value"] = "deregistered"
-                        notify["group"] = SELF_GROUP
+                        notify["group"] = heartbeat["resource"]
                         notify["text"] = "Resource heartbeat deregistered"
                         notify["origin"] = SELF_ORIGIN
                         notify["attributes"] = {}
@@ -696,7 +695,7 @@ if __name__ == "__main__":
                             notify["resource"] = heartbeat["resource"]
                             notify["event"] = "heartbeat_mesh_heartbeat_new"
                             notify["value"] = "registered"
-                            notify["group"] = SELF_GROUP
+                            notify["group"] = heartbeat["resource"]
                             notify["text"] = "New resource heartbeat registered"
                             notify["origin"] = SELF_ORIGIN
                             notify["attributes"] = {}
@@ -750,7 +749,7 @@ if __name__ == "__main__":
                                 notify["resource"] = heartbeat["resource"]
                                 notify["event"] = "heartbeat_mesh_heartbeat_comeback"
                                 notify["value"] = "comeback"
-                                notify["group"] = SELF_GROUP
+                                notify["group"] = heartbeat["resource"]
                                 notify["text"] = "Heartbeat comeback registered after timeout"
                                 notify["origin"] = SELF_ORIGIN
                                 notify["attributes"] = {}
@@ -777,7 +776,7 @@ if __name__ == "__main__":
                                 notify["service"] = notify_service
                                 notify["resource"] = heartbeat["resource"]
                                 notify["value"] = 0
-                                notify["group"] = SELF_GROUP
+                                notify["group"] = heartbeat["resource"]
                                 notify["origin"] = SELF_ORIGIN
                                 notify["attributes"] = {}
                                 notify["attributes"]["receiver"] = SELF_HOSTNAME

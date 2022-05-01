@@ -31,7 +31,6 @@ function report {
     rsp+="\"resource\":\"$(hostname -f):mysql\","
     [[ ${stat} = "negative" ]] && rsp+="\"event\":\"mysql_replica_checker_error\","
     [[ ${stat} = "positive" ]] && rsp+="\"event\":\"mysql_replica_checker_ok\","
-    rsp+="\"group\":\"mysql_replica_checker\","
     rsp+="\"origin\":\"mysql_replica_checker.sh\","
     [[ ${stat} = "negative" ]] && rsp+="\"text\":\"Mysql replication error detected\","
     [[ ${stat} = "positive" ]] && rsp+="\"text\":\"Mysql replication ok detected\","

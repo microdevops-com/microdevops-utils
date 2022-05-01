@@ -65,7 +65,6 @@ FNULL = open(os.devnull, 'w')
 SEVERITY_OK = "ok"
 SEVERITY_WARNING = "warning"
 SELF_SERVICE = "cmd_check_alert"
-SELF_GROUP = "cmd_check_alert"
 SELF_HOSTNAME = socket.gethostname()
 SELF_ORIGIN = "cmd_check_alert.py"
 
@@ -231,10 +230,14 @@ if __name__ == "__main__":
                     notify["correlate"] = ["cmd_check_alert_cmd_ok", "cmd_check_alert_cmd_timeout"]
             notify["value"] = str(retcode)
 
-            # default group
-            notify["group"] = config["defaults"]["group"] if "group" in config["defaults"] else SELF_GROUP
             # override with in check
-            notify["group"] = check["group"] if "group" in check else SELF_GROUP
+            if "group" in check:
+                notify["group"] = check["group"]
+            # default group
+            elif "group" in config["defaults"]:
+                notify["group"] = config["defaults"]["group"]
+            else:
+                notify["group"] = SELF_HOSTNAME
 
             notify["attributes"] = {}
             notify["attributes"]["check name"] = name
@@ -392,7 +395,7 @@ if __name__ == "__main__":
             notify["resource"] = SELF_HOSTNAME
             notify["event"] = "cmd_check_alert_time_limit_warning"
             notify["value"] = "not ok"
-            notify["group"] = SELF_GROUP
+            notify["group"] = SELF_HOSTNAME
             notify["text"] = "Some cmd_check_alert checks on server {server} did not run because time left to total time limit is less than 1 second".format(server=SELF_HOSTNAME)
             notify["origin"] = SELF_ORIGIN
             notify["correlate"] = ["cmd_check_alert_time_limit_ok"]
@@ -406,7 +409,7 @@ if __name__ == "__main__":
             notify["resource"] = SELF_HOSTNAME
             notify["event"] = "cmd_check_alert_time_limit_ok"
             notify["value"] = "ok"
-            notify["group"] = SELF_GROUP
+            notify["group"] = SELF_HOSTNAME
             notify["text"] = "All cmd_check_alert checks on server {server} run in time limit".format(server=SELF_HOSTNAME)
             notify["origin"] = SELF_ORIGIN
             notify["correlate"] = ["cmd_check_alert_time_limit_warning"]
@@ -424,7 +427,7 @@ if __name__ == "__main__":
             notify["resource"] = SELF_HOSTNAME
             notify["event"] = "cmd_check_alert_same_resources_warning"
             notify["value"] = "not ok"
-            notify["group"] = SELF_GROUP
+            notify["group"] = SELF_HOSTNAME
             notify["text"] = "Some cmd_check_alert checks on server {server} did not run because they have same resource per environment and could overwrite events of each other".format(server=SELF_HOSTNAME)
             notify["origin"] = SELF_ORIGIN
             notify["correlate"] = ["cmd_check_alert_same_resources_ok"]
@@ -438,7 +441,7 @@ if __name__ == "__main__":
             notify["resource"] = SELF_HOSTNAME
             notify["event"] = "cmd_check_alert_same_resources_ok"
             notify["value"] = "ok"
-            notify["group"] = SELF_GROUP
+            notify["group"] = SELF_HOSTNAME
             notify["text"] = "All cmd_check_alert checks on server {server} have unique resource per environment".format(server=SELF_HOSTNAME)
             notify["origin"] = SELF_ORIGIN
             notify["correlate"] = ["cmd_check_alert_same_resources_warning"]

@@ -12,7 +12,6 @@ echo '{
 	"resource": "'$HOSTNAME'",
 	"event": "notify_devilry_test",
 	"value": "test",
-	"group": "notify_devilry",
 	"text": "Severity informational test alert sent with notify_devilry_test.sh",
 	"origin": "notify_devilry_test.sh",
 	"timeout": 300

@@ -81,9 +81,9 @@ _*_ - mandatory keys
   - `99%`
   - `5d`
   - `10d`
-- `group` - event group
-  - `notify_devilry`
-  - `cmd_check_alert`
+- `group` - we use this alerta ui filter for host selection
+  - `srv1.example.com` - host fqdn here for host specific alerts
+  - `dns` - something more generic for non-host specific alerts
 - `origin`
   - `heartbeat_mesh/receiver.py`
   - `disk_alert.sh`

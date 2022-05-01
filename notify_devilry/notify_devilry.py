@@ -46,7 +46,6 @@ LOGO="✉ ➔ ✂ ➔ ❓ ➔ ✌"
 NAME="notify_devilry"
 UT_NOW = int(time.time())
 MAX_INDENT = 100
-SELF_GROUP = "notify_devilry"
 SELF_ORIGIN = "notify_devilry.py"
 SELF_SERVICE = "notify_devilry"
 ALERTA_RETRIES = 3
@@ -203,7 +202,7 @@ def send_message(sending_method, sending_method_item_settings, message):
                             "resource": socket.gethostname(),
                             "event": "notify_devilry_alerta_send_error",
                             "value": str(type(e).__name__),
-                            "group": SELF_GROUP,
+                            "group": socket.gethostname(),
                             "origin": SELF_ORIGIN,
                             "text": str(e),
                             "attributes": {
@@ -291,13 +290,13 @@ def apply_defaults(msg):
         msg["value"] = ""
     if "service" not in msg:
         msg["service"] = ""
-    if "group" not in msg:
-        msg["group"] = ""
     if "origin" not in msg:
         msg["origin"] = ""
     if "text" not in msg:
         msg["text"] = ""
     # Defaults
+    if "group" not in msg:
+        msg["group"] = socket.gethostname() # use hostname for group filter in alerta ui by default
     if "type" not in msg:
         msg["type"] = "sysadmws-utils"
     if "environment" not in msg and "environment" in config["defaults"]:
@@ -388,7 +387,7 @@ if __name__ == "__main__":
                 "resource": socket.gethostname(),
                 "event": "notify_devilry_msg_read_failure",
                 "value": str(type(e).__name__),
-                "group": SELF_GROUP,
+                "group": socket.gethostname(),
                 "origin": SELF_ORIGIN,
                 "text": str(e)
             }
