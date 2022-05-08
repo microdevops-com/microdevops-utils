@@ -7,7 +7,7 @@ if [[ "${ID_LIKE}" = "debian" || "${ID}" = "debian" ]]; then
 	# Common utils
 	apt-get -qy -o 'DPkg::Options::=--force-confold' -o 'DPkg::Options::=--force-confdef' install gawk rsnapshot jq
 	# Python
-	if [[ "${UBUNTU_CODENAME}" = "focal" || "${VERSION_CODENAME}" = "bullseye" ]]; then
+	if [[ "${UBUNTU_CODENAME}" = "focal" || "${UBUNTU_CODENAME}" = "jammy" || "${VERSION_CODENAME}" = "bullseye" ]]; then
 		apt-get -qy -o 'DPkg::Options::=--force-confold' -o 'DPkg::Options::=--force-confdef' install python3 python3-yaml python3-jinja2 python3-zmq
 		# Install python-is-python3 if python2 is not installed
 		if ! which python; then
