@@ -23,6 +23,7 @@ if [ -f $CONF_FILE ]; then
 				"/home"
 				"/root"
 				"/var/spool/cron"
+				"/var/lib/dpkg"
 				"/usr/local"
 				"/opt/sysadmws")
 			elif [[ "$LOCAL_PATH" = "DEBIAN" ]]; then
@@ -30,6 +31,7 @@ if [ -f $CONF_FILE ]; then
 				"/home"
 				"/root"
 				"/var/spool/cron"
+				"/var/lib/dpkg"
 				"/usr/local"
 				"/opt/sysadmws")
 			elif [[ "$LOCAL_PATH" = "CENTOS" ]]; then
@@ -37,6 +39,7 @@ if [ -f $CONF_FILE ]; then
 				"/home"
 				"/root"
 				"/var/spool/cron"
+				"/var/lib/rpm"
 				"/usr/local"
 				"/opt/sysadmws")
 			else
