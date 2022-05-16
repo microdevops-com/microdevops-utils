@@ -71,7 +71,7 @@ function print_timestamp() {
 		}
 
 		# Print some stats
-		if (show_notices >= 1) {
+		if (show_notices == 1) {
 			print_timestamp();
 			printf("NOTICE: Dir stats: " host_name host_path " ");
 			daily_check_dir = gensub("/.sync/", "/daily.1/", "g", check_dir);
