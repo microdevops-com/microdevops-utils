@@ -152,7 +152,7 @@ make_deb_v1:
     # Prepare control
     cat deb/control | sed -e "s#__VERSION__#$NEW_VERSION#" -e "s#__SIZE__#$SIZE#" > builds/v1/deb/sysadmws-utils-v1/DEBIAN/control
     # Make deb
-    ( cd builds/v1/deb && fakeroot dpkg-deb -b sysadmws-utils-v1 )
+    ( cd builds/v1/deb && fakeroot dpkg-deb -Zgzip -b sysadmws-utils-v1 )
 
 make_tgz_v1:
   tags:
