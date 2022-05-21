@@ -64,6 +64,7 @@ START_TIME = datetime.now()
 FNULL = open(os.devnull, 'w')
 SEVERITY_OK = "ok"
 SEVERITY_WARNING = "warning"
+SEVERITY_MAJOR = "major"
 SELF_SERVICE = "cmd_check_alert"
 SELF_HOSTNAME = socket.gethostname()
 SELF_ORIGIN = "cmd_check_alert.py"
@@ -215,8 +216,11 @@ if __name__ == "__main__":
                 elif "severity" in check:
                     notify["severity"] = check["severity"]
                 # severity in defaults
-                else:
+                elif "severity" in config["defaults"]:
                     notify["severity"] = config["defaults"]["severity"]
+                # fallback to major severity in the end
+                else:
+                    notify["severity"] = SEVERITY_MAJOR
             notify["resource"] = check["resource"].replace("__hostname__", SELF_HOSTNAME)
             if name in timedout_checks:
                 notify["event"] = "cmd_check_alert_cmd_timeout"
