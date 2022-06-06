@@ -1,3 +1,6 @@
+# Override hostname, by default `hostname -f` is used
+# HOSTNAME_OVERRIDE=srv1.example.com
+
 # Lines to grep from df, default is:
 #DISK_ALERT_FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs"
 

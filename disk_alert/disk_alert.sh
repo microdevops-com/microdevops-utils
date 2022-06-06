@@ -3,7 +3,6 @@
 # Set vars
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 if [[ "$LANG" != "en_US.UTF-8" ]]; then export LANG=C ; fi
-HOSTNAME=$(hostname -f)
 DATE=$(date '+%F %T')
 declare -A DISK_ALERT_PERCENT_CRITICAL
 declare -A DISK_ALERT_PERCENT_WARNING
@@ -21,7 +20,18 @@ if [ -f /opt/sysadmws/disk_alert/disk_alert.conf ]; then
 	. /opt/sysadmws/disk_alert/disk_alert.conf
 fi
 
+# Optional first arg - random sleep up to arg value
+if [[ -n "$1" ]]; then
+	sleep $((RANDOM % $1))
+fi
+
 # Check defaults
+if [[ -n "${HOSTNAME_OVERRIDE}" ]]; then
+	HOSTNAME=${HOSTNAME_OVERRIDE}
+else
+	HOSTNAME=$(hostname -f)
+fi
+#
 if [[ _$DISK_ALERT_FILTER != "_" ]]; then
 	FILTER=$DISK_ALERT_FILTER
 else
