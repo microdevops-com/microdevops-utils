@@ -296,7 +296,10 @@ def apply_defaults(msg):
         msg["text"] = ""
     # Defaults
     if "group" not in msg:
-        msg["group"] = socket.gethostname() # use hostname for group filter in alerta ui by default
+        if "group" in config["defaults"]:
+            msg["group"] = config["defaults"]["group"] # for override purposes
+        else:
+            msg["group"] = socket.gethostname() # use hostname for group filter in alerta ui by default
     if "type" not in msg:
         msg["type"] = "sysadmws-utils"
     if "environment" not in msg and "environment" in config["defaults"]:
