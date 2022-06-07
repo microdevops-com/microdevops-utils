@@ -1,5 +1,7 @@
 enabled: True
 
+#hostname_override: srv1.example.com # optional, override hostname taken from socket.gethostname()
+
 limits:
   time: 300 # total time limit for all checks to avoid check queue infinite growth, use 300 seconds if runned every 5 minute
   threads: 5 # concurrant checks limit

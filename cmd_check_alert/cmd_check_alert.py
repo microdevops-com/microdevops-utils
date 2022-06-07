@@ -66,7 +66,6 @@ SEVERITY_OK = "ok"
 SEVERITY_WARNING = "warning"
 SEVERITY_MAJOR = "major"
 SELF_SERVICE = "cmd_check_alert"
-SELF_HOSTNAME = socket.gethostname()
 SELF_ORIGIN = "cmd_check_alert.py"
 
 # Funcs
@@ -157,6 +156,12 @@ if __name__ == "__main__":
             sys.exit(1)
 
         logger.info("Starting {name}".format(name=NAME))
+
+        # Set SELF_HOSTNAME
+        if "hostname_override" in config:
+            SELF_HOSTNAME = config["hostname_override"]
+        else:
+            SELF_HOSTNAME = socket.gethostname()
 
         check_procs = {}
         check_threads = {}
