@@ -122,7 +122,7 @@ if __name__ == "__main__":
             logger.info("{name} not enabled in config, exiting".format(name=NAME))
             sys.exit(0)
 
-        logger.info("Starting heartbeat_mesh sender")
+        logger.info("Starting {name}".format(name=NAME))
 
         # Start 0MQ
         logger.info("0MQ version {version}".format(version=zmq.pyzmq_version()))
