@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# .sh + .awk scripts are in state of deprecation, use rsnapshot_backup.py
+
 # Check AWK version
 if [ `awk --version | head -1 | sed -e 's/GNU Awk //' -e 's/\..*//'` -lt 4 ]; then
 	date '+%F %T ' | tr -d '\n' >&2
