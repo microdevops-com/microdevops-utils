@@ -1,5 +1,8 @@
-#!/opt/sysadmws/misc/shebang_python_switcher.sh
+#!/opt/sysadmws/misc/shebang_python_switcher.sh -u
 # -*- coding: utf-8 -*-
+
+# -u - for unbuffered output https://docs.python.org/2/using/cmdline.html#cmdoption-u
+# Otherwise output is getting mixed in pipelines
 
 import os
 import sys
@@ -224,6 +227,15 @@ if __name__ == "__main__":
                     if "mongo_args" not in item:
                         item["mongo_args"] = ""
 
+                    if "xtrabackup_throttle" not in item:
+                        item["xtrabackup_throttle"] = "20" # 20 MB IO limit by default https://www.percona.com/doc/percona-xtrabackup/2.3/advanced/throttling_backups.html
+                    if "xtrabackup_parallel" not in item:
+                        item["xtrabackup_parallel"] = "2"
+                    if "xtrabackup_compress_threads" not in item:
+                        item["xtrabackup_compress_threads"] = "2"
+                    if "xtrabackup_args" not in item:
+                        item["xtrabackup_args"] = ""
+
                     # Check before_backup_check and skip item if failed
                     # It is needed for both rotations and sync
                     if "before_backup_check" in item:
@@ -424,7 +436,7 @@ if __name__ == "__main__":
 
                             if item["type"] in ["MYSQL_SSH", "POSTGRESQL_SSH", "MONGODB_SSH"]:
 
-                                # Excludes os dbs
+                                # Generic grep filter for excludes
                                 if "exclude" in item:
                                     grep_db_filter = "| grep -v"
                                     for db_to_exclude in item["exclude"]:
@@ -434,67 +446,142 @@ if __name__ == "__main__":
 
                                 if item["type"] == "MYSQL_SSH":
 
-                                    if item["source"] == "ALL":
-                                        script_dump_part = textwrap.dedent(
-                                            """\
-                                            mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
-                                            for db in $(cat {mysql_dump_dir}/db_list.txt); do
-                                                    if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
-                                                            mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/$db.gz
-                                                    fi
-                                            done
-                                            """
-                                        ).format(
-                                            mysql_dump_dir=item["mysql_dump_dir"],
-                                            mysql_events="" if item["mysql_noevents"] else "--events",
-                                            mysqldump_args=item["mysqldump_args"],
-                                            grep_db_filter=grep_db_filter
-                                        )
-                                    else:
-                                        script_dump_part = textwrap.dedent(
-                                            """\
-                                            if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
-                                                    mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/{source}.gz
-                                            fi
-                                            """
-                                        ).format(
-                                            mysql_dump_dir=item["mysql_dump_dir"],
-                                            mysql_events="" if item["mysql_noevents"] else "--events",
-                                            mysqldump_args=item["mysqldump_args"],
-                                            grep_db_filter=grep_db_filter,
-                                            source=item["source"]
-                                        )
+                                    if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup":
 
-                                    # If hourly retains are used keep dumps only for 59 minutes
-                                    script = textwrap.dedent(
-                                        """\
-                                        #!/bin/bash
-                                        set -e
+                                        if "exclude" in item:
+                                            databases_exclude = "--databases-exclude=\""
+                                            databases_exclude += " ".join(item["exclude"])
+                                            databases_exclude += "\""
+                                        else:
+                                            databases_exclude = ""
 
-                                        ssh {ssh_args} -p {port} {user}@{host} '
-                                            set -x
+                                        if item["source"] == "ALL":
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                if [[ ! -d {mysql_dump_dir}/all.xtrabackup ]]; then
+                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | grep -v -e "log scanned up to" -e "Skipping"
+                                                fi
+                                                """
+                                            ).format(
+                                                xtrabackup_throttle=item["xtrabackup_throttle"],
+                                                xtrabackup_parallel=item["xtrabackup_parallel"],
+                                                xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                databases_exclude=databases_exclude,
+                                                xtrabackup_args=item["xtrabackup_args"]
+                                            )
+                                        else:
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                if [[ ! -d {mysql_dump_dir}/{source}.xtrabackup ]]; then
+                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | grep -v -e "log scanned up to" -e "Skipping"
+                                                fi
+                                                """
+                                            ).format(
+                                                xtrabackup_throttle=item["xtrabackup_throttle"],
+                                                xtrabackup_parallel=item["xtrabackup_parallel"],
+                                                xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                source=item["source"],
+                                                xtrabackup_args=item["xtrabackup_args"]
+                                            )
+
+                                        # If hourly retains are used keep dumps only for 59 minutes
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
                                             set -e
-                                            mkdir -p {mysql_dump_dir}
-                                            chmod 700 {mysql_dump_dir}
-                                            while [[ -d {mysql_dump_dir}/dump.lock ]]; do
-                                                    sleep 5
-                                            done
-                                            mkdir {mysql_dump_dir}/dump.lock
-                                            trap "rm -rf {mysql_dump_dir}/dump.lock" 0
-                                            cd {mysql_dump_dir}
-                                            find {mysql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
-                                            {script_dump_part}
-                                        '
-                                        """
-                                    ).format(
-                                        ssh_args=ssh_args,
-                                        port=item["connect_port"],
-                                        user=item["connect_user"],
-                                        host=item["connect_host"],
-                                        mysql_dump_dir=item["mysql_dump_dir"],
-                                        mmin="59" if "retain_hourly" in item else "720",
-                                        script_dump_part=script_dump_part
-                                    )
+
+                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                                set -x
+                                                set -e
+                                                set -o pipefail
+                                                mkdir -p {mysql_dump_dir}
+                                                chmod 700 {mysql_dump_dir}
+                                                while [[ -d {mysql_dump_dir}/dump.lock ]]; do
+                                                        sleep 5
+                                                done
+                                                mkdir {mysql_dump_dir}/dump.lock
+                                                trap "rm -rf {mysql_dump_dir}/dump.lock" 0
+                                                cd {mysql_dump_dir}
+                                                find {mysql_dump_dir} -type d -name "*.xtrabackup" -mmin +{mmin} -exec rm -rf {{}} +
+                                                {script_dump_part}
+                                            '
+                                            """
+                                        ).format(
+                                            ssh_args=ssh_args,
+                                            port=item["connect_port"],
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            mysql_dump_dir=item["mysql_dump_dir"],
+                                            mmin="59" if "retain_hourly" in item else "720",
+                                            script_dump_part=script_dump_part
+                                        )
+
+                                    else:
+
+                                        if item["source"] == "ALL":
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
+                                                for db in $(cat {mysql_dump_dir}/db_list.txt); do
+                                                        if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
+                                                                mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/$db.gz
+                                                        fi
+                                                done
+                                                """
+                                            ).format(
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                mysql_events="" if item["mysql_noevents"] else "--events",
+                                                mysqldump_args=item["mysqldump_args"],
+                                                grep_db_filter=grep_db_filter
+                                            )
+                                        else:
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
+                                                        mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/{source}.gz
+                                                fi
+                                                """
+                                            ).format(
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                mysql_events="" if item["mysql_noevents"] else "--events",
+                                                mysqldump_args=item["mysqldump_args"],
+                                                grep_db_filter=grep_db_filter,
+                                                source=item["source"]
+                                            )
+
+                                        # If hourly retains are used keep dumps only for 59 minutes
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+
+                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                                set -x
+                                                set -e
+                                                set -o pipefail
+                                                mkdir -p {mysql_dump_dir}
+                                                chmod 700 {mysql_dump_dir}
+                                                while [[ -d {mysql_dump_dir}/dump.lock ]]; do
+                                                        sleep 5
+                                                done
+                                                mkdir {mysql_dump_dir}/dump.lock
+                                                trap "rm -rf {mysql_dump_dir}/dump.lock" 0
+                                                cd {mysql_dump_dir}
+                                                find {mysql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
+                                                {script_dump_part}
+                                            '
+                                            """
+                                        ).format(
+                                            ssh_args=ssh_args,
+                                            port=item["connect_port"],
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            mysql_dump_dir=item["mysql_dump_dir"],
+                                            mmin="59" if "retain_hourly" in item else "720",
+                                            script_dump_part=script_dump_part
+                                        )
 
                                 if item["type"] == "POSTGRESQL_SSH":
 
@@ -538,6 +625,7 @@ if __name__ == "__main__":
                                         ssh {ssh_args} -p {port} {user}@{host} '
                                             set -x
                                             set -e
+                                            set -o pipefail
                                             mkdir -p {postgresql_dump_dir}
                                             chmod 700 {postgresql_dump_dir}
                                             while [[ -d {postgresql_dump_dir}/dump.lock ]]; do
@@ -607,6 +695,7 @@ if __name__ == "__main__":
                                         ssh {ssh_args} -p {port} {user}@{host} '
                                             set -x
                                             set -e
+                                            set -o pipefail
                                             mkdir -p {mongodb_dump_dir}
                                             chmod 700 {mongodb_dump_dir}
                                             while [[ -d {mongodb_dump_dir}/dump.lock ]]; do
@@ -645,16 +734,29 @@ if __name__ == "__main__":
                                 # Remove partially downloaded dumps
                                 log_and_print("NOTICE", "Removing partially downloaded dummps if any on item number {number}:".format(number=item["number"]), logger)
                                 if item["type"] == "MYSQL_SSH":
-                                    script = textwrap.dedent(
-                                        """\
-                                        #!/bin/bash
-                                        set -e
-                                        rm -f {snapshot_root}/.sync/rsnapshot{mysql_dump_dir}/.*.gz.*
-                                        """
-                                    ).format(
-                                        snapshot_root=item["path"],
-                                        mysql_dump_dir=item["mysql_dump_dir"]
-                                    )
+                                    if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup":
+                                        # For now we don't know what to do with xtrabackup
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            #empty
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            mysql_dump_dir=item["mysql_dump_dir"]
+                                        )
+                                    else:
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            rm -f {snapshot_root}/.sync/rsnapshot{mysql_dump_dir}/.*.gz.*
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            mysql_dump_dir=item["mysql_dump_dir"]
+                                        )
                                 if item["type"] == "POSTGRESQL_SSH":
                                     script = textwrap.dedent(
                                         """\
@@ -725,12 +827,14 @@ if __name__ == "__main__":
                                     )
 
                             if item["type"] == "MYSQL_SSH":
+                                # We do not need rsync compression as xtrabackup dumps are already compressed
+                                # With compress it takes 10-12 times longer
                                 conf_backup_lines += conf_backup_line_template.format(
                                     user=item["connect_user"],
                                     host=item["connect_host"],
                                     source=item["mysql_dump_dir"],
-                                    tab_before_rsync_long_args="",
-                                    rsync_long_args=""
+                                    tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup" else "",
+                                    rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup" else ""
                                 )
                             if item["type"] == "POSTGRESQL_SSH":
                                 conf_backup_lines += conf_backup_line_template.format(
