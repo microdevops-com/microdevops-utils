@@ -455,11 +455,13 @@ if __name__ == "__main__":
                                         else:
                                             databases_exclude = ""
 
+                                        xtrabackup_output_filter = 'grep -v -e "log scanned up to" -e "Skipping" -e "Compressing" -e "...done"'
+
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/all.xtrabackup ]]; then
-                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | grep -v -e "log scanned up to" -e "Skipping"
+                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -468,13 +470,14 @@ if __name__ == "__main__":
                                                 xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 databases_exclude=databases_exclude,
-                                                xtrabackup_args=item["xtrabackup_args"]
+                                                xtrabackup_args=item["xtrabackup_args"],
+                                                xtrabackup_output_filter=xtrabackup_output_filter
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/{source}.xtrabackup ]]; then
-                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | grep -v -e "log scanned up to" -e "Skipping"
+                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -483,7 +486,8 @@ if __name__ == "__main__":
                                                 xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 source=item["source"],
-                                                xtrabackup_args=item["xtrabackup_args"]
+                                                xtrabackup_args=item["xtrabackup_args"],
+                                                xtrabackup_output_filter=xtrabackup_output_filter
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -735,12 +739,11 @@ if __name__ == "__main__":
                                 log_and_print("NOTICE", "Removing partially downloaded dummps if any on item number {number}:".format(number=item["number"]), logger)
                                 if item["type"] == "MYSQL_SSH":
                                     if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup":
-                                        # For now we don't know what to do with xtrabackup
                                         script = textwrap.dedent(
                                             """\
                                             #!/bin/bash
                                             set -e
-                                            #empty
+                                            find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -delete
                                             """
                                         ).format(
                                             snapshot_root=item["path"],
