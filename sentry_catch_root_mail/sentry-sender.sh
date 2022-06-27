@@ -27,7 +27,7 @@ eval "\$(/usr/local/bin/sentry-cli bash-hook)"
 
 # WIPE LOG FILE IF SIZE GREATER THAN 1M
 if [[ \$(wc -c < ${logfile}) -ge 1000000 ]]; then
-        echo > "${logfile}
+        echo > "${logfile}"
 fi
 
 # LOG TEMP-SENDER MAIN COMMAND LINE
