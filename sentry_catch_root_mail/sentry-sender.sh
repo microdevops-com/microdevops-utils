@@ -25,10 +25,9 @@ cat << EOF > "${TMP_SENDER}"
 #!/bin/bash
 eval "\$(/usr/local/bin/sentry-cli bash-hook)"
 
-# WIPE LOG FILE
-actualsize=\$(wc -c < ${logfile})
-if [[ \$actualsize -ge 1000000 ]]; then
-    echo > "${logfile}"
+# WIPE LOG FILE IF SIZE GREATER THAN 1M
+if [[ \$(wc -c < ${logfile}) -ge 1000000 ]]; then
+        echo > "${logfile}
 fi
 
 # LOG TEMP-SENDER MAIN COMMAND LINE
