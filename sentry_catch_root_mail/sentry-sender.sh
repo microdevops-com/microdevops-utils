@@ -24,6 +24,13 @@ TMP_SENDER="$(mktemp /tmp/sender.XXXXXXXXX.sh)"
 cat << EOF > "${TMP_SENDER}"
 #!/bin/bash
 eval "\$(/usr/local/bin/sentry-cli bash-hook)"
+
+# WIPE LOG FILE
+actualsize=\$(wc -c < ${logfile})
+if [[ \$actualsize -ge 1000000 ]]; then
+    echo > "${logfile}"
+fi
+
 # LOG TEMP-SENDER MAIN COMMAND LINE
 echo "/usr/local/bin/sentry-cli send-event -t host:$(hostname -f) ${subject} ${lines}" | sed 's/-m/\\\ \n -m/g;s/-t/\n -t/g' >> "${logfile}"
 echo >> "${logfile}"
