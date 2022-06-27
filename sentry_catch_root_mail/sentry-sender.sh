@@ -1,7 +1,6 @@
 #!/bin/bash
 eval "$(/usr/local/bin/sentry-cli bash-hook)"
 logfile=/opt/sysadmws/sentry_catch_root_mail/log/sentry-cli.log
-touch "${logfile}"
 
 if [[ ! -f /opt/sysadmws/sentry_catch_root_mail/sentry.properties ]]; then
         echo 'Sentry settings file /opt/sysadmws/sentry_catch_root_mail/sentry.properties does not exist'
