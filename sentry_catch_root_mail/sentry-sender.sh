@@ -24,6 +24,7 @@ if [[ "$(wc -c < ${logfile})" -ge 1000000 ]]; then
         echo > "${logfile}"
 fi
 # LOG MAIN COMMAND LINE
+#echo "/usr/local/bin/sentry-cli send-event \ -t host:$(hostname -f) ${subject} ${lines}" | sed 's/-m/\\\ \n -m/g;s/-t/\n -t/g' >> "${logfile}"
 echo "/usr/local/bin/sentry-cli send-event -t host:$(hostname -f) -m ${subject:-${0}} --logfile ${TMP_BREADCRUMBS}" >> "${logfile}"
 
 # TEMP-SENDER PATH
