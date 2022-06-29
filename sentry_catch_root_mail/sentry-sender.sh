@@ -10,7 +10,7 @@ export SENTRY_PROPERTIES=/opt/sysadmws/sentry_catch_root_mail/sentry.properties
 TMP_BREADCRUMBS="$(mktemp /tmp/breadcrumbs.XXXXXXXXX.log)"
 while IFS= read line; do
         key=$(echo "${line}" | sed -E 's/([^:]*).*/\1/g')
-        val=$(echo "${line}" | sed -E 's/([^:]*): (.*)/\2/g;s|["'\'']||g')
+        val=$(echo "${line}" | sed -E 's/([^:]*): (.*)/\2/g;s/["'\'']//g')
         if [[ "${key}" == "Subject" ]]; then
                 subject="'${val}'"
                 continue;
