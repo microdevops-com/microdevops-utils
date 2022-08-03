@@ -93,6 +93,7 @@ def check_slave(config, status_slave):
             if not (value is not None and value == status_ok[key]):
                 errors.append(key.lower().replace("_", "-"))
 
+    # add channel-name value to message
     if "Channel_Name" in status_slave.keys():
         message.update({"channel-name": status_slave["Channel_Name"]})
 
