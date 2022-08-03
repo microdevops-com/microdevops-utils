@@ -55,6 +55,7 @@ make_deb_v1:
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log
     # mysql_replica_checker
     cp mysql_replica_checker/mysql_replica_checker.sh \
+       mysql_replica_checker/mysql_replica_checker.py \
        mysql_replica_checker/mysql_replica_checker.cron \
        mysql_replica_checker/mysql_replica_checker.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker
