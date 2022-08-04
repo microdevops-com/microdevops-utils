@@ -1,10 +1,14 @@
 #!/opt/sysadmws/misc/shebang_python_switcher.sh
-import MySQLdb, MySQLdb.cursors
 import json
 import os
 import socket
 import subprocess
+import sys
 
+try:
+    import MySQLdb, MySQLdb.cursors
+except:
+    sys.exit(65)
 
 def read_config():
     pwd = os.path.abspath(os.getcwd())
