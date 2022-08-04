@@ -9,16 +9,17 @@
 ###########################################################
 
 #set -x
-
 if [[ -f /root/.redis ]]; then
   source /root/.redis
   if [[ $(redis-cli -a ${AUTH} --no-auth-warning PING 2>/dev/null) == "PONG" ]]; then
       if [[ $(redis-cli -a ${AUTH} --no-auth-warning INFO | grep -oP  "rejected_connections:\K\d+") -eq 0 ]]; then
       true;
     else
+      echo "$(redis-cli -a ${AUTH} --no-auth-warning INFO | grep rejected_connections)"
       false;
     fi;
   else
+    echo "Can't connect to Redis Server"
     false;
   fi;
 else
