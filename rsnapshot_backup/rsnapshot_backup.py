@@ -236,6 +236,17 @@ if __name__ == "__main__":
                     if "xtrabackup_args" not in item:
                         item["xtrabackup_args"] = ""
 
+                    if "mysqlsh_connect_args" not in item:
+                        item["mysqlsh_connect_args"] = ""
+                    if "mysqlsh_args" not in item:
+                        item["mysqlsh_args"] = ""
+                    if "mysqlsh_max_rate" not in item:
+                        item["mysqlsh_max_rate"] = "20M" # 20 MB IO limit by default
+                    if "mysqlsh_bytes_per_chunk" not in item:
+                        item["mysqlsh_bytes_per_chunk"] = "100M"
+                    if "mysqlsh_threads" not in item:
+                        item["mysqlsh_threads"] = "2"
+
                     # Check before_backup_check and skip item if failed
                     # It is needed for both rotations and sync
                     if "before_backup_check" in item:
@@ -522,6 +533,79 @@ if __name__ == "__main__":
                                             script_dump_part=script_dump_part
                                         )
 
+                                    elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
+
+                                        if "exclude" in item:
+                                            databases_exclude = "--excludeSchemas="
+                                            databases_exclude += ",".join(item["exclude"])
+                                        else:
+                                            databases_exclude = ""
+
+                                        if item["source"] == "ALL":
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                if [[ ! -d {mysql_dump_dir}/all.mysqlsh ]]; then
+                                                        mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args}
+                                                fi
+                                                """
+                                            ).format(
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                mysqlsh_connect_args=item["mysqlsh_connect_args"],
+                                                mysqlsh_max_rate=item["mysqlsh_max_rate"],
+                                                mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
+                                                mysqlsh_threads=item["mysqlsh_threads"],
+                                                databases_exclude=databases_exclude,
+                                                mysqlsh_args=item["mysqlsh_args"]
+                                            )
+                                        else:
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                if [[ ! -d {mysql_dump_dir}/{source}.mysqlsh ]]; then
+                                                        mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args}
+                                                fi
+                                                """
+                                            ).format(
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                source=item["source"],
+                                                mysqlsh_connect_args=item["mysqlsh_connect_args"],
+                                                mysqlsh_max_rate=item["mysqlsh_max_rate"],
+                                                mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
+                                                mysqlsh_threads=item["mysqlsh_threads"],
+                                                mysqlsh_args=item["mysqlsh_args"]
+                                            )
+
+                                        # If hourly retains are used keep dumps only for 59 minutes
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+
+                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                                set -x
+                                                set -e
+                                                set -o pipefail
+                                                mkdir -p {mysql_dump_dir}
+                                                chmod 700 {mysql_dump_dir}
+                                                while [[ -d {mysql_dump_dir}/dump.lock ]]; do
+                                                        sleep 5
+                                                done
+                                                mkdir {mysql_dump_dir}/dump.lock
+                                                trap "rm -rf {mysql_dump_dir}/dump.lock" 0
+                                                cd {mysql_dump_dir}
+                                                find {mysql_dump_dir} -type d -name "*.mysqlsh" -mmin +{mmin} -exec rm -rf {{}} +
+                                                {script_dump_part}
+                                            '
+                                            """
+                                        ).format(
+                                            ssh_args=ssh_args,
+                                            port=item["connect_port"],
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            mysql_dump_dir=item["mysql_dump_dir"],
+                                            mmin="59" if "retain_hourly" in item else "720",
+                                            script_dump_part=script_dump_part
+                                        )
+
                                     else:
 
                                         if item["source"] == "ALL":
@@ -743,7 +827,22 @@ if __name__ == "__main__":
                                             """\
                                             #!/bin/bash
                                             set -e
-                                            find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -delete
+                                            if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -delete
+                                            fi
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            mysql_dump_dir=item["mysql_dump_dir"]
+                                        )
+                                    elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.zst" -delete
+                                            fi
                                             """
                                         ).format(
                                             snapshot_root=item["path"],
@@ -830,14 +929,14 @@ if __name__ == "__main__":
                                     )
 
                             if item["type"] == "MYSQL_SSH":
-                                # We do not need rsync compression as xtrabackup dumps are already compressed
+                                # We do not need rsync compression as xtrabackup or mysqlsh dumps are already compressed
                                 # With compress it takes 10-12 times longer
                                 conf_backup_lines += conf_backup_line_template.format(
                                     user=item["connect_user"],
                                     host=item["connect_host"],
                                     source=item["mysql_dump_dir"],
-                                    tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup" else "",
-                                    rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup" else ""
+                                    tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
+                                    rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
                                 )
                             if item["type"] == "POSTGRESQL_SSH":
                                 conf_backup_lines += conf_backup_line_template.format(

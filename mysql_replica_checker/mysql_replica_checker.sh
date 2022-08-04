@@ -1,6 +1,14 @@
 #!/bin/bash
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+pyver="$(dirname $(readlink -f $0))/mysql_replica_checker.py"
+if [[ -f "${pyver}" ]]; then
+        ${pyver}
+        if [[ $? -eq 0 ]]; then
+            exit
+        fi
+fi
+
 function report {
     local data=${1}
     local master=${2}
