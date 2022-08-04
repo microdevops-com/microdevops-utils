@@ -16,6 +16,9 @@ if [[ -f /root/.redis ]]; then
       true;
     else
       echo "$(redis-cli -a ${AUTH} --no-auth-warning INFO | grep rejected_connections)"
+      echo ""
+      echo "To reset the counter 'rejected_connections' run on the server:"
+      echo "source /root/.redis; redis-cli -a \${AUTH} --no-auth-warning  config resetstat"
       false;
     fi;
   else
@@ -27,9 +30,14 @@ else
     if [[ $(redis-cli INFO | grep -oP  "rejected_connections:\K\d+") -eq 0 ]]; then
       true;
     else
+      echo "$(redis-cli INFO | grep rejected_connections)"
+      echo ""
+      echo "To reset the counter 'rejected_connections' run on the server:"
+      echo "redis-cli config resetstat"
       false;
     fi;
   else
+    echo "Can't connect to Redis Server"
     false;
   fi;
 fi
