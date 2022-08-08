@@ -10,6 +10,7 @@ try:
 except:
     sys.exit(65)
 
+
 def read_config():
     pwd = os.path.abspath(os.getcwd())
     configfile = pwd + "/mysql_replica_checker.conf"
@@ -43,12 +44,18 @@ def read_config():
 
 
 def fetch_mysql_status(config):
-    con = MySQLdb.connect(read_default_file=config.get("MY_CRED", ""))
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("show slave status")
-    status = cur.fetchall()
-    con.close()
-    return status
+    try:
+        con = MySQLdb.connect(read_default_file=config.get("MY_CRED", ""))
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("show slave status")
+        status = cur.fetchall()
+        con.close()
+        return status
+    except Exception as e:
+        if len(e.args) > 1 and isinstance(e.args[0], int) and e.args[0] == 2002:
+            sys.exit(0)
+        else:
+            raise
 
 
 def check_slave(config, status_slave):
