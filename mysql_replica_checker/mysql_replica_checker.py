@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import sys
+import warnings
 
 try:
     import MySQLdb, MySQLdb.cursors
@@ -44,6 +45,7 @@ def read_config():
 
 
 def fetch_mysql_status(config):
+    warnings.filterwarnings("ignore", category = MySQLdb.Warning)
     try:
         con = MySQLdb.connect(read_default_file=config.get("MY_CRED", ""))
         cur = con.cursor(MySQLdb.cursors.DictCursor)
