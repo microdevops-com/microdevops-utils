@@ -13,7 +13,7 @@ except:
 
 
 def read_config():
-    pwd = os.path.abspath(os.getcwd())
+    pwd = os.path.dirname(os.path.abspath(__file__))
     configfile = pwd + "/mysql_replica_checker.conf"
 
     config = {"BEHIND_MASTER_THR": 30, "MY_CRED": "~/.my.cnf"}
