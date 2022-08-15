@@ -45,7 +45,7 @@ def read_config():
 
 
 def fetch_mysql_status(config):
-    warnings.filterwarnings("ignore", category = MySQLdb.Warning)
+    warnings.filterwarnings("ignore", category=MySQLdb.Warning)
     try:
         con = MySQLdb.connect(read_default_file=config.get("MY_CRED", ""))
         cur = con.cursor(MySQLdb.cursors.DictCursor)
@@ -88,8 +88,13 @@ def check_slave(config, status_slave):
         if key == "Seconds_Behind_Master":
             value = status_slave.get(key, None)
             sql_delay = status_slave.get("SQL_Delay", None)
-            message.update({key.lower().replace("_", "-"): value})
-            message.update({"sql-delay": sql_delay})
+            message.update(
+                {
+                    "seconds-behind-master-trh": status_ok[key],
+                    "seconds-behind-master": value,
+                    "sql-delay": sql_delay,
+                }
+            )
             if (
                 value is not None
                 and isinstance(value, int)
@@ -97,7 +102,7 @@ def check_slave(config, status_slave):
                 and isinstance(sql_delay, int)
             ):
                 if not (0 <= value - sql_delay <= status_ok[key]):
-                    errors.append(key.lower().replace("_", "-"))
+                    errors.append("seconds-behind-master")
 
         # process simple statuses
         else:
