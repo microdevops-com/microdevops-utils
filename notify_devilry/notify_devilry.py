@@ -318,6 +318,18 @@ def apply_defaults(msg):
     msg["force_send"] = force_send
     return msg
 
+def suppress_oserror(f):
+    def inner(*args, **kwargs):
+        try:
+            f(*args, **kwargs)
+        except OSError as e:
+            if e.errno == 2:
+                pass
+            else:
+                raise
+    return inner
+RotatingFileHandler.doRollover = suppress_oserror(RotatingFileHandler.doRollover)
+
 if __name__ == "__main__":
 
     # Set default encoding for python 2.x (no need in python 3.x)
