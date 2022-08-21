@@ -16,6 +16,9 @@ import socket
 import lockfile
 import time
 import subprocess
+import re
+import gzip
+import tarfile
 
 # Constants
 LOGO="rsnapshot_backup"
@@ -28,6 +31,11 @@ SELF_HOSTNAME = socket.gethostname()
 LOCK_FILE = "/run/rsnapshot_backup"
 RSNAPSHOT_CONF = "/opt/sysadmws/rsnapshot_backup/rsnapshot.conf"
 RSNAPSHOT_PASSWD = "/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd"
+DATA_EXPAND = {
+    "UBUNTU": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
+    "DEBIAN": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
+    "CENTOS": ["/etc","/home","/root","/var/spool/cron","/var/lib/rpm","/usr/local","/opt/sysadmws"]
+}
 
 # Functions
 
@@ -113,7 +121,7 @@ if __name__ == "__main__":
     group.add_argument("--rotate-daily", dest="rotate_daily", help="prepare rsnapshot configs and run daily rotate", action="store_true")
     group.add_argument("--rotate-weekly", dest="rotate_weekly", help="prepare rsnapshot configs and run weekly rotate", action="store_true")
     group.add_argument("--rotate-monthly", dest="rotate_monthly", help="prepare rsnapshot configs and run monthly rotate", action="store_true")
-    #TBD: group.add_argument("--check", dest="check", help="run checks for rsnapshot backups", action="store_true")
+    group.add_argument("--check", dest="check", help="run checks for rsnapshot backups", action="store_true")
 
     if len(sys.argv) > 1:
         args = parser.parse_args()
@@ -157,6 +165,7 @@ if __name__ == "__main__":
             lock.acquire(timeout=0)
 
             errors = 0
+            oks = 0
             paths_processed = []
 
             # Loop backup items
@@ -257,7 +266,7 @@ if __name__ == "__main__":
                             if retcode == 0:
                                 log_and_print("NOTICE", "Local execution of before_backup_check succeeded on item number {number}".format(number=item["number"]), logger)
                             else:
-                                log_and_print("ERROR", "Local execution of before_backup_check failed on item number {number}, not doing sync".format(number=item["number"]), logger)
+                                log_and_print("ERROR", "Local execution of before_backup_check failed on item number {number}, skipping item with error".format(number=item["number"]), logger)
                                 errors += 1
                                 continue
                         except Exception as e:
@@ -410,23 +419,23 @@ if __name__ == "__main__":
                             # Validate hostname
                             if item["validate_hostname"]:
                                 log_and_print("NOTICE", "Hostname validation required on item number {number}".format(number=item["number"]), logger)
-                            try:
-                                retcode, stdout, stderr = run_cmd_pipe("ssh {ssh_args} -p {port} {user}@{host} 'hostname'".format(ssh_args=ssh_args, port=item["connect_port"], user=item["connect_user"], host=item["connect_host"]))
-                                if retcode == 0:
-                                    hostname_received = stdout.lstrip().rstrip()
-                                    if hostname_received == item["host"]:
-                                        log_and_print("NOTICE", "Remote hostname {hostname} received and validated on item number {number}".format(hostname=hostname_received, number=item["number"]), logger)
+                                try:
+                                    retcode, stdout, stderr = run_cmd_pipe("ssh {ssh_args} -p {port} {user}@{host} 'hostname'".format(ssh_args=ssh_args, port=item["connect_port"], user=item["connect_user"], host=item["connect_host"]))
+                                    if retcode == 0:
+                                        hostname_received = stdout.lstrip().rstrip()
+                                        if hostname_received == item["host"]:
+                                            log_and_print("NOTICE", "Remote hostname {hostname} received and validated on item number {number}".format(hostname=hostname_received, number=item["number"]), logger)
+                                        else:
+                                            log_and_print("ERROR", "Remote hostname {hostname} received, {expected} expected and validation failed on item number {number}, not doing sync".format(hostname=hostname_received, expected=item["host"], number=item["number"]), logger)
+                                            errors += 1
+                                            continue
                                     else:
-                                        log_and_print("ERROR", "Remote hostname {hostname} received, {expected} expected and validation failed on item number {number}, not doing sync".format(hostname=hostname_received, expected=item["host"], number=item["number"]), logger)
+                                        log_and_print("ERROR", "Remote hostname validation failed on item number {number}, not doing sync".format(number=item["number"]), logger)
                                         errors += 1
                                         continue
-                                else:
-                                    log_and_print("ERROR", "Remote hostname validation failed on item number {number}, not doing sync".format(number=item["number"]), logger)
-                                    errors += 1
-                                    continue
-                            except Exception as e:
-                                logger.exception(e)
-                                raise Exception("Caught exception on subprocess.run execution")
+                                except Exception as e:
+                                    logger.exception(e)
+                                    raise Exception("Caught exception on subprocess.run execution")
 
                             # Exec exec_before_rsync
                             if "exec_before_rsync" in item:
@@ -541,11 +550,14 @@ if __name__ == "__main__":
                                         else:
                                             databases_exclude = ""
 
+                                        # Regex dots are to hide words that produce false positive
+                                        mysqlsh_output_filter = 'grep -v -e "The dump may f..l with an e...r if schema changes are made while dumping"'
+
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/all.mysqlsh ]]; then
-                                                        mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args}
+                                                        mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -555,13 +567,14 @@ if __name__ == "__main__":
                                                 mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
                                                 mysqlsh_threads=item["mysqlsh_threads"],
                                                 databases_exclude=databases_exclude,
-                                                mysqlsh_args=item["mysqlsh_args"]
+                                                mysqlsh_args=item["mysqlsh_args"],
+                                                mysqlsh_output_filter=mysqlsh_output_filter
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/{source}.mysqlsh ]]; then
-                                                        mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args}
+                                                        mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -571,7 +584,8 @@ if __name__ == "__main__":
                                                 mysqlsh_max_rate=item["mysqlsh_max_rate"],
                                                 mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
                                                 mysqlsh_threads=item["mysqlsh_threads"],
-                                                mysqlsh_args=item["mysqlsh_args"]
+                                                mysqlsh_args=item["mysqlsh_args"],
+                                                mysqlsh_output_filter=mysqlsh_output_filter
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -903,14 +917,8 @@ if __name__ == "__main__":
 
                             if item["type"] == "RSYNC_SSH":
 
-                                data_expand = {
-                                    "UBUNTU": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
-                                    "DEBIAN": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
-                                    "CENTOS": ["/etc","/home","/root","/var/spool/cron","/var/lib/rpm","/usr/local","/opt/sysadmws"]
-                                }
-
-                                if item["source"] in data_expand:
-                                    for source in data_expand[item["source"]]:
+                                if item["source"] in DATA_EXPAND:
+                                    for source in DATA_EXPAND[item["source"]]:
                                         if not ("exclude" in item and source in item["exclude"]):
                                             conf_backup_lines += conf_backup_line_template.format(
                                                 user=item["connect_user"],
@@ -1125,6 +1133,355 @@ if __name__ == "__main__":
                         else:
                             log_and_print("ERROR", "Unknown item type {type} on item number {number}".format(type=item["type"], number=item["number"]), logger)
                             errors += 1
+
+                    # Check
+                    if args.check and "checks" in item:
+
+                        for check in item["checks"]:
+
+                            # Native DB dumps have similiar logic
+                            if (
+                                    (item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and not ("mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh")))
+                                    or
+                                    (item["type"] == "POSTGRESQL_SSH" and check["type"] == "POSTGRESQL")
+                                    or
+                                    (item["type"] == "MONGODB_SSH" and check["type"] == "MONGODB")
+                                ):
+
+                                sources_to_check = []
+
+                                if check["type"] == "MYSQL":
+                                    db_dump_dir = item["mysql_dump_dir"]
+                                    db_dump_ext = "gz"
+                                elif check["type"] == "POSTGRESQL":
+                                    db_dump_dir = item["postgresql_dump_dir"]
+                                    db_dump_ext = "gz"
+                                elif check["type"] == "MONGODB":
+                                    db_dump_dir = item["mongodb_dump_dir"]
+                                    db_dump_ext = "tar.gz"
+
+                                if item["source"] == "ALL":
+
+                                    db_list_file_path = "{path}/.sync/rsnapshot{db_dump_dir}/db_list.txt".format(path=item["path"], db_dump_dir=db_dump_dir)
+
+                                    if os.path.exists(db_list_file_path):
+                                        with open(db_list_file_path, "r") as db_list_file:
+                                            while True:
+                                                db_list_file_line = db_list_file.readline().rstrip()
+                                                if not db_list_file_line:
+                                                    break
+                                                if "empty_db" in check:
+                                                    if db_list_file_line not in check["empty_db"]:
+                                                        sources_to_check.append(db_list_file_line)
+                                                else:
+                                                    sources_to_check.append(db_list_file_line)
+                                    else:
+                                        log_and_print("ERROR", "{db_list_file_path} file is missing on item number {number}".format(db_list_file_path=db_list_file_path, number=item["number"]), logger)
+                                        errors += 1
+
+                                else:
+                                    sources_to_check.append(item["source"])
+                                
+                                # Check sources
+                                for source in sources_to_check:
+
+                                    dump_file = "{path}/.sync/rsnapshot{db_dump_dir}/{source}.{db_dump_ext}".format(path=item["path"], db_dump_dir=db_dump_dir, source=source, db_dump_ext=db_dump_ext)
+
+                                    # Check dump file exists
+                                    if os.path.exists(dump_file):
+
+                                        log_and_print("NOTICE", "{dump_file} dump file exists on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                        oks += 1
+
+                                        # With MYSQL and POSTGRESQL we read dump files
+                                        if check["type"] in ["MYSQL", "POSTGRESQL"]:
+
+                                            dump_file_lines_number = 0
+                                            dump_file_inserts = 0
+                                            dump_completed_date = None
+                                            with gzip.open(dump_file, "r") as dump_file_file:
+                                                while True:
+                                                    dump_file_lines_number += 1
+                                                    dump_file_line = dump_file_file.readline()
+                                                    if not dump_file_line:
+                                                        log_and_print("NOTICE", "Read {dump_file_lines_number} lines in dump file {dump_file} on item number {number}".format(dump_file_lines_number=dump_file_lines_number, dump_file=dump_file, number=item["number"]), logger)
+                                                        break
+                                                    if check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode()):
+                                                        dump_file_inserts += 1
+                                                    elif check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode()):
+                                                        dump_file_inserts += 1
+                                                    elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_file_line.decode()):
+                                                        re_match = re.match("^-- Dump completed on (.+)$", dump_file_line.decode())
+                                                        if re_match:
+                                                            dump_completed_date = re_match.group(1)
+                                                    elif check["type"] == "POSTGRESQL" and re.match("^-- Completed on", dump_file_line.decode()):
+                                                        re_match = re.match("^-- Completed on (.+)$", dump_file_line.decode())
+                                                        if re_match:
+                                                            dump_completed_date = re_match.group(1)
+
+                                            # Check dump inserts
+                                            if dump_file_inserts > 0:
+                                                log_and_print("NOTICE", "Found {dump_file_inserts} inserts in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Found 0 inserts in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                errors += 1
+
+                                            # Check dump completed date
+                                            if dump_completed_date is not None:
+                                                if check["type"] == "MYSQL":
+                                                    seconds_between_dump_completed_date_and_now = (datetime.now() - datetime.strptime(dump_completed_date, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                                elif check["type"] == "POSTGRESQL":
+                                                    seconds_between_dump_completed_date_and_now = (datetime.now() - datetime.strptime(dump_completed_date, "%Y-%m-%d %H:%M:%S %Z")).total_seconds()
+                                                # Dump files shouldn't be older than 1 day
+                                                if seconds_between_dump_completed_date_and_now < 60*60*24:
+                                                    log_and_print("NOTICE", "Dump completion signature age {seconds} secs is less than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    errors += 1
+                                            else:
+                                                log_and_print("ERROR", "There is no dump completion signature in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
+                                                errors += 1
+
+                                        # With MONGODB we read tar archive
+                                        elif check["type"] in ["MONGODB"]:
+
+                                            tarfile_bsons_number = 0
+                                            tarfile_non_zero_sized_bson_date = None
+                                            tarfile_non_zero_sized_bsons_number = 0
+                                            with tarfile.open(dump_file, "r") as dump_file_file:
+                                                for tarfile_member in dump_file_file.getmembers():
+                                                    if "bson" in tarfile_member.name:
+                                                        tarfile_bsons_number += 1
+                                                        if tarfile_member.size > 0:
+                                                            tarfile_non_zero_sized_bsons_number += 1
+                                                            tarfile_non_zero_sized_bson_date = datetime.fromtimestamp(tarfile_member.mtime)
+                                            log_and_print("NOTICE", "Found {tarfile_bsons_number} bsons in dump file {dump_file} on item number {number}".format(tarfile_bsons_number=tarfile_bsons_number, dump_file=dump_file, number=item["number"]), logger)
+
+                                            # Check non zero sized bsons
+                                            if tarfile_non_zero_sized_bsons_number > 0:
+                                                log_and_print("NOTICE", "Found {tarfile_non_zero_sized_bsons_number} non zero sized bsons in dump file {dump_file} on item number {number}".format(tarfile_non_zero_sized_bsons_number=tarfile_non_zero_sized_bsons_number, dump_file=dump_file, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Found 0 non zero sized bsons in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                errors += 1
+
+                                            # Check dump completed date
+                                            if tarfile_non_zero_sized_bson_date is not None:
+                                                seconds_between_tarfile_non_zero_sized_bson_date_and_now = (datetime.now() - tarfile_non_zero_sized_bson_date).total_seconds()
+                                                # Dump files shouldn't be older than 1 day
+                                                if seconds_between_tarfile_non_zero_sized_bson_date_and_now < 60*60*24:
+                                                    log_and_print("NOTICE", "Dump bsons age {seconds} secs is less than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_tarfile_non_zero_sized_bson_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Dump bsons age {seconds} secs is more than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_tarfile_non_zero_sized_bson_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    errors += 1
+
+                                    else:
+                                        log_and_print("ERROR", "{dump_file} dump file is missing on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                        errors += 1
+
+                            # .backup and FILE_AGE
+                            if item["type"] in ["RSYNC_SSH", "RSYNC_NATIVE"]:
+
+                                sources_to_check = []
+
+                                # Expand paths to check for RSYNC_SSH
+                                if item["type"] == "RSYNC_SSH":
+
+                                    if item["source"] in DATA_EXPAND:
+                                        for source in DATA_EXPAND[item["source"]]:
+                                            if not ("exclude" in item and source in item["exclude"]):
+                                                sources_to_check.append(source)
+                                    else:
+                                        sources_to_check.append(item["source"])
+
+                                # For RSYNC_NATIVE we need to strip first dir path (share name) from source
+                                if item["type"] == "RSYNC_NATIVE":
+                                    sources_to_check.append("/{path}".format(path="/".join(item["source"].split("/")[2:])))
+
+                                # Check sources
+                                for source in sources_to_check:
+
+                                    # FILE_AGE
+                                    if check["type"] == "FILE_AGE":
+
+                                        find_cmd = "find {item_path}/.sync/rsnapshot{source} -type f -regex '.*/{mask}'".format(item_path=item["path"], source=source, mask=check["files_mask"])
+                                        log_and_print("NOTICE", "find cmd: {find_cmd} on item number {number}".format(find_cmd=find_cmd, number=item["number"]), logger)
+
+                                        try:
+                                            retcode, stdout, stderr = run_cmd_pipe(find_cmd)
+                                            if retcode == 0:
+
+                                                # Process find results
+
+                                                file_list = stdout
+                                                file_list_file_count = 0
+                                                file_list_last_file_timestamp = 0
+                                                file_list_last_file_datetime = None
+                                                file_list_last_file = None
+
+                                                for file_list_file in file_list.split("\n"):
+                                                    if len(file_list_file) > 0:
+                                                        file_list_file_count += 1
+
+                                                        # Find last file
+                                                        file_list_file_timestamp = os.path.getmtime(file_list_file)
+                                                        if file_list_file_timestamp > file_list_last_file_timestamp:
+                                                            file_list_last_file_timestamp = file_list_file_timestamp
+                                                            file_list_last_file_datetime = datetime.fromtimestamp(file_list_file_timestamp)
+                                                            file_list_last_file = file_list_file
+
+                                                        # Check min_file_size
+                                                        file_list_file_size = os.stat(file_list_file).st_size
+                                                        if file_list_file_size >= check["min_file_size"]:
+                                                            log_and_print("NOTICE", "File {file_count} {file_list_file} size {size} is not less than needed {min_file_size} on item number {number}".format(file_count=file_list_file_count, size=file_list_file_size, file_list_file=file_list_file, min_file_size=check["min_file_size"], number=item["number"]), logger)
+                                                            oks += 1
+                                                        else:
+                                                            log_and_print("ERROR", "File {file_count} {file_list_file} size {size} is less than needed {min_file_size} on item number {number}".format(file_count=file_list_file_count, size=file_list_file_size, file_list_file=file_list_file, min_file_size=check["min_file_size"], number=item["number"]), logger)
+                                                            errors += 1
+
+                                                        # Check file_type
+                                                        try:
+                                                            ft_retcode, ft_stdout, ft_stderr = run_cmd_pipe("file -b {file_list_file}".format(file_list_file=file_list_file))
+                                                            if ft_retcode == 0:
+                                                                file_type_received = ft_stdout.lstrip().rstrip()
+                                                                if re.match(check["file_type"], file_type_received):
+                                                                    log_and_print("NOTICE", "File {file_count} {file_list_file} type {file_type_received} matched needed {check_file_type} on item number {number}".format(file_count=file_list_file_count, file_list_file=file_list_file, file_type_received=file_type_received, check_file_type=check["file_type"], number=item["number"]), logger)
+                                                                    oks += 1
+                                                                else:
+                                                                    log_and_print("ERROR", "File {file_count} {file_list_file} type {file_type_received} mismatched needed {check_file_type} on item number {number}".format(file_count=file_list_file_count, file_list_file=file_list_file, file_type_received=file_type_received, check_file_type=check["file_type"], number=item["number"]), logger)
+                                                                    errors += 1
+                                                            else:
+                                                                log_and_print("ERROR", "Getting file {file_list_file} type failed on item number {number}".format(file_list_file=file_list_file, number=item["number"]), logger)
+                                                                errors += 1
+                                                        except Exception as e:
+                                                            logger.exception(e)
+                                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                                # Check files_total
+                                                if file_list_file_count >= check["files_total"]:
+                                                    log_and_print("NOTICE", "Found {file_list_file_count} of needed {files_total} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total=check["files_total"], number=item["number"]), logger)
+                                                    oks += 1
+
+                                                else:
+                                                    log_and_print("ERROR", "Found {file_list_file_count} of needed {files_total} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total=check["files_total"], number=item["number"]), logger)
+                                                    errors += 1
+
+                                                # Check last_file_age
+                                                if file_list_file_count > 0:
+                                                    seconds_between_file_list_last_file_datetime_and_now = (datetime.now() - file_list_last_file_datetime).total_seconds()
+                                                    if seconds_between_file_list_last_file_datetime_and_now < check["last_file_age"]*60*60*24:
+                                                        log_and_print("NOTICE", "Last file {file_list_last_file} date {date} is not older than allowed {last_file_age} days old on item number {number}".format(file_list_last_file=file_list_last_file, date=file_list_last_file_datetime, last_file_age=check["last_file_age"], number=item["number"]), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", "Last file {file_list_last_file} date {date} is older than allowed {last_file_age} days old on item number {number}".format(file_list_last_file=file_list_last_file, date=file_list_last_file_datetime, last_file_age=check["last_file_age"], number=item["number"]), logger)
+                                                        errors += 1
+
+                                            else:
+                                                log_and_print("ERROR", "find cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                errors += 1
+
+                                        except Exception as e:
+                                            logger.exception(e)
+                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                    # .backup
+                                    if check["type"] == ".backup":
+
+                                        # Construct path
+                                        check_file = "{item_path}/.sync/rsnapshot{source}/.backup".format(item_path=item["path"], source=source)
+
+                                        # Check check file existance
+                                        if os.path.exists(check_file):
+
+                                            log_and_print("NOTICE", ".backup file exists on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                            oks += 1
+
+                                            # Gather check file data
+                                            check_file_dict = {}
+                                            with open(check_file, "r") as check_file_file:
+                                                while True:
+                                                    check_file_line = check_file_file.readline().rstrip()
+                                                    if not check_file_line:
+                                                        break
+                                                    check_file_line_key = check_file_line.split(": ")[0]
+                                                    check_file_line_val = check_file_line.split(": ")[1]
+                                                    check_file_dict[check_file_line_key] = check_file_line_val
+
+                                            # Check file Host
+                                            if "Host" in check_file_dict:
+                                                if check_file_dict["Host"].lower() == item["host"].lower():
+                                                    log_and_print("NOTICE", ".backup file host {file_host} matched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file host {file_host} not matched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
+                                            else:
+                                                log_and_print("ERROR", ".backup file doesn't contain Host on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                errors += 1
+
+                                            # Check file Path
+                                            if "Path" in check_file_dict:
+
+                                                # Path could be defined in check
+                                                if "path" in check:
+                                                    path_to_check = check["path"]
+                                                else:
+                                                    path_to_check = source
+
+                                                if check_file_dict["Path"] == path_to_check:
+                                                    log_and_print("NOTICE", ".backup file path {file_path} matched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file path {file_path} not matched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
+                                            else:
+                                                log_and_print("ERROR", ".backup file doesn't contain Path on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                errors += 1
+
+                                            # Check file UTC 
+                                            if "UTC" in check_file_dict:
+                                                seconds_between_check_file_utc_and_now = (datetime.now() - datetime.strptime(check_file_dict["UTC"], "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                                # .backups files shouldn't be older than 1 day
+                                                if seconds_between_check_file_utc_and_now < 60*60*24:
+                                                    log_and_print("NOTICE", ".backup file date age {seconds} secs is less than 1d on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), number=item["number"], check_file=check_file), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file date age {seconds} secs is more than 1d on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
+                                            else:
+                                                log_and_print("ERROR", ".backup file doesn't contain UTC on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                errors += 1
+                                            
+                                            # Check file backup hosts to find self
+                                            if "Backup 1 Host" in check_file_dict and "Backup 1 Path" in check_file_dict:
+                                                check_file_backup_item = 1
+                                                backup_host_found = False
+                                                backup_host_path_found = False
+                                                while True:
+                                                    if "Backup {n} Host".format(n=check_file_backup_item) in check_file_dict and "Backup {n} Path".format(n=check_file_backup_item) in check_file_dict:
+                                                        if check_file_dict["Backup {n} Host".format(n=check_file_backup_item)] == SELF_HOSTNAME:
+                                                            backup_host_found = True
+                                                            if check_file_dict["Backup {n} Path".format(n=check_file_backup_item)] == item["path"]:
+                                                                backup_host_path_found = True
+                                                        check_file_backup_item += 1
+                                                    else:
+                                                        break
+                                                if backup_host_found and backup_host_path_found:
+                                                    log_and_print("NOTICE", ".backup file backup host {host} and path {path} are found on item number {number}: {check_file}".format(host=SELF_HOSTNAME, path=item["path"], number=item["number"], check_file=check_file), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file backup host {host} and path {path} are not found on item number {number}: {check_file}".format(host=SELF_HOSTNAME, path=item["path"], number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
+                                            else:
+                                                log_and_print("ERROR", ".backup file doesn't contain at least one backup host/path on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                errors += 1
+
+                                        else:
+                                            log_and_print("ERROR", ".backup file is missing on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                            errors += 1
 
                 except Exception as e:
                     logger.error("Caught exception, but not interrupting")
