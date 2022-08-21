@@ -1388,7 +1388,7 @@ if __name__ == "__main__":
                                             raise Exception("Caught exception on subprocess.run execution")
 
                                     # .backup
-                                    if check["type"] == ".backup":
+                                    if check["type"] in [".backup", "s3/.backup"]:
 
                                         # Construct path
                                         check_file = "{item_path}/.sync/rsnapshot{source}/.backup".format(item_path=item["path"], source=source)
@@ -1410,36 +1410,65 @@ if __name__ == "__main__":
                                                     check_file_line_val = check_file_line.split(": ")[1]
                                                     check_file_dict[check_file_line_key] = check_file_line_val
 
-                                            # Check file Host
-                                            if "Host" in check_file_dict:
-                                                if check_file_dict["Host"].lower() == item["host"].lower():
-                                                    log_and_print("NOTICE", ".backup file host {file_host} matched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
-                                                    oks += 1
+                                            if check["type"] == ".backup":
+
+                                                # Check file Host
+                                                if "Host" in check_file_dict:
+                                                    if check_file_dict["Host"].lower() == item["host"].lower():
+                                                        log_and_print("NOTICE", ".backup file host {file_host} matched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", ".backup file host {file_host} mismatched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
+                                                        errors += 1
                                                 else:
-                                                    log_and_print("ERROR", ".backup file host {file_host} not matched {item_host} on item number {number}: {check_file}".format(file_host=check_file_dict["Host"], item_host=item["host"], number=item["number"], check_file=check_file), logger)
+                                                    log_and_print("ERROR", ".backup file doesn't contain Host on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
                                                     errors += 1
-                                            else:
-                                                log_and_print("ERROR", ".backup file doesn't contain Host on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
-                                                errors += 1
 
-                                            # Check file Path
-                                            if "Path" in check_file_dict:
+                                                # Check file Path
+                                                if "Path" in check_file_dict:
 
-                                                # Path could be defined in check
-                                                if "path" in check:
-                                                    path_to_check = check["path"]
+                                                    # Path could be defined in check
+                                                    if "path" in check:
+                                                        path_to_check = check["path"]
+                                                    else:
+                                                        path_to_check = source
+
+                                                    if check_file_dict["Path"] == path_to_check:
+                                                        log_and_print("NOTICE", ".backup file path {file_path} matched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", ".backup file path {file_path} mismatched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
+                                                        errors += 1
                                                 else:
-                                                    path_to_check = source
-
-                                                if check_file_dict["Path"] == path_to_check:
-                                                    log_and_print("NOTICE", ".backup file path {file_path} matched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
-                                                    oks += 1
-                                                else:
-                                                    log_and_print("ERROR", ".backup file path {file_path} not matched {item_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], item_path=path_to_check, number=item["number"], check_file=check_file), logger)
+                                                    log_and_print("ERROR", ".backup file doesn't contain Path on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
                                                     errors += 1
-                                            else:
-                                                log_and_print("ERROR", ".backup file doesn't contain Path on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
-                                                errors += 1
+
+                                            elif check["type"] == "s3/.backup":
+
+                                                # Check file Bucket
+                                                if "Bucket" in check_file_dict:
+                                                    if check_file_dict["Bucket"] == check["s3_bucket"]:
+                                                        log_and_print("NOTICE", ".backup file bucket {file_bucket} matched s3 {check_bucket} on item number {number}: {check_file}".format(file_bucket=check_file_dict["Bucket"], check_bucket=check["s3_bucket"], number=item["number"], check_file=check_file), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", ".backup file bucket {file_bucket} mismatched s3 {check_bucket} on item number {number}: {check_file}".format(file_bucket=check_file_dict["Bucket"], check_bucket=check["s3_bucket"], number=item["number"], check_file=check_file), logger)
+                                                        errors += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file doesn't contain Bucket on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
+
+                                                # Check file Path
+                                                if "Path" in check_file_dict:
+
+                                                    if check_file_dict["Path"] == check["s3_path"]:
+                                                        log_and_print("NOTICE", ".backup file path {file_path} matched s3 {check_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], check_path=check["s3_path"], number=item["number"], check_file=check_file), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", ".backup file path {file_path} mismatched s3 {check_path} on item number {number}: {check_file}".format(file_path=check_file_dict["Path"], check_path=check["s3_path"], number=item["number"], check_file=check_file), logger)
+                                                        errors += 1
+                                                else:
+                                                    log_and_print("ERROR", ".backup file doesn't contain Path on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
+                                                    errors += 1
 
                                             # Check file UTC 
                                             if "UTC" in check_file_dict:
