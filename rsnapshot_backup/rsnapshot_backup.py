@@ -1176,6 +1176,7 @@ if __name__ == "__main__":
                                             oks += 1
 
                                             try:
+
                                                 retcode, stdout, stderr = run_cmd_pipe(qpress_cmd)
                                                 if retcode == 0:
 
@@ -1207,6 +1208,68 @@ if __name__ == "__main__":
                                                 errors += 1
                                         else:
                                             log_and_print("ERROR", "There is no xtrabackup end_time signature in file {xtrabackup_info_fie} on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            errors += 1
+
+                                else:
+                                    log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    errors += 1
+
+                            # mysqlsh
+                            if item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
+
+                                if item["source"] == "ALL":
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/all.mysqlsh".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"])
+                                else:
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/{source}.mysqlsh".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"], source=item["source"])
+
+                                # Check dump dir exists
+                                if os.path.isdir(dump_dir):
+
+                                        log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                        oks += 1
+
+                                        # Read @.done.json
+                                        mysqlsh_info_fie = "{dump_dir}/@.done.json".format(dump_dir=dump_dir)
+                                        cat_json_cmd = "cat {mysqlsh_info_fie} | grep -e '.end.:'".format(mysqlsh_info_fie=mysqlsh_info_fie)
+                                        mysqlsh_end_time = None
+                                        if os.path.exists(mysqlsh_info_fie):
+
+                                            log_and_print("NOTICE", "Found {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            oks += 1
+
+                                            try:
+
+                                                retcode, stdout, stderr = run_cmd_pipe(cat_json_cmd)
+                                                if retcode == 0:
+
+                                                    for mysqlsh_info_line in stdout.split("\n"):
+                                                        if '"end":' in mysqlsh_info_line.lstrip().rstrip():
+                                                            mysqlsh_end_time = mysqlsh_info_line.lstrip().rstrip().replace('"end": "', "").replace('",', "")
+
+                                                else:
+                                                    log_and_print("ERROR", "cat cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                    errors += 1
+
+                                            except Exception as e:
+                                                logger.exception(e)
+                                                raise Exception("Caught exception on subprocess.run execution")
+
+                                        else:
+                                            log_and_print("NOTICE", "Found no {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            errors += 1
+
+                                        # Check mysqlsh end time
+                                        if mysqlsh_end_time is not None:
+                                            seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(mysqlsh_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                            # Dump files shouldn't be older than 1 day
+                                            if seconds_between_end_time_and_now < 60*60*24:
+                                                log_and_print("NOTICE", "Dump @.done.json end time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Dump @.done.json end time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                errors += 1
+                                        else:
+                                            log_and_print("ERROR", "There is no @.done.json end time signature in file {mysqlsh_info_fie} on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
                                             errors += 1
 
                                 else:
@@ -1613,7 +1676,7 @@ if __name__ == "__main__":
 
         finally:
             if not args.ignore_lock:
-                lock.release() 
+                lock.release()
 
     # Reroute catched exception to log
     except Exception as e:
