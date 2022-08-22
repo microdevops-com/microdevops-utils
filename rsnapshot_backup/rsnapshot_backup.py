@@ -687,13 +687,14 @@ if __name__ == "__main__":
 
                                 if item["type"] == "POSTGRESQL_SSH":
 
+                                    # --verbose is needed for Completed on signature in dumps, and sdterr shouldn't be redirected to /dev/null
                                     if item["source"] == "ALL":
                                         script_dump_part = textwrap.dedent(
                                             """\
-                                            su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} > {postgresql_dump_dir}/db_list.txt
+                                            su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
-                                                            su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db 2>/dev/null" | gzip > {postgresql_dump_dir}/$db.gz
+                                                            su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" | gzip > {postgresql_dump_dir}/$db.gz
                                                     fi
                                             done
                                             """
@@ -707,7 +708,7 @@ if __name__ == "__main__":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
-                                                    su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source} 2>/dev/null" | gzip > {postgresql_dump_dir}/{source}.gz
+                                                    su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" | gzip > {postgresql_dump_dir}/{source}.gz
                                             fi
                                             """
                                         ).format(
@@ -737,7 +738,7 @@ if __name__ == "__main__":
                                             trap "rm -rf {postgresql_dump_dir}/dump.lock" 0
                                             cd {postgresql_dump_dir}
                                             find {postgresql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
-                                            su - postgres -c "pg_dumpall --clean --schema-only --verbose 2>/dev/null" | gzip > {postgresql_dump_dir}/globals.gz
+                                            su - postgres -c "pg_dumpall --clean --schema-only --verbose" | gzip > {postgresql_dump_dir}/globals.gz
                                             {script_dump_part}
                                         '
                                         """
@@ -1519,10 +1520,23 @@ if __name__ == "__main__":
 
             # Exit with error if there were errors
             if errors > 0:
-                log_and_print("ERROR", "{LOGO} on {hostname} errors found: {errors}".format(LOGO=LOGO, hostname=SELF_HOSTNAME, errors=errors), logger)
+                # Show oks if --check
+                if args.check:
+                    log_and_print("ERROR", "{LOGO} on {hostname}, checks ok: {oks}, errors found: {errors}".format(LOGO=LOGO, hostname=SELF_HOSTNAME, oks=oks, errors=errors), logger)
+                else:
+                    log_and_print("ERROR", "{LOGO} on {hostname} errors found: {errors}".format(LOGO=LOGO, hostname=SELF_HOSTNAME, errors=errors), logger)
                 raise Exception("There were errors")
             else:
-                log_and_print("NOTICE", "{LOGO} on {hostname} finished OK".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
+                # Show oks if --check
+                if args.check:
+                    # errros == 0 and oks == 0 => not good
+                    if oks == 0:
+                        log_and_print("ERROR", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
+                        raise Exception("Zero checks made")
+                    else:
+                        log_and_print("NOTICE", "{LOGO} on {hostname}, checks ok: {oks}, finished OK".format(LOGO=LOGO, hostname=SELF_HOSTNAME, oks=oks), logger)
+                else:
+                    log_and_print("NOTICE", "{LOGO} on {hostname} finished OK".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
 
         finally:
             lock.release() 
