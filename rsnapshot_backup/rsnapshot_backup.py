@@ -1206,16 +1206,16 @@ if __name__ == "__main__":
                                                     if not dump_file_line:
                                                         log_and_print("NOTICE", "Read {dump_file_lines_number} lines in dump file {dump_file} on item number {number}".format(dump_file_lines_number=dump_file_lines_number, dump_file=dump_file, number=item["number"]), logger)
                                                         break
-                                                    if check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode()):
+                                                    if check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode(errors="ignore")):
                                                         dump_file_inserts += 1
-                                                    elif check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode()):
+                                                    elif check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode(errors="ignore")):
                                                         dump_file_inserts += 1
-                                                    elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_file_line.decode()):
-                                                        re_match = re.match("^-- Dump completed on (.+)$", dump_file_line.decode())
+                                                    elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_file_line.decode(errors="ignore")):
+                                                        re_match = re.match("^-- Dump completed on (.+)$", dump_file_line.decode(errors="ignore"))
                                                         if re_match:
                                                             dump_completed_date = re_match.group(1)
-                                                    elif check["type"] == "POSTGRESQL" and re.match("^-- Completed on", dump_file_line.decode()):
-                                                        re_match = re.match("^-- Completed on (.+)$", dump_file_line.decode())
+                                                    elif check["type"] == "POSTGRESQL" and re.match("^-- Completed on", dump_file_line.decode(errors="ignore")):
+                                                        re_match = re.match("^-- Completed on (.+)$", dump_file_line.decode(errors="ignore"))
                                                         if re_match:
                                                             dump_completed_date = re_match.group(1)
 
