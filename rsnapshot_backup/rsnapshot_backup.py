@@ -114,6 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", dest="config", help="override config")
     parser.add_argument("--item-number", dest="item_number", help="run only for config item NUMBER", nargs=1, metavar=("NUMBER"))
     parser.add_argument("--host", dest="host", help="run only for items with HOST", nargs=1, metavar=("HOST"))
+    parser.add_argument("--ignore-lock", dest="ignore_lock", help="ignore locking to allow many instances of rsnapshot_backup.py in the same time (use only for testing)", action="store_true")
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--sync", dest="sync", help="prepare rsnapshot configs and run sync, we use sync_first rsnapshot option", action="store_true")
@@ -158,11 +159,13 @@ if __name__ == "__main__":
         os.chdir(WORK_DIR)
 
         # Lock before trying to run, exception and exit on timeout is ok
-        lock = lockfile.LockFile(LOCK_FILE)
+        if not args.ignore_lock:
+            lock = lockfile.LockFile(LOCK_FILE)
         try:
 
             # timeout=0 = do not wait if locked
-            lock.acquire(timeout=0)
+            if not args.ignore_lock:
+                lock.acquire(timeout=0)
 
             errors = 0
             oks = 0
@@ -1140,6 +1143,76 @@ if __name__ == "__main__":
 
                         for check in item["checks"]:
 
+                            # xtrabackup
+                            if item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup":
+
+                                if item["source"] == "ALL":
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/all.xtrabackup".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"])
+                                else:
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/{source}.xtrabackup".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"], source=item["source"])
+
+                                # Check dump dir exists
+                                if os.path.isdir(dump_dir):
+
+                                        log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                        oks += 1
+
+                                        # Check ibdata1.qp at least 1 Mb
+                                        ibdata1_file = "{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)
+                                        if os.path.exists(ibdata1_file) and os.stat(ibdata1_file).st_size > 1000000:
+                                            log_and_print("NOTICE", "Found {ibdata1_file} file larger than 1 Mb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
+                                            oks += 1
+                                        else:
+                                            log_and_print("ERROR", "Found no {ibdata1_file} file larger than 1 Mb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
+                                            errors += 1
+
+                                        # Read xtrabackup_info.qp
+                                        xtrabackup_info_fie = "{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)
+                                        qpress_cmd = "qpress -do {xtrabackup_info_fie}".format(xtrabackup_info_fie=xtrabackup_info_fie)
+                                        xtrabackup_end_time = None
+                                        if os.path.exists(xtrabackup_info_fie):
+
+                                            log_and_print("NOTICE", "Found {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            oks += 1
+
+                                            try:
+                                                retcode, stdout, stderr = run_cmd_pipe(qpress_cmd)
+                                                if retcode == 0:
+
+                                                    for xtrabackup_info_line in stdout.split("\n"):
+                                                        if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
+                                                            xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
+
+                                                else:
+                                                    log_and_print("ERROR", "qpress cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                    errors += 1
+
+                                            except Exception as e:
+                                                logger.exception(e)
+                                                raise Exception("Caught exception on subprocess.run execution")
+
+                                        else:
+                                            log_and_print("NOTICE", "Found no {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            errors += 1
+
+                                        # Check xtrabackup end_time
+                                        if xtrabackup_end_time is not None:
+                                            seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                            # Dump files shouldn't be older than 1 day
+                                            if seconds_between_end_time_and_now < 60*60*24:
+                                                log_and_print("NOTICE", "Dump xtrabackup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Dump xtrabackup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                errors += 1
+                                        else:
+                                            log_and_print("ERROR", "There is no xtrabackup end_time signature in file {xtrabackup_info_fie} on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            errors += 1
+
+                                else:
+                                    log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    errors += 1
+
                             # Native DB dumps have similiar logic
                             if (
                                     (item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and not ("mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh")))
@@ -1539,7 +1612,8 @@ if __name__ == "__main__":
                     log_and_print("NOTICE", "{LOGO} on {hostname} finished OK".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
 
         finally:
-            lock.release() 
+            if not args.ignore_lock:
+                lock.release() 
 
     # Reroute catched exception to log
     except Exception as e:
