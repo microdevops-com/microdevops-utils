@@ -1501,10 +1501,18 @@ if __name__ == "__main__":
                                                 if file_list_file_count >= check["files_total"]:
                                                     log_and_print("NOTICE", "Found {file_list_file_count} of needed {files_total} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total=check["files_total"], number=item["number"]), logger)
                                                     oks += 1
-
                                                 else:
                                                     log_and_print("ERROR", "Found {file_list_file_count} of needed {files_total} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total=check["files_total"], number=item["number"]), logger)
                                                     errors += 1
+
+                                                # Check files_total_max, this check is optional
+                                                if "files_total_max" in check:
+                                                    if file_list_file_count <= check["files_total_max"]:
+                                                        log_and_print("NOTICE", "Found {file_list_file_count} of max {files_total_max} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total_max=check["files_total_max"], number=item["number"]), logger)
+                                                        oks += 1
+                                                    else:
+                                                        log_and_print("ERROR", "Found {file_list_file_count} of max {files_total_max} files on item number {number}".format(file_list_file_count=file_list_file_count, files_total_max=check["files_total_max"], number=item["number"]), logger)
+                                                        errors += 1
 
                                                 # Check last_file_age
                                                 if file_list_file_count > 0:
