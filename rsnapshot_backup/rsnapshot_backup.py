@@ -691,13 +691,20 @@ if __name__ == "__main__":
                                 if item["type"] == "POSTGRESQL_SSH":
 
                                     # --verbose is needed for Completed on signature in dumps, and sdterr shouldn't be redirected to /dev/null
+                                    # and it produces a lot of noise, we need to filter it
+                                    # 2>&1 cannot be used before | gzip
+                                    # grep output should be put into stderr again
+                                    # https://unix.stackexchange.com/questions/3514/how-to-grep-standard-error-stream-stderr
+                                    # allow pg_dump.*: connecting just to see what it does
+                                    pg_dump_filter = "grep -v -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
+
                                     if item["source"] == "ALL":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
-                                                            su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" | gzip > {postgresql_dump_dir}/$db.gz
+                                                            su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
                                                     fi
                                             done
                                             """
@@ -705,13 +712,14 @@ if __name__ == "__main__":
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
                                             postgresql_clean="" if item["postgresql_noclean"] else "--clean",
                                             pg_dump_args=item["pg_dump_args"],
-                                            grep_db_filter=grep_db_filter
+                                            grep_db_filter=grep_db_filter,
+                                            pg_dump_filter=pg_dump_filter
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
-                                                    su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" | gzip > {postgresql_dump_dir}/{source}.gz
+                                                    su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
                                             fi
                                             """
                                         ).format(
@@ -719,7 +727,8 @@ if __name__ == "__main__":
                                             postgresql_clean="" if item["postgresql_noclean"] else "--clean",
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            source=item["source"]
+                                            source=item["source"],
+                                            pg_dump_filter=pg_dump_filter
                                         )
 
                                     # If hourly retains are used keep dumps only for 59 minutes
@@ -741,7 +750,7 @@ if __name__ == "__main__":
                                             trap "rm -rf {postgresql_dump_dir}/dump.lock" 0
                                             cd {postgresql_dump_dir}
                                             find {postgresql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
-                                            su - postgres -c "pg_dumpall --clean --schema-only --verbose" | gzip > {postgresql_dump_dir}/globals.gz
+                                            su - postgres -c "pg_dumpall --clean --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
                                             {script_dump_part}
                                         '
                                         """
@@ -752,7 +761,8 @@ if __name__ == "__main__":
                                         host=item["connect_host"],
                                         postgresql_dump_dir=item["postgresql_dump_dir"],
                                         mmin="59" if "retain_hourly" in item else "720",
-                                        script_dump_part=script_dump_part
+                                        script_dump_part=script_dump_part,
+                                        pg_dump_filter=pg_dump_filter
                                     )
 
                                 if item["type"] == "MONGODB_SSH":
