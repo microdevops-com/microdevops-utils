@@ -1065,10 +1065,11 @@ if __name__ == "__main__":
                             os.chmod(RSNAPSHOT_PASSWD, 0o600)
                             
                             # Check remote .backup existance, if no file - skip to next. Remote windows rsync server can give empty set in some cases, which can lead to backup to be erased.
+                            # --timeout=900 - if no IO for 15 minutes, rsync will exit
                             if item["native_txt_check"]:
                                 log_and_print("NOTICE", "Remote .backup existance check required on item number {number}".format(number=item["number"]), logger)
                                 try:
-                                    retcode = run_cmd("rsync --password-file={passwd} rsync://{user}@{host}:{port}{source}/ | grep .backup".format(
+                                    retcode = run_cmd("rsync --timeout=900 --password-file={passwd} rsync://{user}@{host}:{port}{source}/ | grep .backup".format(
                                         passwd=RSNAPSHOT_PASSWD,
                                         user=item["connect_user"],
                                         host=item["connect_host"],
@@ -1104,7 +1105,7 @@ if __name__ == "__main__":
                                     loglevel	3
                                     logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
                                     lockfile	/opt/sysadmws/rsnapshot_backup/rsnapshot.pid
-                                    rsync_long_args	-az --delete --delete-excluded --no-owner --no-group --numeric-ids --relative --password-file={passwd} {rsync_verbosity_args} {rsync_args}
+                                    rsync_long_args	-az --delete --delete-excluded --no-owner --no-group --numeric-ids --relative --timeout=900 --password-file={passwd} {rsync_verbosity_args} {rsync_args}
                                     sync_first	1
                                     backup		rsync://{user}@{host}:{port}{source}/		rsnapshot/
                                     """
