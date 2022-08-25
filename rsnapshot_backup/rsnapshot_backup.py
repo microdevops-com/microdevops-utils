@@ -1133,7 +1133,9 @@ if __name__ == "__main__":
                                     timeout="timeout --preserve-status -k 60 10h " if item["native_10h_limit"] else "",
                                     conf=RSNAPSHOT_CONF
                                 ))
-                                if retcode == 0:
+                                if retcode == 2:
+                                    log_and_print("NOTICE", "Rsnapshot succeeded with WARNINGs on item number {number}, but we consider it is OK".format(number=item["number"]), logger)
+                                elif retcode == 0:
                                     log_and_print("NOTICE", "Rsnapshot succeeded on item number {number}".format(number=item["number"]), logger)
                                 else:
                                     log_and_print("ERROR", "Rsnapshot failed on item number {number}".format(number=item["number"]), logger)
