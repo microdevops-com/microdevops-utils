@@ -1494,7 +1494,7 @@ if __name__ == "__main__":
 
                                                         # Check file_type
                                                         try:
-                                                            ft_retcode, ft_stdout, ft_stderr = run_cmd_pipe("file -b {file_list_file}".format(file_list_file=file_list_file))
+                                                            ft_retcode, ft_stdout, ft_stderr = run_cmd_pipe("file -b '{file_list_file}'".format(file_list_file=file_list_file))
                                                             if ft_retcode == 0:
                                                                 file_type_received = ft_stdout.lstrip().rstrip()
                                                                 if re.match(check["file_type"], file_type_received):
