@@ -346,6 +346,9 @@ if __name__ == "__main__":
 
                             ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no"
 
+                            # With retries we cannot show error word in output text, otherwise an error will be detected
+                            rsnapshot_error_filter = "sed -e 's/ERROR/E.ROR/g' -e 's/Error/E.ror/g' -e 's/error/e.ror/g'"
+
                             if ":" in item["connect"]:
                                 item["connect_host"] = item["connect"].split(":")[0]
                                 item["connect_port"] = item["connect"].split(":")[1]
@@ -1019,8 +1022,30 @@ if __name__ == "__main__":
                             # Run rsnapshot
                             log_and_print("NOTICE", "Running rsnapshot sync on item number {number}".format(number=item["number"]), logger)
                             try:
-                                retcode = run_cmd("rsnapshot -c {conf} sync".format(conf=RSNAPSHOT_CONF))
-                                if retcode == 0:
+
+                                if "retries" in item:
+                                    times_to_run_max = 1 + item["retries"]
+                                else:
+                                    times_to_run_max = 1
+
+                                rsnapshot_run_times = 0
+
+                                while True:
+
+                                    retcode = run_cmd("rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(conf=RSNAPSHOT_CONF, rsnapshot_error_filter=rsnapshot_error_filter))
+                                    rsnapshot_run_times += 1
+
+                                    if retcode == 0 or retcode == 2:
+                                        break
+
+                                    if rsnapshot_run_times >= times_to_run_max:
+                                        break
+                                    
+                                    log_and_print("NOTICE", "Rsnapshot retry {retry} on item number {number}".format(retry=rsnapshot_run_times, number=item["number"]), logger)
+
+                                if retcode == 2:
+                                    log_and_print("NOTICE", "Rsnapshot succeeded with WARNINGs on item number {number}, but we consider it is OK".format(number=item["number"]), logger)
+                                elif retcode == 0:
                                     log_and_print("NOTICE", "Rsnapshot succeeded on item number {number}".format(number=item["number"]), logger)
                                 else:
                                     log_and_print("ERROR", "Rsnapshot failed on item number {number}".format(number=item["number"]), logger)
@@ -1129,10 +1154,31 @@ if __name__ == "__main__":
                             # Run rsnapshot
                             log_and_print("NOTICE", "Running rsnapshot sync on item number {number}".format(number=item["number"]), logger)
                             try:
-                                retcode = run_cmd("{timeout}rsnapshot -c {conf} sync".format(
-                                    timeout="timeout --preserve-status -k 60 10h " if item["native_10h_limit"] else "",
-                                    conf=RSNAPSHOT_CONF
-                                ))
+
+                                if "retries" in item:
+                                    times_to_run_max = 1 + item["retries"]
+                                else:
+                                    times_to_run_max = 1
+
+                                rsnapshot_run_times = 0
+
+                                while True:
+
+                                    retcode = run_cmd("{timeout}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
+                                        timeout="timeout --preserve-status -k 60 10h " if item["native_10h_limit"] else "",
+                                        conf=RSNAPSHOT_CONF,
+                                        rsnapshot_error_filter=rsnapshot_error_filter
+                                    ))
+                                    rsnapshot_run_times += 1
+
+                                    if retcode == 0 or retcode == 2:
+                                        break
+
+                                    if rsnapshot_run_times >= times_to_run_max:
+                                        break
+                                    
+                                    log_and_print("NOTICE", "Rsnapshot retry {retry} on item number {number}".format(retry=rsnapshot_run_times, number=item["number"]), logger)
+
                                 if retcode == 2:
                                     log_and_print("NOTICE", "Rsnapshot succeeded with WARNINGs on item number {number}, but we consider it is OK".format(number=item["number"]), logger)
                                 elif retcode == 0:
