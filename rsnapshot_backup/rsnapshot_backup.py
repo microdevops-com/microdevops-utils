@@ -327,9 +327,22 @@ if __name__ == "__main__":
                             ))
                         
                         # Run rsnapshot
-                        log_and_print("NOTICE", "Running rsnapshot {command} on item number {number}".format(command=rsnapshot_command, number=item["number"]), logger)
+                        if "rsnapshot_prefix_cmd" in item:
+                            rsnapshot_prefix_cmd = "{rsnapshot_prefix_cmd} ".format(rsnapshot_prefix_cmd=item["rsnapshot_prefix_cmd"])
+                        else:
+                            rsnapshot_prefix_cmd = ""
+                        log_and_print("NOTICE", "Running {rsnapshot_prefix_cmd}rsnapshot -c {conf} {command} on item number {number}".format(
+                            rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                            conf=RSNAPSHOT_CONF,
+                            command=rsnapshot_command,
+                            number=item["number"]
+                        ), logger)
                         try:
-                            retcode = run_cmd("rsnapshot -c {conf} {command}".format(conf=RSNAPSHOT_CONF, command=rsnapshot_command))
+                            retcode = run_cmd("{rsnapshot_prefix_cmd}rsnapshot -c {conf} {command}".format(
+                                rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                conf=RSNAPSHOT_CONF,
+                                command=rsnapshot_command
+                            ))
                             if retcode == 0:
                                 log_and_print("NOTICE", "Rsnapshot succeeded on item number {number}".format(number=item["number"]), logger)
                             else:
@@ -1020,7 +1033,15 @@ if __name__ == "__main__":
                                 ))
                         
                             # Run rsnapshot
-                            log_and_print("NOTICE", "Running rsnapshot sync on item number {number}".format(number=item["number"]), logger)
+                            if "rsnapshot_prefix_cmd" in item:
+                                rsnapshot_prefix_cmd = "{rsnapshot_prefix_cmd} ".format(rsnapshot_prefix_cmd=item["rsnapshot_prefix_cmd"])
+                            else:
+                                rsnapshot_prefix_cmd = ""
+                            log_and_print("NOTICE", "Running {rsnapshot_prefix_cmd}rsnapshot -c {conf} sync on item number {number}".format(
+                                rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                conf=RSNAPSHOT_CONF,
+                                number=item["number"]
+                            ), logger)
                             try:
 
                                 if "retries" in item:
@@ -1032,7 +1053,11 @@ if __name__ == "__main__":
 
                                 while True:
 
-                                    retcode = run_cmd("rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(conf=RSNAPSHOT_CONF, rsnapshot_error_filter=rsnapshot_error_filter))
+                                    retcode = run_cmd("{rsnapshot_prefix_cmd}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
+                                        rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                        conf=RSNAPSHOT_CONF,
+                                        rsnapshot_error_filter=rsnapshot_error_filter
+                                    ))
                                     rsnapshot_run_times += 1
 
                                     if retcode == 0 or retcode == 2:
@@ -1152,7 +1177,20 @@ if __name__ == "__main__":
                                 ))
 
                             # Run rsnapshot
-                            log_and_print("NOTICE", "Running rsnapshot sync on item number {number}".format(number=item["number"]), logger)
+                            if "rsnapshot_prefix_cmd" in item:
+                                rsnapshot_prefix_cmd = "{rsnapshot_prefix_cmd} ".format(rsnapshot_prefix_cmd=item["rsnapshot_prefix_cmd"])
+                            else:
+                                rsnapshot_prefix_cmd = ""
+                            if item["native_10h_limit"]:
+                                timeout_cmd = "timeout --preserve-status -k 60 10h "
+                            else:
+                                timeout_cmd = ""
+                            log_and_print("NOTICE", "Running {timeout_cmd}{rsnapshot_prefix_cmd}rsnapshot -c {conf} sync on item number {number}".format(
+                                timeout_cmd=timeout_cmd,
+                                rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                conf=RSNAPSHOT_CONF,
+                                number=item["number"]
+                            ), logger)
                             try:
 
                                 if "retries" in item:
@@ -1164,8 +1202,9 @@ if __name__ == "__main__":
 
                                 while True:
 
-                                    retcode = run_cmd("{timeout}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
-                                        timeout="timeout --preserve-status -k 60 10h " if item["native_10h_limit"] else "",
+                                    retcode = run_cmd("{timeout_cmd}{rsnapshot_prefix_cmd}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
+                                        timeout_cmd=timeout_cmd,
+                                        rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
                                         conf=RSNAPSHOT_CONF,
                                         rsnapshot_error_filter=rsnapshot_error_filter
                                     ))
