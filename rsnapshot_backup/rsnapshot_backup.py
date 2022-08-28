@@ -355,12 +355,12 @@ if __name__ == "__main__":
                     # Sync
                     if args.sync:
 
+                        # With retries we cannot show error word in output text, otherwise an error will be detected
+                        rsnapshot_error_filter = "sed -e 's/ERROR/E.ROR/g' -e 's/Error/E.ror/g' -e 's/error/e.ror/g'"
+
                         if item["type"] in ["RSYNC_SSH", "MYSQL_SSH", "POSTGRESQL_SSH", "MONGODB_SSH"]:
 
                             ssh_args = "-o BatchMode=yes -o StrictHostKeyChecking=no"
-
-                            # With retries we cannot show error word in output text, otherwise an error will be detected
-                            rsnapshot_error_filter = "sed -e 's/ERROR/E.ROR/g' -e 's/Error/E.ror/g' -e 's/error/e.ror/g'"
 
                             if ":" in item["connect"]:
                                 item["connect_host"] = item["connect"].split(":")[0]
