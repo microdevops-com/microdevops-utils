@@ -96,6 +96,17 @@ def load_yaml_config(d, f):
     ), Loader=yaml.SafeLoader)
     return config
 
+def suppress_oserror(f):
+    def inner(*args, **kwargs):
+        try:
+            f(*args, **kwargs)
+        except OSError as e:
+            if e.errno == 2:
+                pass
+            else:
+                raise
+    return inner
+RotatingFileHandler.doRollover = suppress_oserror(RotatingFileHandler.doRollover)
 # Main
 
 if __name__ == "__main__":
