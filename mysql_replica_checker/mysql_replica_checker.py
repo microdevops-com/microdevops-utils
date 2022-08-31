@@ -30,7 +30,7 @@ def read_config():
                 line = line[0:pos]
             except:
                 pass
-            k, v = line.strip().split("=", maxsplit=1)
+            k, v = line.strip().split("=", 1)
             k, v = k.strip(), v.strip().replace('"', "").replace("'", "")
             if k == "BEHIND_MASTER_THR":
                 v = int(v)
