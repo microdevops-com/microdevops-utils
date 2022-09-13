@@ -1773,8 +1773,13 @@ if __name__ == "__main__":
                 if args.check:
                     # errros == 0 and oks == 0 => not good
                     if oks == 0:
-                        log_and_print("ERROR", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
-                        raise Exception("Zero checks made")
+                        # Check items count in config, substract by 1 because of the "default" item
+                        # Print ok if there are no items in config, but print error if there are items in config and zero checks were done
+                        if len(config["items"]) - 1 == 0:
+                            log_and_print("NOTICE", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made, but it is ok for the empty config".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
+                        else:
+                            log_and_print("ERROR", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
+                            raise Exception("Zero checks made")
                     else:
                         log_and_print("NOTICE", "{LOGO} on {hostname}, checks ok: {oks}, finished OK".format(LOGO=LOGO, hostname=SELF_HOSTNAME, oks=oks), logger)
                 else:
