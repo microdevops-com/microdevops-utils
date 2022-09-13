@@ -136,7 +136,7 @@ make_deb_v1:
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/heartbeat_mesh
     # sentry_catch_root_mail
     cp sentry_catch_root_mail/sentry-sender.sh \
-       set-alias-for-all-users.sh \
+       sentry_catch_root_mail/set-alias-for-all-users.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/sentry_catch_root_mail
     # misc
     cp misc/mysql_dump_all_dbs_to_files.sh \
