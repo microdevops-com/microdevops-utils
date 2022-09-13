@@ -1776,7 +1776,7 @@ if __name__ == "__main__":
                         # Check items count in config, substract by 1 because of the "default" item
                         # Print ok if there are no items in config, but print error if there are items in config and zero checks were done
                         if len(config["items"]) - 1 == 0:
-                            log_and_print("NOTICE", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made, but it is ok for the empty config".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
+                            log_and_print("NOTICE", "{LOGO} on {hostname}, zero checks made, but it is ok for the empty config".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
                         else:
                             log_and_print("ERROR", "{LOGO} on {hostname}, checks ok: 0, errors found: 0, zero checks made".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
                             raise Exception("Zero checks made")
