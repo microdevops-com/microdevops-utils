@@ -28,6 +28,7 @@ make_deb_v1:
     mkdir -p builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/bulk_log \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_queries_log \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker \
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_increment_checker \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/notify_devilry \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/disk_alert \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/put_check_files \
@@ -59,6 +60,11 @@ make_deb_v1:
        mysql_replica_checker/mysql_replica_checker.cron \
        mysql_replica_checker/mysql_replica_checker.conf.example \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_replica_checker
+    # mysql_increment_checker
+    cp mysql_increment_checker/mysql_increment_checker.py \
+       mysql_increment_checker/mysql_increment_checker.cron \
+       mysql_increment_checker/mysql_increment_checker.yaml.example \
+       builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/mysql_increment_checker
     # notify_devilry
     cp notify_devilry/notify_devilry.py \
        notify_devilry/notify_devilry_test.sh \
