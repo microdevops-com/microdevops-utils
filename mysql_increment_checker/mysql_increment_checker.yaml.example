@@ -1,0 +1,2 @@
+auto_increment_ratio: 70
+my_cred: "~/.my.cnf"

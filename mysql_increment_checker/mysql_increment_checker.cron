@@ -1,0 +1,2 @@
+# Check MYSQL autoincrement counters
+*/30 * * * *	root	/opt/sysadmws/mysql_increment_checker/mysql_increment_checker.py
