@@ -224,5 +224,5 @@ rsync_repo:
     refs:
       - master
   script: |
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no" /opt/sysadmws/apt/ repo@web1.sysadm.ws:/var/www/repo/sysadmws-apt/
-    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no" /opt/sysadmws/tgz/ repo@web1.sysadm.ws:/var/www/repo/tgz/
+    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no" /opt/sysadmws/apt/ repo@web2.sysadm.ws:/var/www/repo/repo/sysadmws-apt/
+    rsync -a -e "ssh -i /opt/sysadmws/ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no" /opt/sysadmws/tgz/ repo@web2.sysadm.ws:/var/www/repo/repo/tgz/
