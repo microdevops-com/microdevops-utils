@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import warnings
+import re
 
 try:
     import MySQLdb, MySQLdb.cursors
@@ -21,7 +22,7 @@ def read_config():
 
     if os.path.exists(configfile):
         with open(configfile, "r") as f:
-             config.update(yaml.safe_load(f))
+            config.update(yaml.safe_load(f))
 
     if not os.path.exists(os.path.expanduser(config["my_cred"])):
         _ = config.pop("my_cred")
@@ -66,18 +67,32 @@ def fetch_increment_status(config):
         else:
             raise
 
-def process_status(status):
+
+def process_status(status, config):
     _text = ""
     _max = 0
 
     if status:
         for entry in status:
-            _text += entry["TABLE_SCHEMA"] + "." + entry["TABLE_NAME"] + ": " +  str(entry["AUTO_INCREMENT_RATIO"]) + "\n"
-            if int(entry["AUTO_INCREMENT_RATIO"]) > _max:
-                _max = int(entry["AUTO_INCREMENT_RATIO"])
-        return {"text": _text, "max": _max}, False
-    else:
-        return {"text": _text, "max": _max}, True
+
+            # filter entries in status
+            for pattern in config.get("exclude_patterns",[]):
+                if re.search(pattern, entry["TABLE_SCHEMA"] + "." + entry["TABLE_NAME"]):
+                    break
+            else:
+                _text += (
+                    entry["TABLE_SCHEMA"]
+                    + "."
+                    + entry["TABLE_NAME"]
+                    + ": "
+                    + str(entry["AUTO_INCREMENT_RATIO"])
+                    + "\n"
+                )
+                if int(entry["AUTO_INCREMENT_RATIO"]) > _max:
+                    _max = int(entry["AUTO_INCREMENT_RATIO"])
+
+    return {"text": _text, "max": _max}, _text == ""
+
 
 def process_check(message, ok):
 
@@ -105,16 +120,25 @@ def process_check(message, ok):
                 "correlate": ["mysql_increment_checker_ok"],
             }
         )
-    response.update({"value": message["max"],
-                     "text": message["text"]})
+    response.update(
+        {
+            "value": message["max"],
+            "text": message["text"],
+            "attributes": {
+                "auto_increment_ratio_threshold": config["auto_increment_ratio"]
+            },
+        }
+    )
     return response
-
 
 
 if __name__ == "__main__":
     config = read_config()
+    if not config.get("enabled", "True"):
+        sys.exit(0)
+
     increment_status = fetch_increment_status(config)
-    message, ok = process_status(increment_status)
+    message, ok = process_status(increment_status, config)
     check = process_check(message, ok)
     p = subprocess.Popen(
         ["/opt/sysadmws/notify_devilry/notify_devilry.py"], stdin=subprocess.PIPE
