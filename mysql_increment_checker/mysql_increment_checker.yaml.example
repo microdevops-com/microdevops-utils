@@ -1,2 +1,7 @@
 auto_increment_ratio: 70
 my_cred: "~/.my.cnf"
+enabled: True
+exclude_patterns: # will match against db_name.table_name compound string
+  - .*_dev_.*
+  - .*_local
+  - ^tmp
