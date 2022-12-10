@@ -8,6 +8,7 @@ defaults:
   client: Client 1
   location: Some Datacenter
   #group: srv1.example.com # override group, hostname by default
+  description: Server 1
 
 alerta:
 
