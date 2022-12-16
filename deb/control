@@ -5,4 +5,4 @@ Installed-Size: __SIZE__
 Maintainer: Microdevops Admin <admin@microdevops.com>
 Architecture: all
 Version: 1.__VERSION__
-Description: Microdevops Utils - a set of useful utils for SRE.
+Description: Microdevops Utils - a set of useful utils for SRE
