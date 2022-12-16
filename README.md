@@ -1,5 +1,5 @@
 # sysadmws-utils-v1
-Sysadmin Workshop Utilities:
+Microdevops Utilities:
 - bulk_log - collect and logrotate raw output from debug commands, useful for post-mortem diagnosis.
 - disk_alert - simple autonomouos script to check free space and space prediction using linear regression, sends alerts to Telegram usign notify_devilry.
 - logrotate_db_backup - script to rotate db dumps using logrotate.

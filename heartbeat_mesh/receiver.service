@@ -1,5 +1,5 @@
 [Unit]
-Description=Sysadmin Workshop Heartbeat Mesh Receiver Service
+Description=Microdevops Heartbeat Mesh Receiver Service
 
 [Service]
 ExecStart=/opt/sysadmws/heartbeat_mesh/receiver.py
