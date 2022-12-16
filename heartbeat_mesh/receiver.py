@@ -500,6 +500,14 @@ if __name__ == "__main__":
 
         logger.info("Starting {name} on port {port}".format(name=NAME, port=args.port))
 
+        # Check custom NOTIFY_DEVILRY_SLEEP and QUEUE_THRESHOLD in config
+        if "notify_devilry_sleep" in config:
+            NOTIFY_DEVILRY_SLEEP = config["notify_devilry_sleep"]
+            logger.info("Using custom NOTIFY_DEVILRY_SLEEP {sleep}".format(sleep=NOTIFY_DEVILRY_SLEEP))
+        if "queue_threshold" in config:
+            QUEUE_THRESHOLD = config["queue_threshold"]
+            logger.info("Using custom QUEUE_THRESHOLD {threshold}".format(threshold=QUEUE_THRESHOLD))
+
         # Transpone clients to token dict
         token_to_client = {}
         for client in config["clients"]:

@@ -1,5 +1,7 @@
 # This file is reread on every check, no need to reload the daemon on resources changes
 enabled: True
+notify_devilry_sleep: 1 # optional, 1 second by default, sleep between notifying alerta, depends on alerta performance
+queue_threshold: 1000 # optional, 1000 by default, max alerta queue length, depends on resource quantity, do not make too big, to avoid storms in case of global network outages
 clients:
   Client1:
     token: aaaaaaaaaaaaaaaaaaaaa # each client is identified by token, all tokens should be unique
