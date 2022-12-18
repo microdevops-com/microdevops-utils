@@ -39,6 +39,7 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cloudflare \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/heartbeat_mesh \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/sentry_catch_root_mail \
+             builds/v1/deb/sysadmws-utils-v1/opt/microdevops/catch_server_mail \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
     # LICENSE README.md
     cp LICENSE \
@@ -144,6 +145,9 @@ make_deb_v1:
     cp sentry_catch_root_mail/sentry-sender.sh \
        sentry_catch_root_mail/set-alias-for-all-users.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/sentry_catch_root_mail
+    # catch_server_mail
+    cp catch_server_mail/sentry.sh \
+       builds/v1/deb/sysadmws-utils-v1/opt/microdevops/catch_server_mail
     # misc
     cp misc/mysql_dump_all_dbs_to_files.sh \
        misc/postgresql_dump_all_dbs_to_files.sh \
