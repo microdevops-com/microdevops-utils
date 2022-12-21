@@ -32,9 +32,9 @@ LOCK_FILE = "/run/rsnapshot_backup"
 RSNAPSHOT_CONF = "/opt/sysadmws/rsnapshot_backup/rsnapshot.conf"
 RSNAPSHOT_PASSWD = "/opt/sysadmws/rsnapshot_backup/rsnapshot.passwd"
 DATA_EXPAND = {
-    "UBUNTU": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
-    "DEBIAN": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws"],
-    "CENTOS": ["/etc","/home","/root","/var/spool/cron","/var/lib/rpm","/usr/local","/opt/sysadmws"]
+    "UBUNTU": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws","/opt/microdevops"],
+    "DEBIAN": ["/etc","/home","/root","/var/spool/cron","/var/lib/dpkg","/usr/local","/opt/sysadmws","/opt/microdevops"],
+    "CENTOS": ["/etc","/home","/root","/var/spool/cron","/var/lib/rpm","/usr/local","/opt/sysadmws","/opt/microdevops"]
 }
 
 # Functions
