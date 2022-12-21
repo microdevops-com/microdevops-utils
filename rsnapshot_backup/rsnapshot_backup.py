@@ -1257,11 +1257,11 @@ if __name__ == "__main__":
 
                                         # Check ibdata1.qp at least 1 Mb
                                         ibdata1_file = "{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)
-                                        if os.path.exists(ibdata1_file) and os.stat(ibdata1_file).st_size > 1000000:
-                                            log_and_print("NOTICE", "Found {ibdata1_file} file larger than 1 Mb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
+                                        if os.path.exists(ibdata1_file) and os.stat(ibdata1_file).st_size > 500000:
+                                            log_and_print("NOTICE", "Found {ibdata1_file} file larger than 500 Kb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
                                             oks += 1
                                         else:
-                                            log_and_print("ERROR", "Found no {ibdata1_file} file larger than 1 Mb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Found no {ibdata1_file} file larger than 500 Kb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
                                             errors += 1
 
                                         # Read xtrabackup_info.qp
