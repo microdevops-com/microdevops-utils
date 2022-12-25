@@ -39,7 +39,8 @@ make_deb_v1:
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/cloudflare \
              builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/heartbeat_mesh \
              builds/v1/deb/sysadmws-utils-v1/opt/microdevops/catch_server_mail \
-             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
+             builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc \
+             builds/v1/deb/sysadmws-utils-v1/opt/microdevops/misc
     # LICENSE README.md
     cp LICENSE \
        README.md \
@@ -143,18 +144,20 @@ make_deb_v1:
     # catch_server_mail
     cp catch_server_mail/sentry.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/microdevops/catch_server_mail
-    # misc
+    # misc old
     cp misc/mysql_dump_all_dbs_to_files.sh \
        misc/postgresql_dump_all_dbs_to_files.sh \
        misc/mysql_table_extractor.sh \
        misc/mysql_create_new_database.sh \
        misc/mysqlpump_one_base_exclude_tables.sh \
        misc/shebang_python_switcher.sh \
-       misc/install_requirements.sh \
-       misc/tgz_cleanup.sh \
        misc/pxc_check.sh \
        misc/check_redis_rejected_connections.sh \
        builds/v1/deb/sysadmws-utils-v1/opt/sysadmws/misc
+    # misc new
+    cp misc/cleanup.sh \
+       misc/install_requirements.sh \
+       builds/v1/deb/sysadmws-utils-v1/opt/microdevops/misc
     # Make control dir
     mkdir -p builds/v1/deb/sysadmws-utils-v1/DEBIAN
     # Make md5sums
