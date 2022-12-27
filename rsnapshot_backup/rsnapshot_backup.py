@@ -570,7 +570,7 @@ if __name__ == "__main__":
                                             databases_exclude = ""
 
                                         # Regex dots are to hide words that produce false positive
-                                        mysqlsh_output_filter = 'grep -v -e "The dump may f..l with an e...r if schema changes are made while dumping" -e "Writing DDL" -e "Data dump for" -e "Found e...rs loading plugins"'
+                                        mysqlsh_output_filter = 'grep -v -e "dump may f..l with an e...r" -e "Writing DDL" -e "Data dump for" -e "Found e...rs loading plugins" -e "Preparing data dump for" -e "Could not select a column to be used as an index"'
 
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
