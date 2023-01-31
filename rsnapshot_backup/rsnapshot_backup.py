@@ -232,6 +232,9 @@ if __name__ == "__main__":
                     if "mongodb_dump_dir" not in item:
                         item["mongodb_dump_dir"] = "/var/backups/mongodb"
 
+                    if "dump_prefix_cmd" not in item:
+                        item["dump_prefix_cmd"] = ""
+
                     if "mysqldump_args" not in item:
                         item["mysqldump_args"] = ""
                     if "pg_dump_args" not in item:
@@ -500,7 +503,7 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/all.xtrabackup ]]; then
-                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                        {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -509,6 +512,7 @@ if __name__ == "__main__":
                                                 xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 databases_exclude=databases_exclude,
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 xtrabackup_args=item["xtrabackup_args"],
                                                 xtrabackup_output_filter=xtrabackup_output_filter
                                             )
@@ -516,7 +520,7 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/{source}.xtrabackup ]]; then
-                                                        xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                        {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                 fi
                                                 """
                                             ).format(
@@ -525,6 +529,7 @@ if __name__ == "__main__":
                                                 xtrabackup_compress_threads=item["xtrabackup_compress_threads"],
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 source=item["source"],
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 xtrabackup_args=item["xtrabackup_args"],
                                                 xtrabackup_output_filter=xtrabackup_output_filter
                                             )
@@ -576,11 +581,12 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/all.mysqlsh ]]; then
-                                                        mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                        {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                 fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 mysqlsh_connect_args=item["mysqlsh_connect_args"],
                                                 mysqlsh_max_rate=item["mysqlsh_max_rate"],
                                                 mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
@@ -593,12 +599,13 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -d {mysql_dump_dir}/{source}.mysqlsh ]]; then
-                                                        mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                        {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                 fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 source=item["source"],
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 mysqlsh_connect_args=item["mysqlsh_connect_args"],
                                                 mysqlsh_max_rate=item["mysqlsh_max_rate"],
                                                 mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
@@ -647,13 +654,14 @@ if __name__ == "__main__":
                                                 mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
                                                 for db in $(cat {mysql_dump_dir}/db_list.txt); do
                                                         if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
-                                                                mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/$db.gz
+                                                                {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/$db.gz
                                                         fi
                                                 done
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 mysql_events="" if item["mysql_noevents"] else "--events",
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter
                                             )
@@ -661,12 +669,13 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
-                                                        mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/{source}.gz
+                                                        {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/{source}.gz
                                                 fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
                                                 mysql_events="" if item["mysql_noevents"] else "--events",
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
                                                 source=item["source"]
@@ -720,13 +729,14 @@ if __name__ == "__main__":
                                             su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
-                                                            su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
+                                                            su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
                                                     fi
                                             done
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
                                             postgresql_clean="" if item["postgresql_noclean"] else "--clean",
+                                            dump_prefix_cmd=item["dump_prefix_cmd"],
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             pg_dump_filter=pg_dump_filter
@@ -735,12 +745,13 @@ if __name__ == "__main__":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
-                                                    su - postgres -c "pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
+                                                    su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
                                             fi
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
                                             postgresql_clean="" if item["postgresql_noclean"] else "--clean",
+                                            dump_prefix_cmd=item["dump_prefix_cmd"],
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
@@ -789,7 +800,7 @@ if __name__ == "__main__":
                                             echo show dbs | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
-                                                            mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
+                                                            {dump_prefix_cmd} mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
                                                             cd {mongodb_dump_dir}
                                                             tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
                                                             rm -rf {mongodb_dump_dir}/$db
@@ -798,6 +809,7 @@ if __name__ == "__main__":
                                             """
                                         ).format(
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
+                                            dump_prefix_cmd=item["dump_prefix_cmd"],
                                             mongo_args=item["mongo_args"],
                                             grep_db_filter=grep_db_filter
                                         )
@@ -805,7 +817,7 @@ if __name__ == "__main__":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if [[ ! -f {mongodb_dump_dir}/{source}.tar.gz ]]; then
-                                                    mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
+                                                    {dump_prefix_cmd} mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
                                                     cd {mongodb_dump_dir}
                                                     tar zcvf {mongodb_dump_dir}/{source}.tar.gz {source}
                                                     rm -rf {mongodb_dump_dir}/{source}
@@ -813,6 +825,7 @@ if __name__ == "__main__":
                                             """
                                         ).format(
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
+                                            dump_prefix_cmd=item["dump_prefix_cmd"],
                                             mongo_args=item["mongo_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"]
