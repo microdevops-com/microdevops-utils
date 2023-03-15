@@ -25,7 +25,8 @@ if [ -f $CONF_FILE ]; then
 				"/var/spool/cron"
 				"/var/lib/dpkg"
 				"/usr/local"
-				"/opt/sysadmws")
+				"/opt/sysadmws"
+				"/opt/microdevops")
 			elif [[ "$LOCAL_PATH" = "DEBIAN" ]]; then
 				LOCAL_SUBPATHS=("/etc"
 				"/home"
@@ -33,7 +34,8 @@ if [ -f $CONF_FILE ]; then
 				"/var/spool/cron"
 				"/var/lib/dpkg"
 				"/usr/local"
-				"/opt/sysadmws")
+				"/opt/sysadmws"
+				"/opt/microdevops")
 			elif [[ "$LOCAL_PATH" = "CENTOS" ]]; then
 				LOCAL_SUBPATHS=("/etc"
 				"/home"
@@ -41,7 +43,8 @@ if [ -f $CONF_FILE ]; then
 				"/var/spool/cron"
 				"/var/lib/rpm"
 				"/usr/local"
-				"/opt/sysadmws")
+				"/opt/sysadmws"
+				"/opt/microdevops")
 			else
 				LOCAL_SUBPATHS=("$LOCAL_PATH")
 			fi
