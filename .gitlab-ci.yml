@@ -158,6 +158,7 @@ make_deb_v1:
     cp misc/cleanup.sh \
        misc/install_requirements.sh \
        misc/check_domain_expiration.py \
+       check_redis_memory.py \
        builds/v1/deb/sysadmws-utils-v1/opt/microdevops/misc
     # Make control dir
     mkdir -p builds/v1/deb/sysadmws-utils-v1/DEBIAN
