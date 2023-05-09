@@ -654,7 +654,7 @@ if __name__ == "__main__":
                                                 mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
                                                 for db in $(cat {mysql_dump_dir}/db_list.txt); do
                                                         if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
-                                                                {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/$db.gz
+                                                                {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
                                                         fi
                                                 done
                                                 """
@@ -669,7 +669,7 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
-                                                        {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} {mysqldump_args} --max_allowed_packet=1G | gzip > {mysql_dump_dir}/{source}.gz
+                                                        {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/{source}.gz
                                                 fi
                                                 """
                                             ).format(
