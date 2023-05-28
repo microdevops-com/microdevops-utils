@@ -19,6 +19,7 @@ import subprocess
 import re
 import gzip
 import tarfile
+import resource
 
 # Constants
 LOGO="rsnapshot_backup"
@@ -52,8 +53,10 @@ def log_and_print(kind, text, logger):
     sys.stderr.write("\n")
 
 def run_cmd(cmd):
+    def setlim():
+      resource.setrlimit(resource.RLIMIT_NOFILE, (10**4,10**4))
 
-    process = subprocess.Popen(cmd, shell=True, executable="/bin/bash")
+    process = subprocess.Popen(cmd, shell=True, executable="/bin/bash", preexec_fn=setlim)
     try:
         process.communicate(None)
     except:
