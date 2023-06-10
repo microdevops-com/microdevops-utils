@@ -9,7 +9,8 @@ from pprint import pprint
 @click.option("--domain", required=True, help="Domain to check")
 @click.option("--warning", type=click.INT, default=(28 * 24 * 60), help="Minutes to warning, default 28 * 24 * 60 (4 weeks)")
 @click.option("--critical", type=click.INT, default=(7 * 24 * 60), help="Minutes to critical, default 7 * 24 * 60 (1 week)")
-def main(domain, warning, critical):
+@click.option("--no-cache", is_flag=True, default=False, help="Do not use cache file, optional")
+def main(domain, warning, critical, no_cache):
 
     exit_code = 0
     try:
@@ -18,7 +19,7 @@ def main(domain, warning, critical):
         # Try query 3 times
         for i in range(3):
             try:
-                query = whois.query(domain=domain, cache_file="/opt/microdevops/misc/check_domain_expiration.cache", ignore_returncode=True)
+                query = whois.query(domain=domain, cache_file="/opt/microdevops/misc/check_domain_expiration.cache", ignore_returncode=True, force=no_cache)
             except Exception as e:
                 print("WARNING: {exception}".format(exception=e))
                 continue
