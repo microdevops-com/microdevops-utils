@@ -7,28 +7,43 @@ from pprint import pprint
 
 @click.command()
 @click.option("--domain", required=True, help="Domain to check")
-@click.option("--days-warning", type=click.INT, default=28, help="Days to warning, default 28")
-@click.option("--days-critical", type=click.INT, default=7, help="Days to critical, default 7")
-def main(domain, days_warning, days_critical):
+@click.option("--warning", type=click.INT, default=(28 * 24 * 60), help="Minutes to warning, default 28 * 24 * 60 (4 weeks)")
+@click.option("--critical", type=click.INT, default=(7 * 24 * 60), help="Minutes to critical, default 7 * 24 * 60 (1 week)")
+def main(domain, warning, critical):
 
     exit_code = 0
     try:
-        query = whois.query(domain)
+        query_success = False
+        # We ignore return code because the whois command itself does retries to different servers and return 1 if retries made
+        # Try query 3 times
+        for i in range(3):
+            try:
+                query = whois.query(domain=domain, cache_file="/opt/microdevops/misc/check_domain_expiration.cache", ignore_returncode=True)
+            except Exception as e:
+                print("WARNING: {exception}".format(exception=e))
+                continue
+            else:
+                query_success = True
+                break
+        if not query_success:
+            print("CRITICAL: Unable to query domain {domain}".format(domain=domain))
+            exit(2)
         if query.expiration_date is None:
+            print("CRITICAL: Domain {domain} has no expiration date".format(domain=domain))
             exit_code = 2
         else:
             expiration_date = query.expiration_date
-            days = (expiration_date - datetime.datetime.now()).days
-            if days < days_critical:
-                print("CRITICAL: Domain %s expires in %d days" % (domain, days))
+            minutes = int((expiration_date - datetime.datetime.now()).total_seconds() / 60)
+            if minutes < critical:
+                print("CRITICAL: Domain {domain} expires in {minutes} minutes ({days} days)".format(domain=domain, minutes=minutes, days=int(minutes / 60 / 24)))
                 exit_code = 2
-            elif days < days_warning:
-                print("WARNING: Domain %s expires in %d days" % (domain, days))
+            elif minutes < warning:
+                print("WARNING: Domain {domain} expires in {minutes} minutes ({days} days)".format(domain=domain, minutes=minutes, days=int(minutes / 60 / 24)))
                 exit_code = 1
             else:
-                print("OK: Domain %s expires in %d days" % (domain, days))
+                print("OK: Domain {domain} expires in {minutes} minutes ({days} days)".format(domain=domain, minutes=minutes, days=int(minutes / 60 / 24)))
     except Exception as e:
-        print("CRITICAL: %s" % e)
+        print("CRITICAL: {exception}".format(exception=e))
         exit(2)
     else:
         pprint(vars(query))
