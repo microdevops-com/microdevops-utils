@@ -23,13 +23,13 @@ ping -c 4 ${GW_IP_ADDRESS} 2>&1
 echo "###"
 arp -an 2>&1
 echo "###"
-ifconfig 2>&1
+ifconfig -a 2>&1
 echo "###"
 ethtool eth0 2>&1
 echo "###"
 ethtool -S eth0 2>&1
 echo "###"
-netstat -i 2>&1
+netstat -ia 2>&1
 echo "###"
 netstat -nr 2>&1
 echo "###"
