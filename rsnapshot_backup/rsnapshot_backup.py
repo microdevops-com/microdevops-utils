@@ -241,6 +241,11 @@ if __name__ == "__main__":
                         item["pg_dump_args"] = ""
                     if "mongo_args" not in item:
                         item["mongo_args"] = ""
+                    # For backward compatibility:
+                    # if only mongo_args is set use it for mongo and mongodump
+                    # if mongodump_args is set use them separately
+                    if "mongodump_args" not in item:
+                        item["mongodump_args"] = item["mongo_args"]
 
                     if "xtrabackup_throttle" not in item:
                         item["xtrabackup_throttle"] = "20" # 20 MB IO limit by default https://www.percona.com/doc/percona-xtrabackup/2.3/advanced/throttling_backups.html
@@ -800,7 +805,7 @@ if __name__ == "__main__":
                                             echo show dbs | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
-                                                            {dump_prefix_cmd} mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
+                                                            {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
                                                             cd {mongodb_dump_dir}
                                                             tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
                                                             rm -rf {mongodb_dump_dir}/$db
@@ -811,13 +816,14 @@ if __name__ == "__main__":
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             mongo_args=item["mongo_args"],
+                                            mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if [[ ! -f {mongodb_dump_dir}/{source}.tar.gz ]]; then
-                                                    {dump_prefix_cmd} mongodump --quiet {mongo_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
+                                                    {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
                                                     cd {mongodb_dump_dir}
                                                     tar zcvf {mongodb_dump_dir}/{source}.tar.gz {source}
                                                     rm -rf {mongodb_dump_dir}/{source}
@@ -827,6 +833,7 @@ if __name__ == "__main__":
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             mongo_args=item["mongo_args"],
+                                            mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"]
                                         )
