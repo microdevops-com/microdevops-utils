@@ -958,7 +958,12 @@ if __name__ == "__main__":
 
                             # Populate backup lines in config
 
-                            conf_backup_line_template = textwrap.dedent(
+                            conf_backup_line_template_self = textwrap.dedent(
+                                """\
+                                backup		{source}/	rsnapshot/{tab_before_rsync_long_args}{rsync_long_args}
+                                """
+                            )
+                            conf_backup_line_template_ssh = textwrap.dedent(
                                 """\
                                 backup		{user}@{host}:{source}/	rsnapshot/{tab_before_rsync_long_args}{rsync_long_args}
                                 """
@@ -970,48 +975,83 @@ if __name__ == "__main__":
                                 if item["source"] in DATA_EXPAND:
                                     for source in DATA_EXPAND[item["source"]]:
                                         if not ("exclude" in item and source in item["exclude"]):
-                                            conf_backup_lines += conf_backup_line_template.format(
-                                                user=item["connect_user"],
-                                                host=item["connect_host"],
-                                                source=source,
-                                                tab_before_rsync_long_args="\t" if source == "/opt/sysadmws" else "",
-                                                rsync_long_args="+rsync_long_args=--exclude=/opt/sysadmws/bulk_log --exclude=log" if source == "/opt/sysadmws" else ""
-                                            )
+                                            if item["host"] == SELF_HOSTNAME:
+                                                conf_backup_lines += conf_backup_line_template_self.format(
+                                                    source=source,
+                                                    tab_before_rsync_long_args="\t" if source == "/opt/sysadmws" else "",
+                                                    rsync_long_args="+rsync_long_args=--exclude=/opt/sysadmws/bulk_log --exclude=log" if source == "/opt/sysadmws" else ""
+                                                )
+                                            else:
+                                                conf_backup_lines += conf_backup_line_template_ssh.format(
+                                                    user=item["connect_user"],
+                                                    host=item["connect_host"],
+                                                    source=source,
+                                                    tab_before_rsync_long_args="\t" if source == "/opt/sysadmws" else "",
+                                                    rsync_long_args="+rsync_long_args=--exclude=/opt/sysadmws/bulk_log --exclude=log" if source == "/opt/sysadmws" else ""
+                                                )
                                 else:
-                                    conf_backup_lines += conf_backup_line_template.format(
-                                        user=item["connect_user"],
-                                        host=item["connect_host"],
-                                        source=item["source"],
-                                        tab_before_rsync_long_args="",
-                                        rsync_long_args=""
-                                    )
+                                    if item["host"] == SELF_HOSTNAME:
+                                        conf_backup_lines += conf_backup_line_template_self.format(
+                                            source=item["source"],
+                                            tab_before_rsync_long_args="",
+                                            rsync_long_args=""
+                                        )
+                                    else:
+                                        conf_backup_lines += conf_backup_line_template_ssh.format(
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            source=item["source"],
+                                            tab_before_rsync_long_args="",
+                                            rsync_long_args=""
+                                        )
 
                             if item["type"] == "MYSQL_SSH":
                                 # We do not need rsync compression as xtrabackup or mysqlsh dumps are already compressed
                                 # With compress it takes 10-12 times longer
-                                conf_backup_lines += conf_backup_line_template.format(
-                                    user=item["connect_user"],
-                                    host=item["connect_host"],
-                                    source=item["mysql_dump_dir"],
-                                    tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
-                                    rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
-                                )
+                                if item["host"] == SELF_HOSTNAME:
+                                    conf_backup_lines += conf_backup_line_template_self.format(
+                                        source=item["mysql_dump_dir"],
+                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
+                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
+                                    )
+                                else:
+                                    conf_backup_lines += conf_backup_line_template_ssh.format(
+                                        user=item["connect_user"],
+                                        host=item["connect_host"],
+                                        source=item["mysql_dump_dir"],
+                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
+                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
+                                    )
                             if item["type"] == "POSTGRESQL_SSH":
-                                conf_backup_lines += conf_backup_line_template.format(
-                                    user=item["connect_user"],
-                                    host=item["connect_host"],
-                                    source=item["postgresql_dump_dir"],
-                                    tab_before_rsync_long_args="",
-                                    rsync_long_args=""
-                                )
+                                if item["host"] == SELF_HOSTNAME:
+                                    conf_backup_lines += conf_backup_line_template_self.format(
+                                        source=item["postgresql_dump_dir"],
+                                        tab_before_rsync_long_args="",
+                                        rsync_long_args=""
+                                    )
+                                else:
+                                    conf_backup_lines += conf_backup_line_template_ssh.format(
+                                        user=item["connect_user"],
+                                        host=item["connect_host"],
+                                        source=item["postgresql_dump_dir"],
+                                        tab_before_rsync_long_args="",
+                                        rsync_long_args=""
+                                    )
                             if item["type"] == "MONGODB_SSH":
-                                conf_backup_lines += conf_backup_line_template.format(
-                                    user=item["connect_user"],
-                                    host=item["connect_host"],
-                                    source=item["mongodb_dump_dir"],
-                                    tab_before_rsync_long_args="",
-                                    rsync_long_args=""
-                                )
+                                if item["host"] == SELF_HOSTNAME:
+                                    conf_backup_lines += conf_backup_line_template_self.format(
+                                        source=item["mongodb_dump_dir"],
+                                        tab_before_rsync_long_args="",
+                                        rsync_long_args=""
+                                    )
+                                else:
+                                    conf_backup_lines += conf_backup_line_template_ssh.format(
+                                        user=item["connect_user"],
+                                        host=item["connect_host"],
+                                        source=item["mongodb_dump_dir"],
+                                        tab_before_rsync_long_args="",
+                                        rsync_long_args=""
+                                    )
 
                             # Save config
                             with open(RSNAPSHOT_CONF, "w") as file_to_write:
