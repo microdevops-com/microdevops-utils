@@ -296,6 +296,17 @@ if __name__ == "__main__":
                         if args.rotate_monthly:
                             rsnapshot_command = "monthly"
 
+                        # Skip calling rotate when retain = 0
+                        if rsnapshot_command == "daily" and str(item["retain_daily"]) == "0":
+                            log_and_print("NOTICE", "Skipping rotate daily on item number {number} because retain_daily = 0".format(number=item["number"]), logger)
+                            continue
+                        if rsnapshot_command == "weekly" and str(item["retain_weekly"]) == "0":
+                            log_and_print("NOTICE", "Skipping rotate weekly on item number {number} because retain_weekly = 0".format(number=item["number"]), logger)
+                            continue
+                        if rsnapshot_command == "monthly" and str(item["retain_monthly"]) == "0":
+                            log_and_print("NOTICE", "Skipping rotate monthly on item number {number} because retain_monthly = 0".format(number=item["number"]), logger)
+                            continue
+
                         # Process paths from many items only once on rotations
                         if item["path"] in paths_processed:
                             log_and_print("NOTICE", "Path {path} on item number {number} already rotated, skipping".format(path=item["path"], number=item["number"]), logger)
