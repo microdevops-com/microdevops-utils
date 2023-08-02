@@ -313,9 +313,9 @@ if __name__ == "__main__":
                                 cmd_ssh		/usr/bin/ssh
                                 cmd_logger	/usr/bin/logger
                                 {retain_hourly_comment}retain		hourly	{retain_hourly}
-                                retain		daily	{retain_daily}
-                                retain		weekly	{retain_weekly}
-                                retain		monthly	{retain_monthly}
+                                {retain__daily_comment}retain		daily	{retain_daily}
+                                {retain_weekly_comment}retain		weekly	{retain_weekly}
+                                {retain_monthlycomment}retain		monthly	{retain_monthly}
                                 verbose		{verbosity_level}
                                 loglevel	3
                                 logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
@@ -327,6 +327,9 @@ if __name__ == "__main__":
                             ).format(
                                 snapshot_root=item["path"],
                                 retain_hourly_comment="" if "retain_hourly" in item else "#",
+                                retain__daily_comment="" if str("retain_daily") != "0" else "#",
+                                retain_weekly_comment="" if str("retain_weekly") != "0" else "#",
+                                retain_monthlycomment="" if str("retain_monthly") != "0" else "#",
                                 retain_hourly=item["retain_hourly"] if "retain_hourly" in item else "NONE",
                                 retain_daily=item["retain_daily"],
                                 retain_weekly=item["retain_weekly"],
@@ -1065,9 +1068,9 @@ if __name__ == "__main__":
                                     cmd_ssh		/usr/bin/ssh
                                     cmd_logger	/usr/bin/logger
                                     {retain_hourly_comment}retain		hourly	{retain_hourly}
-                                    retain		daily	{retain_daily}
-                                    retain		weekly	{retain_weekly}
-                                    retain		monthly	{retain_monthly}
+                                    {retain__daily_comment}retain		daily	{retain_daily}
+                                    {retain_weekly_comment}retain		weekly	{retain_weekly}
+                                    {retain_monthlycomment}retain		monthly	{retain_monthly}
                                     verbose		{verbosity_level}
                                     loglevel	3
                                     logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
@@ -1080,6 +1083,9 @@ if __name__ == "__main__":
                                 ).format(
                                     snapshot_root=item["path"],
                                     retain_hourly_comment="" if "retain_hourly" in item else "#",
+                                    retain__daily_comment="" if str("retain_daily") != "0" else "#",
+                                    retain_weekly_comment="" if str("retain_weekly") != "0" else "#",
+                                    retain_monthlycomment="" if str("retain_monthly") != "0" else "#",
                                     retain_hourly=item["retain_hourly"] if "retain_hourly" in item else "NONE",
                                     retain_daily=item["retain_daily"],
                                     retain_weekly=item["retain_weekly"],
@@ -1208,9 +1214,9 @@ if __name__ == "__main__":
                                     cmd_ssh		/usr/bin/ssh
                                     cmd_logger	/usr/bin/logger
                                     {retain_hourly_comment}retain		hourly	{retain_hourly}
-                                    retain		daily	{retain_daily}
-                                    retain		weekly	{retain_weekly}
-                                    retain		monthly	{retain_monthly}
+                                    {retain__daily_comment}retain		daily	{retain_daily}
+                                    {retain_weekly_comment}retain		weekly	{retain_weekly}
+                                    {retain_monthlycomment}retain		monthly	{retain_monthly}
                                     verbose		{verbosity_level}
                                     loglevel	3
                                     logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
@@ -1222,6 +1228,9 @@ if __name__ == "__main__":
                                 ).format(
                                     snapshot_root=item["path"],
                                     retain_hourly_comment="" if "retain_hourly" in item else "#",
+                                    retain__daily_comment="" if str("retain_daily") != "0" else "#",
+                                    retain_weekly_comment="" if str("retain_weekly") != "0" else "#",
+                                    retain_monthlycomment="" if str("retain_monthly") != "0" else "#",
                                     retain_hourly=item["retain_hourly"] if "retain_hourly" in item else "NONE",
                                     retain_daily=item["retain_daily"],
                                     retain_weekly=item["retain_weekly"],
