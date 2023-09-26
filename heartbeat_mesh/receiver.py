@@ -508,6 +508,14 @@ if __name__ == "__main__":
             QUEUE_THRESHOLD = config["queue_threshold"]
             logger.info("Using custom QUEUE_THRESHOLD {threshold}".format(threshold=QUEUE_THRESHOLD))
 
+        # Make sure that resources in config are dicts, change to empty dict if not
+        for client in config["clients"]:
+            if "resources" not in config["clients"][client]:
+                config["clients"][client]["resources"] = {}
+            else:
+                if type(config["clients"][client]["resources"]) is not dict:
+                    config["clients"][client]["resources"] = {}
+
         # Transpone clients to token dict
         token_to_client = {}
         for client in config["clients"]:
