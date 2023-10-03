@@ -1485,11 +1485,7 @@ if __name__ == "__main__":
                                                 db_list_file_line = db_list_file.readline().rstrip()
                                                 if not db_list_file_line:
                                                     break
-                                                if "empty_db" in check:
-                                                    if db_list_file_line not in check["empty_db"]:
-                                                        sources_to_check.append(db_list_file_line)
-                                                else:
-                                                    sources_to_check.append(db_list_file_line)
+                                                sources_to_check.append(db_list_file_line)
                                     else:
                                         log_and_print("ERROR", "{db_list_file_path} file is missing on item number {number}".format(db_list_file_path=db_list_file_path, number=item["number"]), logger)
                                         errors += 1
@@ -1511,6 +1507,7 @@ if __name__ == "__main__":
                                         # With MYSQL and POSTGRESQL we read dump files
                                         if check["type"] in ["MYSQL", "POSTGRESQL"]:
 
+                                            # Do dump_file_inserts check only if source or ALL is not in empty_db
                                             dump_file_lines_number = 0
                                             dump_file_inserts = 0
                                             dump_completed_date = None
@@ -1521,9 +1518,9 @@ if __name__ == "__main__":
                                                     if not dump_file_line:
                                                         log_and_print("NOTICE", "Read {dump_file_lines_number} lines in dump file {dump_file} on item number {number}".format(dump_file_lines_number=dump_file_lines_number, dump_file=dump_file, number=item["number"]), logger)
                                                         break
-                                                    if check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode(errors="ignore")):
+                                                    if not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode(errors="ignore")):
                                                         dump_file_inserts += 1
-                                                    elif check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode(errors="ignore")):
+                                                    elif not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode(errors="ignore")):
                                                         dump_file_inserts += 1
                                                     elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_file_line.decode(errors="ignore")):
                                                         re_match = re.match("^-- Dump completed on (.+)$", dump_file_line.decode(errors="ignore"))
@@ -1534,13 +1531,16 @@ if __name__ == "__main__":
                                                         if re_match:
                                                             dump_completed_date = re_match.group(1)
 
-                                            # Check dump inserts
-                                            if dump_file_inserts > 0:
-                                                log_and_print("NOTICE", "Found {dump_file_inserts} inserts in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
-                                                oks += 1
+                                            # Do dump_file_inserts check only if source or ALL is not in empty_db
+                                            if not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])):
+                                                if dump_file_inserts > 0:
+                                                    log_and_print("NOTICE", "Found {dump_file_inserts} inserts in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Found 0 inserts in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                    errors += 1
                                             else:
-                                                log_and_print("ERROR", "Found 0 inserts in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
-                                                errors += 1
+                                                log_and_print("NOTICE", "Skipping dump file inserts check on item number {number} because source or ALL is in empty_db".format(number=item["number"]), logger)
 
                                             # Check dump completed date
                                             if dump_completed_date is not None:
@@ -1556,7 +1556,7 @@ if __name__ == "__main__":
                                                     log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_file=dump_file, number=item["number"]), logger)
                                                     errors += 1
                                             else:
-                                                log_and_print("ERROR", "There is no dump completion signature in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
+                                                log_and_print("ERROR", "There is no dump completion signature in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
                                                 errors += 1
 
                                         # With MONGODB we read tar archive
