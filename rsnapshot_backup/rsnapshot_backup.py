@@ -822,6 +822,7 @@ if __name__ == "__main__":
                                                 echo "echo db.getMongo().setSecondaryOk()
                                                 show dbs"
                                                 """
+                                            )
                                         else:
                                             show_dbs_part = "echo show dbs"
                                         script_dump_part = textwrap.dedent(
