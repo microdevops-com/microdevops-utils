@@ -819,9 +819,8 @@ if __name__ == "__main__":
                                         if item["mongo_secondary_ok"]:
                                             show_dbs_part = textwrap.dedent(
                                                 """\
-                                                echo "echo db.getMongo().setSecondaryOk()
-                                                show dbs"
-                                                """
+                                                echo "db.getMongo().setSecondaryOk()
+                                                show dbs" """
                                             )
                                         else:
                                             show_dbs_part = "echo show dbs"
