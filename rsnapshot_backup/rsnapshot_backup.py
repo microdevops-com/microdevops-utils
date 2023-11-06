@@ -246,6 +246,8 @@ if __name__ == "__main__":
                     # if mongodump_args is set use them separately
                     if "mongodump_args" not in item:
                         item["mongodump_args"] = item["mongo_args"]
+                    if "mongo_secondary_ok" not in item:
+                        item["mongo_secondary_ok"] = False
 
                     if "xtrabackup_throttle" not in item:
                         item["xtrabackup_throttle"] = "20" # 20 MB IO limit by default https://www.percona.com/doc/percona-xtrabackup/2.3/advanced/throttling_backups.html
@@ -814,9 +816,17 @@ if __name__ == "__main__":
                                 if item["type"] == "MONGODB_SSH":
 
                                     if item["source"] == "ALL":
+                                        if item["mongo_secondary_ok"]:
+                                            show_dbs_part = textwrap.dedent(
+                                                """\
+                                                echo "echo db.getMongo().setSecondaryOk()
+                                                show dbs"
+                                                """
+                                        else:
+                                            show_dbs_part = "echo show dbs"
                                         script_dump_part = textwrap.dedent(
                                             """\
-                                            echo show dbs | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
                                                             {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
@@ -827,6 +837,7 @@ if __name__ == "__main__":
                                             done
                                             """
                                         ).format(
+                                            show_dbs_part=show_dbs_part,
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             mongo_args=item["mongo_args"],
