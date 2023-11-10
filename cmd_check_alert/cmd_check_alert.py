@@ -297,12 +297,19 @@ if __name__ == "__main__":
             if "client" in check:
                 notify["client"] = check["client"]
 
-            # default client
+            # default location
             if "location" in config["defaults"]:
                 notify["attributes"]["location"] = config["defaults"]["location"]
             # override with in check
             if "location" in check:
                 notify["attributes"]["location"] = check["location"]
+
+            # default description
+            if "description" in config["defaults"]:
+                notify["attributes"]["description"] = config["defaults"]["description"]
+            # override with in check
+            if "description" in check:
+                notify["attributes"]["description"] = check["description"]
 
             # Send notify_devilry
             send_notify_devilry(notify)
