@@ -693,20 +693,20 @@ if __name__ == "__main__":
                                             script_dump_part = textwrap.dedent(
                                                 """\
                                                 mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
-                                                WAS_ERROR=0
+                                                WAS_ERR=0
                                                 for db in $(cat {mysql_dump_dir}/db_list.txt); do
                                                         set +e
                                                         if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
                                                                 {exec_before_dump}
-                                                                if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                                if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                                 {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
-                                                                if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                                if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                                 {exec_after_dump}
-                                                                if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                                if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         fi
                                                         set -e
                                                 done
-                                                if [[ $WAS_ERROR -ne 0 ]]; then false; else true; fi
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
@@ -783,20 +783,20 @@ if __name__ == "__main__":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
-                                            WAS_ERROR=0
+                                            WAS_ERR=0
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     set +e
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
                                                             {exec_before_dump}
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             {exec_after_dump}
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     fi
                                                     set -e
                                             done
-                                            if [[ $WAS_ERROR -ne 0 ]]; then false; else true; fi
+                                            if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
@@ -881,23 +881,23 @@ if __name__ == "__main__":
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
-                                            WAS_ERROR=0
+                                            WAS_ERR=0
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     set +e
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
                                                             {exec_before_dump}
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             cd {mongodb_dump_dir}
                                                             tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
                                                             rm -rf {mongodb_dump_dir}/$db
                                                             {exec_after_dump}
-                                                            if [[ $? -ne 0 ]]; then WAS_ERROR=1; fi
+                                                            if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     fi
                                                     set -e
                                             done
-                                            if [[ $WAS_ERROR -ne 0 ]]; then false; else true; fi
+                                            if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                             """
                                         ).format(
                                             show_dbs_part=show_dbs_part,
