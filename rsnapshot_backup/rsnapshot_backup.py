@@ -225,6 +225,9 @@ if __name__ == "__main__":
                     if "rsync_args" not in item:
                         item["rsync_args"] = ""
 
+                    if "ignore_remote_dump_failed" not in item:
+                        item["ignore_remote_dump_failed"] = False
+
                     if "mysql_dump_dir" not in item:
                         item["mysql_dump_dir"] = "/var/backups/mysql"
                     if "postgresql_dump_dir" not in item:
@@ -970,9 +973,13 @@ if __name__ == "__main__":
                                     if retcode == 0:
                                         log_and_print("NOTICE", "Remote dump succeeded on item number {number}".format(number=item["number"]), logger)
                                     else:
-                                        log_and_print("ERROR", "Remote dump failed on item number {number}, not doing sync".format(number=item["number"]), logger)
-                                        errors += 1
-                                        continue
+                                        if not item["ignore_remote_dump_failed"]:
+                                            log_and_print("ERROR", "Remote dump failed on item number {number}, not doing sync".format(number=item["number"]), logger)
+                                            errors += 1
+                                            continue
+                                        else:
+                                            log_and_print("ERROR", "Remote dump failed on item number {number}, but doing sync due to ignore_remote_dump_failed".format(number=item["number"]), logger)
+                                            errors += 1
                                 except Exception as e:
                                     logger.exception(e)
                                     raise Exception("Caught exception on subprocess.run execution")
