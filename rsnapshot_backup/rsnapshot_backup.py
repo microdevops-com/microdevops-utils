@@ -228,6 +228,9 @@ if __name__ == "__main__":
                     if "ignore_remote_dump_failed" not in item:
                         item["ignore_remote_dump_failed"] = False
 
+                    if "dump_retries" not in item:
+                        item["dump_retries"] = 1
+
                     if "mysql_dump_dir" not in item:
                         item["mysql_dump_dir"] = "/var/backups/mysql"
                     if "postgresql_dump_dir" not in item:
@@ -530,11 +533,29 @@ if __name__ == "__main__":
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
+                                                WAS_ERR=0
+                                                set +e
                                                 if [[ ! -d {mysql_dump_dir}/all.xtrabackup ]]; then
                                                         {exec_before_dump}
-                                                        {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
                                                 fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 xtrabackup_throttle=item["xtrabackup_throttle"],
@@ -546,16 +567,35 @@ if __name__ == "__main__":
                                                 exec_before_dump=item["exec_before_dump"],
                                                 exec_after_dump=item["exec_after_dump"],
                                                 xtrabackup_args=item["xtrabackup_args"],
-                                                xtrabackup_output_filter=xtrabackup_output_filter
+                                                xtrabackup_output_filter=xtrabackup_output_filter,
+                                                dump_retries=item["dump_retries"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
                                                 """\
+                                                WAS_ERR=0
+                                                set +e
                                                 if [[ ! -d {mysql_dump_dir}/{source}.xtrabackup ]]; then
                                                         {exec_before_dump}
-                                                        {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
                                                 fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 xtrabackup_throttle=item["xtrabackup_throttle"],
@@ -567,7 +607,8 @@ if __name__ == "__main__":
                                                 exec_before_dump=item["exec_before_dump"],
                                                 exec_after_dump=item["exec_after_dump"],
                                                 xtrabackup_args=item["xtrabackup_args"],
-                                                xtrabackup_output_filter=xtrabackup_output_filter
+                                                xtrabackup_output_filter=xtrabackup_output_filter,
+                                                dump_retries=item["dump_retries"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -616,11 +657,29 @@ if __name__ == "__main__":
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
+                                                WAS_ERR=0
+                                                set +e
                                                 if [[ ! -d {mysql_dump_dir}/all.mysqlsh ]]; then
                                                         {exec_before_dump}
-                                                        {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
                                                 fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
@@ -633,16 +692,35 @@ if __name__ == "__main__":
                                                 mysqlsh_threads=item["mysqlsh_threads"],
                                                 databases_exclude=databases_exclude,
                                                 mysqlsh_args=item["mysqlsh_args"],
-                                                mysqlsh_output_filter=mysqlsh_output_filter
+                                                mysqlsh_output_filter=mysqlsh_output_filter,
+                                                dump_retries=item["dump_retries"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
                                                 """\
+                                                WAS_ERR=0
+                                                set +e
                                                 if [[ ! -d {mysql_dump_dir}/{source}.mysqlsh ]]; then
                                                         {exec_before_dump}
-                                                        {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
                                                 fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
@@ -655,7 +733,8 @@ if __name__ == "__main__":
                                                 mysqlsh_bytes_per_chunk=item["mysqlsh_bytes_per_chunk"],
                                                 mysqlsh_threads=item["mysqlsh_threads"],
                                                 mysqlsh_args=item["mysqlsh_args"],
-                                                mysqlsh_output_filter=mysqlsh_output_filter
+                                                mysqlsh_output_filter=mysqlsh_output_filter,
+                                                dump_retries=item["dump_retries"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -702,10 +781,21 @@ if __name__ == "__main__":
                                                         if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
                                                                 {exec_before_dump}
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                                {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
+                                                                for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                                    {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
+                                                                    if [[ $? -ne 0 ]]; then
+                                                                        WAS_ERR=1
+                                                                        echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    else
+                                                                        echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                        break
+                                                                    fi
+                                                                done
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                                 {exec_after_dump}
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        else
+                                                            echo "NOTICE: Valid dump already exists, skipping"
                                                         fi
                                                         set -e
                                                 done
@@ -718,16 +808,35 @@ if __name__ == "__main__":
                                                 exec_before_dump=item["exec_before_dump"],
                                                 exec_after_dump=item["exec_after_dump"],
                                                 mysqldump_args=item["mysqldump_args"],
-                                                grep_db_filter=grep_db_filter
+                                                grep_db_filter=grep_db_filter,
+                                                dump_retries=item["dump_retries"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
                                                 """\
+                                                WAS_ERR=0
+                                                set +e
                                                 if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
                                                         {exec_before_dump}
-                                                        {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/{source}.gz
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/{source}.gz
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
                                                 fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                                 """
                                             ).format(
                                                 mysql_dump_dir=item["mysql_dump_dir"],
@@ -737,7 +846,8 @@ if __name__ == "__main__":
                                                 exec_after_dump=item["exec_after_dump"],
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
-                                                source=item["source"]
+                                                source=item["source"],
+                                                dump_retries=item["dump_retries"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -792,10 +902,21 @@ if __name__ == "__main__":
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                            su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
+                                                            for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                                su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
+                                                                if [[ $? -ne 0 ]]; then
+                                                                    WAS_ERR=1
+                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                else
+                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    break
+                                                                fi
+                                                            done
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             {exec_after_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                    else
+                                                        echo "NOTICE: Valid dump already exists, skipping"
                                                     fi
                                                     set -e
                                             done
@@ -809,16 +930,35 @@ if __name__ == "__main__":
                                             exec_after_dump=item["exec_after_dump"],
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            pg_dump_filter=pg_dump_filter
+                                            pg_dump_filter=pg_dump_filter,
+                                            dump_retries=item["dump_retries"]
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
                                             """\
+                                            WAS_ERR=0
+                                            set +e
                                             if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
                                                     {exec_before_dump}
-                                                    su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                    for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
+                                                        if [[ $? -ne 0 ]]; then
+                                                            WAS_ERR=1
+                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                        else
+                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            break
+                                                        fi
+                                                    done
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     {exec_after_dump}
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                            else
+                                                echo "NOTICE: Valid dump already exists, skipping"
                                             fi
+                                            set -e
+                                            if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
@@ -829,7 +969,8 @@ if __name__ == "__main__":
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
-                                            pg_dump_filter=pg_dump_filter
+                                            pg_dump_filter=pg_dump_filter,
+                                            dump_retries=item["dump_retries"]
                                         )
 
                                     # If hourly retains are used keep dumps only for 59 minutes
@@ -890,13 +1031,24 @@ if __name__ == "__main__":
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                            {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
+                                                            for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                                {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
+                                                                if [[ $? -ne 0 ]]; then
+                                                                    WAS_ERR=1
+                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                else
+                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    break
+                                                                fi
+                                                            done
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             cd {mongodb_dump_dir}
                                                             tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
                                                             rm -rf {mongodb_dump_dir}/$db
                                                             {exec_after_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                    else
+                                                        echo "NOTICE: Valid dump already exists, skipping"
                                                     fi
                                                     set -e
                                             done
@@ -910,19 +1062,38 @@ if __name__ == "__main__":
                                             exec_after_dump=item["exec_after_dump"],
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
-                                            grep_db_filter=grep_db_filter
+                                            grep_db_filter=grep_db_filter,
+                                            dump_retries=item["dump_retries"]
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
                                             """\
+                                            WAS_ERR=0
+                                            set +e
                                             if [[ ! -f {mongodb_dump_dir}/{source}.tar.gz ]]; then
                                                     {exec_before_dump}
-                                                    {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                    for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
+                                                        if [[ $? -ne 0 ]]; then
+                                                            WAS_ERR=1
+                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                        else
+                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            break
+                                                        fi
+                                                    done
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     cd {mongodb_dump_dir}
                                                     tar zcvf {mongodb_dump_dir}/{source}.tar.gz {source}
                                                     rm -rf {mongodb_dump_dir}/{source}
                                                     {exec_after_dump}
+                                                    if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                            else
+                                                echo "NOTICE: Valid dump already exists, skipping"
                                             fi
+                                            set -e
+                                            if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
                                             """
                                         ).format(
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
@@ -932,7 +1103,8 @@ if __name__ == "__main__":
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            source=item["source"]
+                                            source=item["source"],
+                                            dump_retries=item["dump_retries"]
                                         )
 
                                     # If hourly retains are used keep dumps only for 59 minutes
