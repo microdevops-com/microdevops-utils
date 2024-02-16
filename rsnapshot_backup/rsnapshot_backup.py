@@ -228,8 +228,8 @@ if __name__ == "__main__":
                     if "ignore_remote_dump_failed" not in item:
                         item["ignore_remote_dump_failed"] = False
 
-                    if "dump_retries" not in item:
-                        item["dump_retries"] = 1
+                    if "dump_attempts" not in item:
+                        item["dump_attempts"] = 1
 
                     if "mysql_dump_dir" not in item:
                         item["mysql_dump_dir"] = "/var/backups/mysql"
@@ -538,13 +538,13 @@ if __name__ == "__main__":
                                                 if [[ ! -d {mysql_dump_dir}/all.xtrabackup ]]; then
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                             {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/all.xtrabackup {databases_exclude} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
-                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             else
-                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 break
                                                             fi
                                                         done
@@ -568,7 +568,7 @@ if __name__ == "__main__":
                                                 exec_after_dump=item["exec_after_dump"],
                                                 xtrabackup_args=item["xtrabackup_args"],
                                                 xtrabackup_output_filter=xtrabackup_output_filter,
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
@@ -578,13 +578,13 @@ if __name__ == "__main__":
                                                 if [[ ! -d {mysql_dump_dir}/{source}.xtrabackup ]]; then
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                             {dump_prefix_cmd} xtrabackup --backup --compress --throttle={xtrabackup_throttle} --parallel={xtrabackup_parallel} --compress-threads={xtrabackup_compress_threads} --target-dir={mysql_dump_dir}/{source}.xtrabackup --databases={source} {xtrabackup_args} 2>&1 | {xtrabackup_output_filter}
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
-                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             else
-                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 break
                                                             fi
                                                         done
@@ -608,7 +608,7 @@ if __name__ == "__main__":
                                                 exec_after_dump=item["exec_after_dump"],
                                                 xtrabackup_args=item["xtrabackup_args"],
                                                 xtrabackup_output_filter=xtrabackup_output_filter,
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -662,13 +662,13 @@ if __name__ == "__main__":
                                                 if [[ ! -d {mysql_dump_dir}/all.mysqlsh ]]; then
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                             {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-instance {mysql_dump_dir}/all.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {databases_exclude} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
-                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             else
-                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 break
                                                             fi
                                                         done
@@ -693,7 +693,7 @@ if __name__ == "__main__":
                                                 databases_exclude=databases_exclude,
                                                 mysqlsh_args=item["mysqlsh_args"],
                                                 mysqlsh_output_filter=mysqlsh_output_filter,
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
@@ -703,13 +703,13 @@ if __name__ == "__main__":
                                                 if [[ ! -d {mysql_dump_dir}/{source}.mysqlsh ]]; then
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                             {dump_prefix_cmd} mysqlsh {mysqlsh_connect_args} -- util dump-schemas {source} --outputUrl={mysql_dump_dir}/{source}.mysqlsh --maxRate={mysqlsh_max_rate} --bytesPerChunk={mysqlsh_bytes_per_chunk} --threads={mysqlsh_threads} {mysqlsh_args} 2>&1 | {mysqlsh_output_filter}
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
-                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             else
-                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 break
                                                             fi
                                                         done
@@ -734,7 +734,7 @@ if __name__ == "__main__":
                                                 mysqlsh_threads=item["mysqlsh_threads"],
                                                 mysqlsh_args=item["mysqlsh_args"],
                                                 mysqlsh_output_filter=mysqlsh_output_filter,
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -781,13 +781,13 @@ if __name__ == "__main__":
                                                         if [[ ! -f {mysql_dump_dir}/$db.gz ]]; then
                                                                 {exec_before_dump}
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                                for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                                for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                                     {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
                                                                     if [[ $? -ne 0 ]]; then
                                                                         WAS_ERR=1
-                                                                        echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                        echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                     else
-                                                                        echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                        echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                         break
                                                                     fi
                                                                 done
@@ -809,7 +809,7 @@ if __name__ == "__main__":
                                                 exec_after_dump=item["exec_after_dump"],
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
@@ -819,13 +819,13 @@ if __name__ == "__main__":
                                                 if [[ ! -f {mysql_dump_dir}/{source}.gz ]]; then
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                        for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                             {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/{source}.gz
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
-                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             else
-                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 break
                                                             fi
                                                         done
@@ -847,7 +847,7 @@ if __name__ == "__main__":
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
                                                 source=item["source"],
-                                                dump_retries=item["dump_retries"]
+                                                dump_attempts=item["dump_attempts"]
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -902,13 +902,13 @@ if __name__ == "__main__":
                                                     if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                            for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                                 su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
                                                                 if [[ $? -ne 0 ]]; then
                                                                     WAS_ERR=1
-                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 else
-                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                     break
                                                                 fi
                                                             done
@@ -931,7 +931,7 @@ if __name__ == "__main__":
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             pg_dump_filter=pg_dump_filter,
-                                            dump_retries=item["dump_retries"]
+                                            dump_attempts=item["dump_attempts"]
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
@@ -941,13 +941,13 @@ if __name__ == "__main__":
                                             if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
                                                     {exec_before_dump}
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                    for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                    for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                         su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
                                                         if [[ $? -ne 0 ]]; then
                                                             WAS_ERR=1
-                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                         else
-                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             break
                                                         fi
                                                     done
@@ -970,7 +970,7 @@ if __name__ == "__main__":
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
                                             pg_dump_filter=pg_dump_filter,
-                                            dump_retries=item["dump_retries"]
+                                            dump_attempts=item["dump_attempts"]
                                         )
 
                                     # If hourly retains are used keep dumps only for 59 minutes
@@ -1031,13 +1031,13 @@ if __name__ == "__main__":
                                                     if [[ ! -f {mongodb_dump_dir}/$db.tar.gz ]]; then
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                            for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                            for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                                 {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db $db
                                                                 if [[ $? -ne 0 ]]; then
                                                                     WAS_ERR=1
-                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                 else
-                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                                    echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                                     break
                                                                 fi
                                                             done
@@ -1063,7 +1063,7 @@ if __name__ == "__main__":
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            dump_retries=item["dump_retries"]
+                                            dump_attempts=item["dump_attempts"]
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
@@ -1073,13 +1073,13 @@ if __name__ == "__main__":
                                             if [[ ! -f {mongodb_dump_dir}/{source}.tar.gz ]]; then
                                                     {exec_before_dump}
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
-                                                    for DUMP_ATTEMPT in $(seq 1 {dump_retries}); do
+                                                    for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
                                                         {dump_prefix_cmd} mongodump --quiet {mongodump_args} --out {mongodb_dump_dir} --dumpDbUsersAndRoles --db {source}
                                                         if [[ $? -ne 0 ]]; then
                                                             WAS_ERR=1
-                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                         else
-                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_retries}"
+                                                            echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
                                                             break
                                                         fi
                                                     done
@@ -1104,7 +1104,7 @@ if __name__ == "__main__":
                                             mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
-                                            dump_retries=item["dump_retries"]
+                                            dump_attempts=item["dump_attempts"]
                                         )
 
                                     # If hourly retains are used keep dumps only for 59 minutes
