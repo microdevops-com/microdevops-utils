@@ -893,17 +893,30 @@ if __name__ == "__main__":
                                     pg_dump_filter = "grep -v -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
 
                                     if item["source"] == "ALL":
+
+                                        if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
+                                            pg_dump_line_pipe_part = ""
+                                            pg_dump_format_part = "--format=directory --file={postgresql_dump_dir}/$db".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                            if_exists_part = "-d {postgresql_dump_dir}/$db".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                            mkdir_chown_part = "mkdir -p {postgresql_dump_dir}/$db && chown postgres:postgres {postgresql_dump_dir}/$db".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                        else:
+                                            pg_dump_line_pipe_part = "| gzip > {postgresql_dump_dir}/$db.gz".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                            pg_dump_format_part = "--format=plain"
+                                            if_exists_part = "-f {postgresql_dump_dir}/$db.gz".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                            mkdir_chown_part = ""
+
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
                                             WAS_ERR=0
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     set +e
-                                                    if [[ ! -f {postgresql_dump_dir}/$db.gz ]]; then
+                                                    if [[ ! {if_exists_part} ]]; then
+                                                            {mkdir_chown_part}
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                                su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose $db" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/$db.gz
+                                                                su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose $db" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
                                                                 if [[ $? -ne 0 ]]; then
                                                                     WAS_ERR=1
                                                                     echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -924,25 +937,42 @@ if __name__ == "__main__":
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
-                                            postgresql_clean="" if item["postgresql_noclean"] else "--clean",
+                                            postgresql_clean="" if item["postgresql_noclean"] else "--clean --if-exists",
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             exec_before_dump=item["exec_before_dump"],
                                             exec_after_dump=item["exec_after_dump"],
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             pg_dump_filter=pg_dump_filter,
-                                            dump_attempts=item["dump_attempts"]
+                                            dump_attempts=item["dump_attempts"],
+                                            pg_dump_line_pipe_part=pg_dump_line_pipe_part,
+                                            pg_dump_format_part=pg_dump_format_part,
+                                            if_exists_part=if_exists_part,
+                                            mkdir_chown_part=mkdir_chown_part
                                         )
                                     else:
+
+                                        if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
+                                            pg_dump_line_pipe_part = ""
+                                            pg_dump_format_part = "--format=directory --file={postgresql_dump_dir}/{source}".format(postgresql_dump_dir=item["postgresql_dump_dir"], source=item["source"])
+                                            if_exists_part = "-d {postgresql_dump_dir}/{source}".format(postgresql_dump_dir=item["postgresql_dump_dir"], source=item["source"])
+                                            mkdir_chown_part = "mkdir -p {postgresql_dump_dir}/{source} && chown postgres:postgres {postgresql_dump_dir}/{source}".format(postgresql_dump_dir=item["postgresql_dump_dir"], source=item["source"])
+                                        else:
+                                            pg_dump_line_pipe_part = "| gzip > {postgresql_dump_dir}/{source}.gz".format(postgresql_dump_dir=item["postgresql_dump_dir"], source=item["source"])
+                                            pg_dump_format_part = "--format=plain"
+                                            if_exists_part = "-f {postgresql_dump_dir}/{source}.gz".format(postgresql_dump_dir=item["postgresql_dump_dir"], source=item["source"])
+                                            mkdir_chown_part = ""
+
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             WAS_ERR=0
                                             set +e
-                                            if [[ ! -f {postgresql_dump_dir}/{source}.gz ]]; then
+                                            if [[ ! {if_exists_part} ]]; then
+                                                    {mkdir_chown_part}
                                                     {exec_before_dump}
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                        su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} --verbose {source}" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/{source}.gz
+                                                        su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose {source}" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
                                                         if [[ $? -ne 0 ]]; then
                                                             WAS_ERR=1
                                                             echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -962,7 +992,7 @@ if __name__ == "__main__":
                                             """
                                         ).format(
                                             postgresql_dump_dir=item["postgresql_dump_dir"],
-                                            postgresql_clean="" if item["postgresql_noclean"] else "--clean",
+                                            postgresql_clean="" if item["postgresql_noclean"] else "--clean --if-exists",
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             exec_before_dump=item["exec_before_dump"],
                                             exec_after_dump=item["exec_after_dump"],
@@ -970,8 +1000,21 @@ if __name__ == "__main__":
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
                                             pg_dump_filter=pg_dump_filter,
-                                            dump_attempts=item["dump_attempts"]
+                                            dump_attempts=item["dump_attempts"],
+                                            pg_dump_line_pipe_part=pg_dump_line_pipe_part,
+                                            pg_dump_format_part=pg_dump_format_part,
+                                            if_exists_part=if_exists_part,
+                                            mkdir_chown_part=mkdir_chown_part
                                         )
+
+                                    if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
+                                        # Name mask is not needed for directory dumps, as directories are used as db dump folders only
+                                        find_part = '-type d'
+                                        # With directory format pg_dump writes by itself to the directory, chown needed for pg_dump to be able to traverse to dump directory
+                                        chown_part = "chown postgres:postgres {postgresql_dump_dir}".format(postgresql_dump_dir=item["postgresql_dump_dir"])
+                                    else:
+                                        find_part = '-type f -name "*.gz"'
+                                        chown_part = ""
 
                                     # If hourly retains are used keep dumps only for 59 minutes
                                     script = textwrap.dedent(
@@ -985,15 +1028,16 @@ if __name__ == "__main__":
                                             set -o pipefail
                                             mkdir -p {postgresql_dump_dir}
                                             chmod 700 {postgresql_dump_dir}
+                                            {chown_part}
                                             while [[ -d {postgresql_dump_dir}/dump.lock ]]; do
                                                     sleep 5
                                             done
                                             mkdir {postgresql_dump_dir}/dump.lock
                                             trap "rm -rf {postgresql_dump_dir}/dump.lock" 0
                                             cd {postgresql_dump_dir}
-                                            find {postgresql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
+                                            find {postgresql_dump_dir} {find_part} -mmin +{mmin} -exec rm -rf {{}} +
                                             {exec_before_dump}
-                                            su - postgres -c "pg_dumpall --clean --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
+                                            su - postgres -c "pg_dumpall --clean --if-exists --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
                                             {exec_after_dump}
                                             {script_dump_part}
                                         '
@@ -1008,7 +1052,9 @@ if __name__ == "__main__":
                                         script_dump_part=script_dump_part,
                                         pg_dump_filter=pg_dump_filter,
                                         exec_before_dump=item["exec_before_dump"],
-                                        exec_after_dump=item["exec_after_dump"]
+                                        exec_after_dump=item["exec_after_dump"],
+                                        find_part=find_part,
+                                        chown_part=chown_part
                                     )
 
                                 if item["type"] == "MONGODB_SSH":
@@ -1157,7 +1203,7 @@ if __name__ == "__main__":
                                     raise Exception("Caught exception on subprocess.run execution")
 
                                 # Remove partially downloaded dumps
-                                log_and_print("NOTICE", "Removing partially downloaded dummps if any on item number {number}:".format(number=item["number"]), logger)
+                                log_and_print("NOTICE", "Removing partially downloaded dumps if any on item number {number}:".format(number=item["number"]), logger)
                                 if item["type"] == "MYSQL_SSH":
                                     if "mysql_dump_type" in item and item["mysql_dump_type"] == "xtrabackup":
                                         script = textwrap.dedent(
@@ -1178,7 +1224,7 @@ if __name__ == "__main__":
                                             #!/bin/bash
                                             set -e
                                             if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
-                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.zst" -delete
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.zst.*" -delete
                                             fi
                                             """
                                         ).format(
@@ -1197,16 +1243,30 @@ if __name__ == "__main__":
                                             mysql_dump_dir=item["mysql_dump_dir"]
                                         )
                                 if item["type"] == "POSTGRESQL_SSH":
-                                    script = textwrap.dedent(
-                                        """\
-                                        #!/bin/bash
-                                        set -e
-                                        rm -f {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir}/.*.gz.*
-                                        """
-                                    ).format(
-                                        snapshot_root=item["path"],
-                                        postgresql_dump_dir=item["postgresql_dump_dir"]
-                                    )
+                                    if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            if [[ -d {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir} ]]; then
+                                                find {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir} -type f -name "*.zstd.*" -or -name "*.gz.*" -delete
+                                            fi
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            postgresql_dump_dir=item["postgresql_dump_dir"]
+                                        )
+                                    else:
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            rm -f {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir}/.*.gz.*
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            postgresql_dump_dir=item["postgresql_dump_dir"]
+                                        )
                                 if item["type"] == "MONGODB_SSH":
                                     script = textwrap.dedent(
                                         """\
@@ -1221,9 +1281,9 @@ if __name__ == "__main__":
                                 try:
                                     retcode = run_cmd(script)
                                     if retcode == 0:
-                                        log_and_print("NOTICE", "Removing partially downloaded dummps command succeeded on item number {number}".format(number=item["number"]), logger)
+                                        log_and_print("NOTICE", "Removing partially downloaded dumps command succeeded on item number {number}".format(number=item["number"]), logger)
                                     else:
-                                        log_and_print("ERROR", "Removing partially downloaded dummps command failed on item number {number}, but script continues".format(number=item["number"]), logger)
+                                        log_and_print("ERROR", "Removing partially downloaded dumps command failed on item number {number}, but script continues".format(number=item["number"]), logger)
                                         errors += 1
                                 except Exception as e:
                                     logger.exception(e)
@@ -1630,7 +1690,7 @@ if __name__ == "__main__":
                                                 raise Exception("Caught exception on subprocess.run execution")
 
                                         else:
-                                            log_and_print("NOTICE", "Found no {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Found no {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
                                             errors += 1
 
                                         # Check xtrabackup end_time
@@ -1692,7 +1752,7 @@ if __name__ == "__main__":
                                                 raise Exception("Caught exception on subprocess.run execution")
 
                                         else:
-                                            log_and_print("NOTICE", "Found no {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Found no {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
                                             errors += 1
 
                                         # Check mysqlsh end time
@@ -1713,11 +1773,138 @@ if __name__ == "__main__":
                                     log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
                                     errors += 1
 
+                            # pg_dump directory
+                            if item["type"] == "POSTGRESQL_SSH" and check["type"] == "POSTGRESQL" and "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
+
+                                sources_to_check = []
+
+                                if item["source"] == "ALL":
+
+                                    db_list_file_path = "{path}/.sync/rsnapshot{postgresql_dump_dir}/db_list.txt".format(path=item["path"], postgresql_dump_dir=item["postgresql_dump_dir"])
+
+                                    if os.path.exists(db_list_file_path):
+                                        with open(db_list_file_path, "r") as db_list_file:
+                                            while True:
+                                                db_list_file_line = db_list_file.readline().rstrip()
+                                                if not db_list_file_line:
+                                                    break
+                                                sources_to_check.append(db_list_file_line)
+                                    else:
+                                        log_and_print("ERROR", "{db_list_file_path} file is missing on item number {number}".format(db_list_file_path=db_list_file_path, number=item["number"]), logger)
+                                        errors += 1
+
+                                else:
+                                    sources_to_check.append(item["source"])
+
+                                # Check sources
+                                for source in sources_to_check:
+
+                                    dump_dir = "{path}/.sync/rsnapshot{postgresql_dump_dir}/{source}".format(path=item["path"], postgresql_dump_dir=item["postgresql_dump_dir"], source=source)
+
+                                    # Check dump dir exists
+                                    if os.path.isdir(dump_dir):
+
+                                            log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                            oks += 1
+
+                                            # Check toc.dat at least 10 Kb
+                                            toc_dat_file = "{dump_dir}/toc.dat".format(dump_dir=dump_dir)
+                                            if os.path.exists(toc_dat_file) and os.stat(toc_dat_file).st_size > 10000:
+                                                log_and_print("NOTICE", "Found {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Found no {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
+                                                errors += 1
+
+                                            # Read dump_dir stats using pg_restore
+                                            toc_dat_file = "{dump_dir}/toc.dat".format(dump_dir=dump_dir)
+                                            pg_restore_cmd = "pg_restore --list {dump_dir}".format(dump_dir=dump_dir)
+                                            toc_archive_created = None
+                                            toc_dbname = None
+                                            toc_entries = None
+                                            toc_table_data_count = 0
+                                            if os.path.exists(toc_dat_file):
+
+                                                log_and_print("NOTICE", "Found {toc_dat_file} file in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
+                                                oks += 1
+
+                                                try:
+
+                                                    retcode, stdout, stderr = run_cmd_pipe(pg_restore_cmd)
+                                                    if retcode == 0:
+
+                                                        for pg_restore_line in stdout.split("\n"):
+                                                            # Find '; Archive created at ' line and get toc_archive_created - everything after that block
+                                                            if pg_restore_line.lstrip().rstrip().startswith("; Archive created at "):
+                                                                toc_archive_created = pg_restore_line.split("; Archive created at ")[1]
+                                                            # Find line that contains 'dbname: ' and get toc_dbname
+                                                            if "dbname: " in pg_restore_line.lstrip().rstrip():
+                                                                toc_dbname = pg_restore_line.split("dbname: ")[1]
+                                                            # Find line that contains 'TOC Entries: ' and get toc_entries
+                                                            if "TOC Entries: " in pg_restore_line.lstrip().rstrip():
+                                                                toc_entries = pg_restore_line.split("TOC Entries: ")[1]
+                                                            # Each line that contains " TABLE DATA " increases toc_table_data_count
+                                                            if " TABLE DATA " in pg_restore_line.lstrip().rstrip():
+                                                                toc_table_data_count += 1
+
+                                                    else:
+                                                        log_and_print("ERROR", "pg_restore cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                        errors += 1
+
+                                                except Exception as e:
+                                                    logger.exception(e)
+                                                    raise Exception("Caught exception on subprocess.run execution")
+
+                                            else:
+                                                log_and_print("ERROR", "Found no {toc_dat_file} file in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
+                                                errors += 1
+
+                                            # Check toc_archive_created time, example: '2024-02-17 13:53:50 EET'
+                                            if toc_archive_created is not None:
+                                                seconds_between_archive_created_and_now = (datetime.now() - datetime.strptime(toc_archive_created, "%Y-%m-%d %H:%M:%S %Z")).total_seconds()
+                                                # Dump files shouldn't be older than 1 day
+                                                if seconds_between_archive_created_and_now < 60*60*24:
+                                                    log_and_print("NOTICE", "Dump Archive created at signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Dump Archive created at signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                    errors += 1
+
+                                            # Check toc_dbname matches with item["source"]
+                                            if toc_dbname is not None:
+                                                if toc_dbname == source:
+                                                    log_and_print("NOTICE", "Dump dbname signature matches with source {source} for the dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Dump dbname signature {toc_dbname} does not match with source {source} for the dump dir {dump_dir} on item number {number}".format(toc_dbname=toc_dbname, source=source, dump_dir=dump_dir, number=item["number"]), logger)
+                                                    errors += 1
+
+                                            # Check toc_entries is not empty
+                                            if toc_entries is not None:
+                                                if int(toc_entries) > 0:
+                                                    log_and_print("NOTICE", "Found {toc_entries} TOC Entries in dump dir on item number {number}".format(toc_entries=toc_entries, number=item["number"]), logger)
+                                                    oks += 1
+                                                else:
+                                                    log_and_print("ERROR", "Found 0 TOC Entries in dump dir on item number {number}".format(number=item["number"]), logger)
+                                                    errors += 1
+
+                                            # Check toc_table_data_count is not empty
+                                            if toc_table_data_count > 0:
+                                                log_and_print("NOTICE", "Found {toc_table_data_count} TABLE DATA entries in dump dir on item number {number}".format(toc_table_data_count=toc_table_data_count, number=item["number"]), logger)
+                                                oks += 1
+                                            else:
+                                                log_and_print("ERROR", "Found 0 TABLE DATA entries in dump dir on item number {number}".format(number=item["number"]), logger)
+                                                errors += 1
+
+                                    else:
+                                        log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                        errors += 1
+
                             # Native DB dumps have similiar logic
                             if (
                                     (item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and not ("mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh")))
                                     or
-                                    (item["type"] == "POSTGRESQL_SSH" and check["type"] == "POSTGRESQL")
+                                    (item["type"] == "POSTGRESQL_SSH" and check["type"] == "POSTGRESQL" and not ("postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory"))
                                     or
                                     (item["type"] == "MONGODB_SSH" and check["type"] == "MONGODB")
                                 ):
