@@ -1249,7 +1249,7 @@ if __name__ == "__main__":
                                             #!/bin/bash
                                             set -e
                                             if [[ -d {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir} ]]; then
-                                                find {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir} -type f -name "*.zstd.*" -or -name "*.gz.*" -delete
+                                                find {snapshot_root}/.sync/rsnapshot{postgresql_dump_dir} -type f -name "*.zst.*" -or -name "*.gz.*" -delete
                                             fi
                                             """
                                         ).format(
