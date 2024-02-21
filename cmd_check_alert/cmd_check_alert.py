@@ -107,6 +107,7 @@ def suppress_oserror(f):
                 raise
     return inner
 RotatingFileHandler.doRollover = suppress_oserror(RotatingFileHandler.doRollover)
+
 # Main
 
 if __name__ == "__main__":
@@ -185,31 +186,49 @@ if __name__ == "__main__":
         def run_check(name, cmd, check):
             logger.info("Running check {name} with command {cmd}".format(name=name, cmd=cmd))
 
-            # custom PATH env for cases when cron runs with poor PATH
+            # Custom PATH env for cases when cron runs with poor PATH
             check_env = os.environ.copy()
             check_env["PATH"] = "/usr/local/sbin:/usr/sbin:/sbin:/snap/bin:" + check_env["PATH"]
 
-            # preexec_fn sets independent process group for check cmd children, all them could be killed together
-            process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", env=check_env)
+            # Attempts in check, by default 1 attempt
+            if "attempts" in check:
+                attempts = check["attempts"]
+            elif "attempts" in config["defaults"]:
+                attempts = config["defaults"]["attempts"]
+            else:
+                attempts = 1
 
-            # Save process to global dict for further killing
-            check_procs[name] = process
+            for attempt in range(1, attempts+1):
 
-            # Communicate with process and get data from it
-            try:
-                stdout, stderr = process.communicate(None)
-            except:
-                process.kill()
-                process.wait()
-                raise
-            retcode = process.poll()
-            stdout = stdout.decode()
-            stderr = stderr.decode()
-            logger.info("Check retcode: {retcode}".format(retcode=retcode))
-            logger.info("Check stdout:")
-            logger.info(stdout)
-            logger.info("Check stderr:")
-            logger.info(stderr)
+                # preexec_fn sets independent process group for check cmd children, all them could be killed together
+                process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", env=check_env)
+
+                # Save process to global dict for further killing
+                check_procs[name] = process
+
+                # Communicate with process and get data from it
+                try:
+                    stdout, stderr = process.communicate(None)
+                except:
+                    process.kill()
+                    process.wait()
+                    raise
+                retcode = process.poll()
+                stdout = stdout.decode()
+                stderr = stderr.decode()
+                logger.info("Check retcode on attempt {attempt}: {retcode}".format(attempt=attempt, retcode=retcode))
+                logger.info("Check stdout on attempt {attempt}:".format(attempt=attempt))
+                logger.info(stdout)
+                logger.info("Check stderr on attempt {attempt}:".format(attempt=attempt))
+                logger.info(stderr)
+
+                # If check timeout, break the loop
+                if name in timedout_checks:
+                    break
+
+                # If retcode is 0, break the loop
+                if retcode == 0:
+                    break
             
             # Prepare notify data
             notify = {}
@@ -266,6 +285,8 @@ if __name__ == "__main__":
             notify["attributes"]["check host"] = SELF_HOSTNAME
             if name in timedout_checks:
                 notify["attributes"]["check killed after timeout"] = str(timedout_checks[name])
+            notify["attributes"]["attempts max"] = attempts
+            notify["attributes"]["attempts made"] = attempt
             notify["text"] = "stdout:\n{stdout}\nstderr:\n{stderr}".format(stdout=stdout, stderr=stderr)
             notify["origin"] = SELF_ORIGIN
 
