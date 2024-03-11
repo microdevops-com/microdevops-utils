@@ -890,7 +890,7 @@ if __name__ == "__main__":
                                     # grep output should be put into stderr again
                                     # https://unix.stackexchange.com/questions/3514/how-to-grep-standard-error-stream-stderr
                                     # allow pg_dump.*: connecting just to see what it does
-                                    pg_dump_filter = "grep -v -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
+                                    pg_dump_filter = "grep -v -e \"pg_dump.*: finished item\" -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
 
                                     if item["source"] == "ALL":
 
