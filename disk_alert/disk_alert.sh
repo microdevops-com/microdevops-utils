@@ -105,8 +105,25 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	else
 		PREDICT_WARNING="86400"
 	fi
+	# 100% is always fatal
+	if [[ $USEP -eq "100" ]]; then
+		echo '{
+			"severity": "fatal",
+			"service": "disk",
+			"resource": "'$HOSTNAME':'$PARTITION'",
+			"event": "disk_alert_percentage_usage_high",
+			"origin": "disk_alert.sh",
+			"text": "Disk usage high percentage detected",
+			"value": "'$USEP'%",
+			"correlate": ["disk_alert_percentage_usage_ok","disk_alert_percentage_usage_almost_high"],
+			"attributes": {
+				"free space": "'$FREESP'MB",
+				"warning threshold": "'$WARNING'%",
+				"critical threshold": "'$CRITICAL'%"
+			}
+		}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 	# Usage check type
-	if [[ $USAGE_CHECK == "PERCENT" ]]; then
+	elif [[ $USAGE_CHECK == "PERCENT" ]]; then
 		# Critical percent message
 		if [[ $USEP -ge $CRITICAL ]]; then
 			echo '{
