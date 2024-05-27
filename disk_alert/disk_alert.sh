@@ -105,36 +105,36 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 	else
 		PREDICT_WARNING="86400"
 	fi
-	# 100% is always fatal
-	if [[ $USEP -eq "100" ]]; then
-		echo '{
-			"severity": "fatal",
-			"service": "disk",
-			"resource": "'$HOSTNAME':'$PARTITION'",
-			"event": "disk_alert_percentage_usage_high",
-			"origin": "disk_alert.sh",
-			"text": "Disk usage high percentage detected",
-			"value": "'$USEP'%",
-			"correlate": ["disk_alert_percentage_usage_ok","disk_alert_percentage_usage_almost_high"],
-			"attributes": {
-				"free space": "'$FREESP'MB",
-				"warning threshold": "'$WARNING'%",
-				"critical threshold": "'$CRITICAL'%"
-			}
-		}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 	# Usage check type
-	elif [[ $USAGE_CHECK == "PERCENT" ]]; then
+	if [[ $USAGE_CHECK == "PERCENT" ]]; then
+		# 100% is always fatal
+		if [[ $USEP -eq "100" ]]; then
+			echo '{
+				"severity": "fatal",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_space_usage_high",
+				"origin": "disk_alert.sh",
+				"text": "Disk usage fatal percentage detected",
+				"value": "'$USEP'%",
+				"correlate": ["disk_alert_space_usage_ok"],
+				"attributes": {
+					"free space": "'$FREESP'MB",
+					"warning threshold": "'$WARNING'%",
+					"critical threshold": "'$CRITICAL'%"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		# Critical percent message
-		if [[ $USEP -ge $CRITICAL ]]; then
+		elif [[ $USEP -ge $CRITICAL ]]; then
 			echo '{
 				"severity": "critical",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_percentage_usage_high",
+				"event": "disk_alert_space_usage_high",
 				"origin": "disk_alert.sh",
-				"text": "Disk usage high percentage detected",
+				"text": "Disk usage critical percentage detected",
 				"value": "'$USEP'%",
-				"correlate": ["disk_alert_percentage_usage_ok","disk_alert_percentage_usage_almost_high"],
+				"correlate": ["disk_alert_space_usage_ok"],
 				"attributes": {
 					"free space": "'$FREESP'MB",
 					"warning threshold": "'$WARNING'%",
@@ -146,11 +146,11 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 				"severity": "major",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_percentage_usage_almost_high",
+				"event": "disk_alert_space_usage_high",
 				"origin": "disk_alert.sh",
-				"text": "Disk usage almost high percentage detected",
+				"text": "Disk usage warning percentage detected",
 				"value": "'$USEP'%",
-				"correlate": ["disk_alert_percentage_usage_ok","disk_alert_percentage_usage_high"],
+				"correlate": ["disk_alert_space_usage_ok"],
 				"attributes": {
 					"free space": "'$FREESP'MB",
 					"warning threshold": "'$WARNING'%",
@@ -162,11 +162,11 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 				"severity": "ok",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_percentage_usage_ok",
+				"event": "disk_alert_space_usage_ok",
 				"origin": "disk_alert.sh",
 				"text": "Disk usage ok percentage detected",
 				"value": "'$USEP'%",
-				"correlate": ["disk_alert_percentage_usage_high","disk_alert_percentage_usage_almost_high"],
+				"correlate": ["disk_alert_space_usage_high"],
 				"attributes": {
 					"free space": "'$FREESP'MB",
 					"warning threshold": "'$WARNING'%",
@@ -175,17 +175,34 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		fi
 	elif [[ $USAGE_CHECK == "FREE_SPACE" ]]; then
+		# 0 is always fatal
+		if [[ $FREESP -eq "0" ]]; then
+			echo '{
+				"severity": "fatal",
+				"service": "disk",
+				"resource": "'$HOSTNAME':'$PARTITION'",
+				"event": "disk_alert_space_usage_high",
+				"origin": "disk_alert.sh",
+				"text": "Fatal disk free space in MB detected",
+				"value": "'$FREESP'MB",
+				"correlate": ["disk_alert_space_usage_ok"],
+				"attributes": {
+					"use": "'$USEP'%",
+					"warning threshold": "'$FREE_SPACE_WARNING'MB",
+					"critical threshold": "'$FREE_SPACE_CRITICAL'MB"
+				}
+			}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 		# Critical free space message
-		if [[ $FREESP -le $FREE_SPACE_CRITICAL ]]; then
+		elif [[ $FREESP -le $FREE_SPACE_CRITICAL ]]; then
 			echo '{
 				"severity": "critical",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_free_space_low",
+				"event": "disk_alert_space_usage_high",
 				"origin": "disk_alert.sh",
-				"text": "Low disk free space in MB detected",
+				"text": "Critical disk free space in MB detected",
 				"value": "'$FREESP'MB",
-				"correlate": ["disk_alert_free_space_ok","disk_alert_free_space_almost_low"],
+				"correlate": ["disk_alert_space_usage_ok"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"warning threshold": "'$FREE_SPACE_WARNING'MB",
@@ -197,11 +214,11 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 				"severity": "major",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_free_space_almost_low",
+				"event": "disk_alert_space_usage_high",
 				"origin": "disk_alert.sh",
-				"text": "Almost low disk free space in MB detected",
+				"text": "Warning disk free space in MB detected",
 				"value": "'$FREESP'MB",
-				"correlate": ["disk_alert_free_space_ok","disk_alert_free_space_low"],
+				"correlate": ["disk_alert_space_usage_ok"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"warning threshold": "'$FREE_SPACE_WARNING'MB",
@@ -213,11 +230,11 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 				"severity": "ok",
 				"service": "disk",
 				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_free_space_ok",
+				"event": "disk_alert_space_usage_ok",
 				"origin": "disk_alert.sh",
-				"text": "Enough disk free space in MB detected",
+				"text": "Ok disk free space in MB detected",
 				"value": "'$FREESP'MB",
-				"correlate": ["disk_alert_free_space_low","disk_alert_free_space_almost_low"],
+				"correlate": ["disk_alert_space_usage_high"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"warning threshold": "'$FREE_SPACE_WARNING'MB",
@@ -255,12 +272,12 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 			echo '{
 				"severity": "minor",
 				"service": "disk",
-				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_predict_usage_full",
+				"resource": "'$HOSTNAME':'$PARTITION'-predict",
+				"event": "disk_alert_predict_usage_high",
 				"origin": "disk_alert.sh",
 				"text": "Full usage of disk predicted within critical threshold",
 				"value": "'$PREDICT_SECONDS's",
-				"correlate": ["disk_alert_predict_usage_ok","disk_alert_warning_predict_usage_full"],
+				"correlate": ["disk_alert_predict_usage_ok"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"free space": "'$FREESP'MB",
@@ -276,12 +293,12 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 			echo '{
 				"severity": "warning",
 				"service": "disk",
-				"resource": "'$HOSTNAME':'$PARTITION'",
-				"event": "disk_alert_warning_predict_usage_full",
+				"resource": "'$HOSTNAME':'$PARTITION'-predict",
+				"event": "disk_alert_predict_usage_high",
 				"origin": "disk_alert.sh",
 				"text": "Full usage of disk predicted within warning threshold",
 				"value": "'$PREDICT_SECONDS's",
-				"correlate": ["disk_alert_predict_usage_ok","disk_alert_predict_usage_full"],
+				"correlate": ["disk_alert_predict_usage_ok"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"free space": "'$FREESP'MB",
@@ -297,12 +314,12 @@ df -P -BM | grep -vE $FILTER | awk '{ print $5 " " $6 " " $4 }' | while read out
 			echo '{
 				"severity": "ok",
 				"service": "disk",
-				"resource": "'$HOSTNAME':'$PARTITION'",
+				"resource": "'$HOSTNAME':'$PARTITION'-predict",
 				"event": "disk_alert_predict_usage_ok",
 				"origin": "disk_alert.sh",
 				"text": "No full usage of disk predicted within threshold",
 				"value": "'$PREDICT_SECONDS's",
-				"correlate": ["disk_alert_predict_usage_full","disk_alert_warning_predict_usage_full"],
+				"correlate": ["disk_alert_predict_usage_high"],
 				"attributes": {
 					"use": "'$USEP'%",
 					"free space": "'$FREESP'MB",
@@ -342,17 +359,33 @@ df -P -i | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
 		WARNING="90"
 	fi
 	#
+	# 100% is always fatal
+	if [[ $USEP -eq "100" ]]; then
+		echo '{
+			"severity": "fatal",
+			"service": "disk",
+			"resource": "'$HOSTNAME':'$PARTITION'-inode",
+			"event": "disk_alert_inode_usage_high",
+			"origin": "disk_alert.sh",
+			"text": "Inode usage fatal percentage detected",
+			"value": "'$USEP'%",
+			"correlate": ["disk_alert_inode_usage_ok"],
+			"attributes": {
+				"warning threshold": "'$WARNING'%",
+				"critical threshold": "'$CRITICAL'%"
+			}
+		}' | /opt/sysadmws/notify_devilry/notify_devilry.py
 	# Critical percent message
-	if [[ $USEP -ge $CRITICAL ]]; then
+	elif [[ $USEP -ge $CRITICAL ]]; then
 		echo '{
 			"severity": "critical",
 			"service": "disk",
-			"resource": "'$HOSTNAME':'$PARTITION'",
+			"resource": "'$HOSTNAME':'$PARTITION'-inode",
 			"event": "disk_alert_inode_usage_high",
 			"origin": "disk_alert.sh",
-			"text": "Inode usage high percentage detected",
+			"text": "Inode usage critical percentage detected",
 			"value": "'$USEP'%",
-			"correlate": ["disk_alert_inode_usage_ok","disk_alert_inode_usage_almost_high"],
+			"correlate": ["disk_alert_inode_usage_ok"],
 			"attributes": {
 				"warning threshold": "'$WARNING'%",
 				"critical threshold": "'$CRITICAL'%"
@@ -362,12 +395,12 @@ df -P -i | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
 		echo '{
 			"severity": "major",
 			"service": "disk",
-			"resource": "'$HOSTNAME':'$PARTITION'",
-			"event": "disk_alert_inode_usage_almost_high",
+			"resource": "'$HOSTNAME':'$PARTITION'-inode",
+			"event": "disk_alert_inode_usage_high",
 			"origin": "disk_alert.sh",
-			"text": "Inode usage almost high percentage detected",
+			"text": "Inode usage warning percentage detected",
 			"value": "'$USEP'%",
-			"correlate": ["disk_alert_inode_usage_ok","disk_alert_inode_usage_high"],
+			"correlate": ["disk_alert_inode_usage_ok"],
 			"attributes": {
 				"warning threshold": "'$WARNING'%",
 				"critical threshold": "'$CRITICAL'%"
@@ -377,12 +410,12 @@ df -P -i | grep -vE $FILTER | awk '{ print $5 " " $6 }' | while read output; do
 		echo '{
 			"severity": "ok",
 			"service": "disk",
-			"resource": "'$HOSTNAME':'$PARTITION'",
+			"resource": "'$HOSTNAME':'$PARTITION'-inode",
 			"event": "disk_alert_inode_usage_ok",
 			"origin": "disk_alert.sh",
 			"text": "Inode usage ok percentage detected",
 			"value": "'$USEP'%",
-			"correlate": ["disk_alert_inode_usage_high","disk_alert_inode_usage_almost_high"],
+			"correlate": ["disk_alert_inode_usage_high"],
 			"attributes": {
 				"warning threshold": "'$WARNING'%",
 				"critical threshold": "'$CRITICAL'%"
