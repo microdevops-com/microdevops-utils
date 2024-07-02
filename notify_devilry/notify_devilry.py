@@ -41,7 +41,7 @@ LOG_FILE = "notify_devilry.log"
 HISTORY_MESSAGE_IN_PREFIX = "in"
 HISTORY_MESSAGE_OUT_PREFIX = "out"
 HISTORY_MESSAGE_SUFFIX = "json"
-SENDING_METHODS = ['alerta', 'telegram']
+SENDING_METHODS = ['alerta', 'telegram','oncall']
 LOGO="✉ ➔ ✂ ➔ ❓ ➔ ✌"
 NAME="notify_devilry"
 UT_NOW = int(time.time())
@@ -51,6 +51,9 @@ SELF_SERVICE = "notify_devilry"
 ALERTA_RETRIES = 3
 ALERTA_RETRY_SLEEP = 2
 ALERTA_URLOPEN_TIMEOUT = 30
+ONCALL_RETRIES = 3
+ONCALL_RETRY_SLEEP = 2
+ONCALL_URLOPEN_TIMEOUT = 30
 SEVERITY_MINOR = "minor"
 SEVERITY_CRITICAL = "critical"
 
@@ -124,6 +127,61 @@ def send_alerta(url, api_key, msg):
     url_obj = urlopen(url_req, url_data, ALERTA_URLOPEN_TIMEOUT)
     url_result = url_obj.read()
     logger.info("Sending to Alerta API result: {0}".format(url_result))
+
+# Oncall
+def send_oncall(url, msg):
+    # Keys ignored:
+    # client - oncall maps customer by api key
+    data = {
+        "severity": msg["severity"],
+        "environment": msg["environment"],
+        "service": [msg["service"]],
+        "resource": msg["resource"],
+        "event": msg["event"],
+        "value": msg["value"],
+        "group": msg["group"],
+        "origin": msg["origin"],
+        "attributes": msg["attributes"],
+        "text": msg["text"],
+        "type": msg["type"],
+        "escalation_chain": "default"  # Added escalation_chain field with default value
+    }
+    if "timeout" in msg:
+        data["timeout"] = msg["timeout"]
+    if "correlate" in msg:
+        data["correlate"] = msg["correlate"]
+
+    # Check severity and set appropriate escalation_chain
+    if msg["severity"] == "critical":
+        data["escalation_chain"] = "critical"
+
+    # Prepare data for sending
+    url_data = json.dumps(data).encode()
+    url_req = Request(url)
+    url_req.add_header("Content-Type", "application/json")
+
+    # Function to log the sending result
+    def log_result(url_result):
+        logger.info("Sending to Oncall API result: {0}".format(url_result))
+
+    # Send messages
+    if msg["severity"] == "ok":
+        # Prepare data for critical message
+        critical_data = data.copy()
+        critical_data["escalation_chain"] = "critical"
+        critical_url_data = json.dumps(critical_data).encode()
+
+        # Send first message (critical)
+        url_obj = urlopen(url_req, critical_url_data, ONCALL_URLOPEN_TIMEOUT)
+        log_result(url_obj.read())
+
+        # Send second message (default)
+        url_obj = urlopen(url_req, url_data, ONCALL_URLOPEN_TIMEOUT)
+        log_result(url_obj.read())
+    else:
+        # Send one message for other cases
+        url_obj = urlopen(url_req, url_data, ONCALL_URLOPEN_TIMEOUT)
+        log_result(url_obj.read())
 
 # Telegram
 def send_telegram(token, chat_id, sound, msg):
@@ -224,7 +282,44 @@ def send_message(sending_method, sending_method_item_settings, message):
         chat_id = sending_method_item_settings["chat_id"]
         sound = sending_method_item_settings["sound"] if "sound" in sending_method_item_settings else None
         send_telegram(token, chat_id, sound, message)
-
+    if sending_method == "oncall":
+        url = sending_method_item_settings["url"]
+        for retry in range(ONCALL_RETRIES):
+            try:
+                send_oncall(url, message)
+            except Exception as e:
+                # Retry if not last retry
+                if retry < (ONCALL_RETRIES - 1):
+                    logger.info("send_oncall exception catch, retry {retry}".format(retry=retry + 1))
+                    time.sleep(ONCALL_RETRY_SLEEP)
+                else:
+                    # Send exception
+                    logger.error("send_oncall exception catch, all retries failed")
+                    if "exception" in sending_method_item_settings:
+                        logger.info("Sending exception")
+                        exception_message = {
+                            "severity": SEVERITY_MINOR,
+                            "service": SELF_SERVICE,
+                            "resource": socket.gethostname(),
+                            "event": "notify_devilry_oncall_send_error",
+                            "value": str(type(e).__name__),
+                            "group": socket.gethostname(),
+                            "origin": SELF_ORIGIN,
+                            "text": str(e),
+                            "attributes": {
+                                "oncall url": sending_method_item_settings["url"]
+                            }
+                        }
+                        exception_message = apply_defaults(exception_message)
+                        for s_method in SENDING_METHODS:
+                            if s_method in sending_method_item_settings["exception"]:
+                                for al in sending_method_item_settings["exception"][s_method]:
+                                    al_settings = config[s_method][al] 
+                                    send_message(s_method, al_settings, exception_message)
+                    # And raise
+                    raise
+            else:
+                break
 # History funcs
 def history_load_message_in(f, key):
     # Read JSON from file
