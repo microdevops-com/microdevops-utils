@@ -131,7 +131,8 @@ def send_alerta(url, api_key, msg):
 # Oncall
 def send_oncall(url, msg):
     # Keys ignored:
-    # client - oncall maps customer by api key
+    # client - oncall doesn't have clients
+    # Added escalation_chain field with default value
     data = {
         "severity": msg["severity"],
         "environment": msg["environment"],
@@ -144,7 +145,7 @@ def send_oncall(url, msg):
         "attributes": msg["attributes"],
         "text": msg["text"],
         "type": msg["type"],
-        "escalation_chain": "default"  # Added escalation_chain field with default value
+        "escalation_chain": "default"
     }
     if "timeout" in msg:
         data["timeout"] = msg["timeout"]
@@ -152,7 +153,7 @@ def send_oncall(url, msg):
         data["correlate"] = msg["correlate"]
 
     # Check severity and set appropriate escalation_chain
-    if msg["severity"] == "critical":
+    if msg["severity"] in ["critical", "fatal"]:
         data["escalation_chain"] = "critical"
 
     # Prepare data for sending
@@ -166,6 +167,7 @@ def send_oncall(url, msg):
 
     # Send messages
     if msg["severity"] == "ok":
+        # With ok severity we have to duplicate the message in both escalation chains
         # Prepare data for critical message
         critical_data = data.copy()
         critical_data["escalation_chain"] = "critical"
