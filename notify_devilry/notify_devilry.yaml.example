@@ -42,6 +42,14 @@ telegram:
     token: xxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     chat_id: -xxxxxxxxxxxxx
 
+oncall:
+
+  Alias 1:
+    url: << INSERT URL FROM ONCALL INTEGRATION >>
+    exception:
+      telegram:
+        - Alias 1 Alert Exceptions
+
 chains:
 
   entrypoint:
@@ -74,6 +82,7 @@ chains:
       jump:
         - alerta_chain
         - telegram_chain
+        - oncall_chain
 
   alerta_chain:
     - name: Alias 1 # if client == Client 1, send alert to Alias 1 alias and stop processing next rules in this chain
@@ -122,6 +131,13 @@ chains:
             - false
       suppress: True
       chain_break: True
+
+  oncall_chain:
+    - name: Alias 1
+      send:
+        oncall:
+          - Alias 1
+
 {#
 Config could be templated by Jinja2 code.
 current_time and current_date are added as vars in server local time zone.
