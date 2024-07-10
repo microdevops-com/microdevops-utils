@@ -1406,7 +1406,7 @@ if __name__ == "__main__":
                                     logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
                                     lockfile	/opt/sysadmws/rsnapshot_backup/rsnapshot.pid
                                     ssh_args	{ssh_args} -p {port}
-                                    rsync_long_args	-az --delete --delete-excluded --numeric-ids --relative {rsync_verbosity_args} {rsync_args}
+                                    rsync_long_args	-a --delete --delete-excluded --numeric-ids --relative {rsync_verbosity_args} {rsync_args}
                                     sync_first	1
                                     {conf_backup_lines}
                                     """
@@ -1551,7 +1551,7 @@ if __name__ == "__main__":
                                     loglevel	3
                                     logfile		/opt/sysadmws/rsnapshot_backup/rsnapshot.log
                                     lockfile	/opt/sysadmws/rsnapshot_backup/rsnapshot.pid
-                                    rsync_long_args	-az --delete --delete-excluded --no-owner --no-group --numeric-ids --relative --timeout=900 --password-file={passwd} {rsync_verbosity_args} {rsync_args}
+                                    rsync_long_args	-a --delete --delete-excluded --no-owner --no-group --numeric-ids --relative --timeout=900 --password-file={passwd} {rsync_verbosity_args} {rsync_args}
                                     sync_first	1
                                     backup		rsync://{user}@{host}:{port}{source}/		rsnapshot/
                                     """
