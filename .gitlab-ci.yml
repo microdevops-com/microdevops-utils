@@ -70,6 +70,7 @@ make_deb_v1:
     cp notify_devilry/notify_devilry.py \
        notify_devilry/notify_devilry_test.sh \
        notify_devilry/notify_devilry_critical.sh \
+       notify_devilry/notify_devilry_fatal.sh \
        notify_devilry/notify_devilry_ok.sh \
        notify_devilry/notify_devilry.yaml.example \
        notify_devilry/notify_devilry.yaml.minimal \
