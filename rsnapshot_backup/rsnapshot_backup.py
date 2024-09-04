@@ -1651,61 +1651,90 @@ if __name__ == "__main__":
                                 # Check dump dir exists
                                 if os.path.isdir(dump_dir):
 
-                                        log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    oks += 1
+
+                                    # Check if ibdata1.qp or ibdata1.zst exist
+                                    if os.path.exists("{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)):
+                                        # Should be at least 100 Kb
+                                        if os.stat("{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)).st_size > 100000:
+                                            log_and_print("NOTICE", "Found ibdata1.qp file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                            oks += 1
+                                    elif os.path.exists("{dump_dir}/ibdata1.zst".format(dump_dir=dump_dir)):
+                                        # Should be at least 100 Kb
+                                        if os.stat("{dump_dir}/ibdata1.zst".format(dump_dir=dump_dir)).st_size > 100000:
+                                            log_and_print("NOTICE", "Found ibdata1.zst file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                            oks += 1
+                                    else:
+                                        log_and_print("ERROR", "Found no ibdata1.qp or ibdata1.zst file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                        errors += 1
+
+                                    # Read xtrabackup_info.qp or xtrabackup_info.zst
+                                    if os.path.exists("{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)):
+                                        xtrabackup_info_file = "{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)
+                                        qpress_cmd = "qpress -do {xtrabackup_info_file}".format(xtrabackup_info_file=xtrabackup_info_file)
+                                        xtrabackup_end_time = None
+                                        log_and_print("NOTICE", "Found {xtrabackup_info_file} file in dump dir on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
                                         oks += 1
 
-                                        # Check ibdata1.qp at least 1 Mb
-                                        ibdata1_file = "{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)
-                                        if os.path.exists(ibdata1_file) and os.stat(ibdata1_file).st_size > 100000:
-                                            log_and_print("NOTICE", "Found {ibdata1_file} file larger than 100 Kb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
-                                            oks += 1
-                                        else:
-                                            log_and_print("ERROR", "Found no {ibdata1_file} file larger than 100 Kb in dump dir on item number {number}".format(ibdata1_file=ibdata1_file, number=item["number"]), logger)
-                                            errors += 1
+                                        try:
 
-                                        # Read xtrabackup_info.qp
-                                        xtrabackup_info_fie = "{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)
-                                        qpress_cmd = "qpress -do {xtrabackup_info_fie}".format(xtrabackup_info_fie=xtrabackup_info_fie)
-                                        xtrabackup_end_time = None
-                                        if os.path.exists(xtrabackup_info_fie):
+                                            retcode, stdout, stderr = run_cmd_pipe(qpress_cmd)
+                                            if retcode == 0:
 
-                                            log_and_print("NOTICE", "Found {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
-                                            oks += 1
+                                                for xtrabackup_info_line in stdout.split("\n"):
+                                                    if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
+                                                        xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
 
-                                            try:
-
-                                                retcode, stdout, stderr = run_cmd_pipe(qpress_cmd)
-                                                if retcode == 0:
-
-                                                    for xtrabackup_info_line in stdout.split("\n"):
-                                                        if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
-                                                            xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
-
-                                                else:
-                                                    log_and_print("ERROR", "qpress cmd failed on item number {number}".format(number=item["number"]), logger)
-                                                    errors += 1
-
-                                            except Exception as e:
-                                                logger.exception(e)
-                                                raise Exception("Caught exception on subprocess.run execution")
-
-                                        else:
-                                            log_and_print("ERROR", "Found no {xtrabackup_info_fie} file in dump dir on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
-                                            errors += 1
-
-                                        # Check xtrabackup end_time
-                                        if xtrabackup_end_time is not None:
-                                            seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
-                                            # Dump files shouldn't be older than 1 day
-                                            if seconds_between_end_time_and_now < 60*60*24:
-                                                log_and_print("NOTICE", "Dump xtrabackup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
-                                                oks += 1
                                             else:
-                                                log_and_print("ERROR", "Dump xtrabackup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                log_and_print("ERROR", "qpress cmd failed on item number {number}".format(number=item["number"]), logger)
                                                 errors += 1
+
+                                        except Exception as e:
+                                            logger.exception(e)
+                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                    elif os.path.exists("{dump_dir}/xtrabackup_info.zst".format(dump_dir=dump_dir)):
+                                        xtrabackup_info_file = "{dump_dir}/xtrabackup_info.zst".format(dump_dir=dump_dir)
+                                        zstd_cmd = "zstd -d -c {xtrabackup_info_file}".format(xtrabackup_info_file=xtrabackup_info_file)
+                                        xtrabackup_end_time = None
+                                        log_and_print("NOTICE", "Found {xtrabackup_info_file} file in dump dir on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
+                                        oks += 1
+
+                                        try:
+
+                                            retcode, stdout, stderr = run_cmd_pipe(zstd_cmd)
+                                            if retcode == 0:
+
+                                                for xtrabackup_info_line in stdout.split("\n"):
+                                                    if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
+                                                        xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
+
+                                            else:
+                                                log_and_print("ERROR", "zstd cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                errors += 1
+
+                                        except Exception as e:
+                                            logger.exception(e)
+                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                    else:
+                                        log_and_print("ERROR", "Found no xtrabackup_info.qp or xtrabackup_info.zst file in dump dir on item number {number}".format(number=item["number"]), logger)
+                                        errors += 1
+
+                                    # Check xtrabackup end_time
+                                    if xtrabackup_end_time is not None:
+                                        seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                        # Dump files shouldn't be older than 1 day
+                                        if seconds_between_end_time_and_now < 60*60*24:
+                                            log_and_print("NOTICE", "Dump xtrabackup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            oks += 1
                                         else:
-                                            log_and_print("ERROR", "There is no xtrabackup end_time signature in file {xtrabackup_info_fie} on item number {number}".format(xtrabackup_info_fie=xtrabackup_info_fie, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Dump xtrabackup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
                                             errors += 1
+                                    else:
+                                        log_and_print("ERROR", "There is no xtrabackup end_time signature in file {xtrabackup_info_file} on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
+                                        errors += 1
 
                                 else:
                                     log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
@@ -1726,12 +1755,12 @@ if __name__ == "__main__":
                                         oks += 1
 
                                         # Read @.done.json
-                                        mysqlsh_info_fie = "{dump_dir}/@.done.json".format(dump_dir=dump_dir)
-                                        cat_json_cmd = "cat {mysqlsh_info_fie} | grep -e '.end.:'".format(mysqlsh_info_fie=mysqlsh_info_fie)
+                                        mysqlsh_info_file = "{dump_dir}/@.done.json".format(dump_dir=dump_dir)
+                                        cat_json_cmd = "cat {mysqlsh_info_file} | grep -e '.end.:'".format(mysqlsh_info_file=mysqlsh_info_file)
                                         mysqlsh_end_time = None
-                                        if os.path.exists(mysqlsh_info_fie):
+                                        if os.path.exists(mysqlsh_info_file):
 
-                                            log_and_print("NOTICE", "Found {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            log_and_print("NOTICE", "Found {mysqlsh_info_file} file in dump dir on item number {number}".format(mysqlsh_info_file=mysqlsh_info_file, number=item["number"]), logger)
                                             oks += 1
 
                                             try:
@@ -1752,7 +1781,7 @@ if __name__ == "__main__":
                                                 raise Exception("Caught exception on subprocess.run execution")
 
                                         else:
-                                            log_and_print("ERROR", "Found no {mysqlsh_info_fie} file in dump dir on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Found no {mysqlsh_info_file} file in dump dir on item number {number}".format(mysqlsh_info_file=mysqlsh_info_file, number=item["number"]), logger)
                                             errors += 1
 
                                         # Check mysqlsh end time
@@ -1766,7 +1795,7 @@ if __name__ == "__main__":
                                                 log_and_print("ERROR", "Dump @.done.json end time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
                                                 errors += 1
                                         else:
-                                            log_and_print("ERROR", "There is no @.done.json end time signature in file {mysqlsh_info_fie} on item number {number}".format(mysqlsh_info_fie=mysqlsh_info_fie, number=item["number"]), logger)
+                                            log_and_print("ERROR", "There is no @.done.json end time signature in file {mysqlsh_info_file} on item number {number}".format(mysqlsh_info_file=mysqlsh_info_file, number=item["number"]), logger)
                                             errors += 1
 
                                 else:
