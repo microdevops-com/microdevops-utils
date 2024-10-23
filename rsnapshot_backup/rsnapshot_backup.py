@@ -1428,52 +1428,58 @@ if __name__ == "__main__":
                                     conf_backup_lines=conf_backup_lines
                                 ))
                         
-                            # Run rsnapshot
-                            if "rsnapshot_prefix_cmd" in item:
-                                rsnapshot_prefix_cmd = "{rsnapshot_prefix_cmd} ".format(rsnapshot_prefix_cmd=item["rsnapshot_prefix_cmd"])
+                            # Do not execute rsnapshot if retain_daily is 0
+                            # Used to initiate db dumps in advance which are then picked up by remote backup servers
+                            if str(item["retain_daily"]) == "0":
+                                log_and_print("NOTICE", "retain_daily is 0, not running rsnapshot sync on item number {number}".format(number=item["number"]), logger)
                             else:
-                                rsnapshot_prefix_cmd = ""
-                            log_and_print("NOTICE", "Running {rsnapshot_prefix_cmd}rsnapshot -c {conf} sync on item number {number}".format(
-                                rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
-                                conf=RSNAPSHOT_CONF,
-                                number=item["number"]
-                            ), logger)
-                            try:
 
-                                if "retries" in item:
-                                    times_to_run_max = 1 + item["retries"]
+                                # Run rsnapshot
+                                if "rsnapshot_prefix_cmd" in item:
+                                    rsnapshot_prefix_cmd = "{rsnapshot_prefix_cmd} ".format(rsnapshot_prefix_cmd=item["rsnapshot_prefix_cmd"])
                                 else:
-                                    times_to_run_max = 1
+                                    rsnapshot_prefix_cmd = ""
+                                log_and_print("NOTICE", "Running {rsnapshot_prefix_cmd}rsnapshot -c {conf} sync on item number {number}".format(
+                                    rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                    conf=RSNAPSHOT_CONF,
+                                    number=item["number"]
+                                ), logger)
+                                try:
 
-                                rsnapshot_run_times = 0
+                                    if "retries" in item:
+                                        times_to_run_max = 1 + item["retries"]
+                                    else:
+                                        times_to_run_max = 1
 
-                                while True:
+                                    rsnapshot_run_times = 0
 
-                                    retcode = run_cmd("{rsnapshot_prefix_cmd}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
-                                        rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
-                                        conf=RSNAPSHOT_CONF,
-                                        rsnapshot_error_filter=rsnapshot_error_filter
-                                    ))
-                                    rsnapshot_run_times += 1
+                                    while True:
 
-                                    if retcode == 0 or retcode == 2:
-                                        break
+                                        retcode = run_cmd("{rsnapshot_prefix_cmd}rsnapshot -c {conf} sync 2> >({rsnapshot_error_filter})".format(
+                                            rsnapshot_prefix_cmd=rsnapshot_prefix_cmd,
+                                            conf=RSNAPSHOT_CONF,
+                                            rsnapshot_error_filter=rsnapshot_error_filter
+                                        ))
+                                        rsnapshot_run_times += 1
 
-                                    if rsnapshot_run_times >= times_to_run_max:
-                                        break
-                                    
-                                    log_and_print("NOTICE", "Rsnapshot retry {retry} on item number {number}".format(retry=rsnapshot_run_times, number=item["number"]), logger)
+                                        if retcode == 0 or retcode == 2:
+                                            break
 
-                                if retcode == 2:
-                                    log_and_print("NOTICE", "Rsnapshot succeeded with WARNINGs on item number {number}, but we consider it is OK".format(number=item["number"]), logger)
-                                elif retcode == 0:
-                                    log_and_print("NOTICE", "Rsnapshot succeeded on item number {number}".format(number=item["number"]), logger)
-                                else:
-                                    log_and_print("ERROR", "Rsnapshot failed on item number {number}".format(number=item["number"]), logger)
-                                    errors += 1
-                            except Exception as e:
-                                logger.exception(e)
-                                raise Exception("Caught exception on subprocess.run execution")
+                                        if rsnapshot_run_times >= times_to_run_max:
+                                            break
+
+                                        log_and_print("NOTICE", "Rsnapshot retry {retry} on item number {number}".format(retry=rsnapshot_run_times, number=item["number"]), logger)
+
+                                    if retcode == 2:
+                                        log_and_print("NOTICE", "Rsnapshot succeeded with WARNINGs on item number {number}, but we consider it is OK".format(number=item["number"]), logger)
+                                    elif retcode == 0:
+                                        log_and_print("NOTICE", "Rsnapshot succeeded on item number {number}".format(number=item["number"]), logger)
+                                    else:
+                                        log_and_print("ERROR", "Rsnapshot failed on item number {number}".format(number=item["number"]), logger)
+                                        errors += 1
+                                except Exception as e:
+                                    logger.exception(e)
+                                    raise Exception("Caught exception on subprocess.run execution")
 
                             # Exec exec_after_rsync
                             if "exec_after_rsync" in item:
@@ -1637,6 +1643,12 @@ if __name__ == "__main__":
 
                     # Check
                     if args.check and "checks" in item:
+
+                        # If retain_daily is 0, nothing to check, just increase oks
+                        if str(item["retain_daily"]) == "0":
+                            log_and_print("NOTICE", "retain_daily is 0, not running checks on item number {number}".format(number=item["number"]), logger)
+                            oks += 1
+                            continue
 
                         for check in item["checks"]:
 
