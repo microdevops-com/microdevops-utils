@@ -249,6 +249,8 @@ if __name__ == "__main__":
                         item["mysqldump_args"] = ""
                     if "pg_dump_args" not in item:
                         item["pg_dump_args"] = ""
+                    if "pg_dump_filter" not in item:
+                        item["pg_dump_filter"] = "grep -v -e \"pg_dump.*: finished item\" -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
                     if "mongo_args" not in item:
                         item["mongo_args"] = ""
                     # For backward compatibility:
@@ -890,8 +892,6 @@ if __name__ == "__main__":
                                     # grep output should be put into stderr again
                                     # https://unix.stackexchange.com/questions/3514/how-to-grep-standard-error-stream-stderr
                                     # allow pg_dump.*: connecting just to see what it does
-                                    pg_dump_filter = "grep -v -e \"pg_dump.*: finished item\" -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
-
                                     if item["source"] == "ALL":
 
                                         if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
@@ -943,7 +943,7 @@ if __name__ == "__main__":
                                             exec_after_dump=item["exec_after_dump"],
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            pg_dump_filter=pg_dump_filter,
+                                            pg_dump_filter=item["pg_dump_filter"],
                                             dump_attempts=item["dump_attempts"],
                                             pg_dump_line_pipe_part=pg_dump_line_pipe_part,
                                             pg_dump_format_part=pg_dump_format_part,
@@ -999,7 +999,7 @@ if __name__ == "__main__":
                                             pg_dump_args=item["pg_dump_args"],
                                             grep_db_filter=grep_db_filter,
                                             source=item["source"],
-                                            pg_dump_filter=pg_dump_filter,
+                                            pg_dump_filter=item["pg_dump_filter"],
                                             dump_attempts=item["dump_attempts"],
                                             pg_dump_line_pipe_part=pg_dump_line_pipe_part,
                                             pg_dump_format_part=pg_dump_format_part,
@@ -1050,7 +1050,7 @@ if __name__ == "__main__":
                                         postgresql_dump_dir=item["postgresql_dump_dir"],
                                         mmin="59" if "retain_hourly" in item else "720",
                                         script_dump_part=script_dump_part,
-                                        pg_dump_filter=pg_dump_filter,
+                                        pg_dump_filter=item["pg_dump_filter"],
                                         exec_before_dump=item["exec_before_dump"],
                                         exec_after_dump=item["exec_after_dump"],
                                         find_part=find_part,
