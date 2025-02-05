@@ -250,7 +250,7 @@ if __name__ == "__main__":
                     if "pg_dump_args" not in item:
                         item["pg_dump_args"] = ""
                     if "pg_dump_filter" not in item:
-                        item["pg_dump_filter"] = ["pg_dump.*: finished item", "pg_dump.*: creating", "pg_dump.*: executing", "pg_dump.*: last built-in", "pg_dump.*: reading", "pg_dump.*: identifying", "pg_dump.*: finding", "pg_dump.*: flagging", "pg_dump.*: saving", "pg_dump.*: dropping", "pg_dump.*: dumping", "pg_dump.*: running", "pg_dump.*: processing\"]
+                        item["pg_dump_filter"] = ["pg_dump.*: finished item", "pg_dump.*: creating", "pg_dump.*: executing", "pg_dump.*: last built-in", "pg_dump.*: reading", "pg_dump.*: identifying", "pg_dump.*: finding", "pg_dump.*: flagging", "pg_dump.*: saving", "pg_dump.*: dropping", "pg_dump.*: dumping", "pg_dump.*: running", "pg_dump.*: processing"]
                     # item["pg_dump_filter"] = "grep -v -e \"pg_dump.*: finished item\" -e \"pg_dump.*: creating\" -e \"pg_dump.*: executing\" -e \"pg_dump.*: last built-in\" -e \"pg_dump.*: reading\" -e \"pg_dump.*: identifying\" -e \"pg_dump.*: finding\" -e \"pg_dump.*: flagging\" -e \"pg_dump.*: saving\" -e \"pg_dump.*: dropping\" -e \"pg_dump.*: dumping\" -e \"pg_dump.*: running\" -e \"pg_dump.*: processing\" >&2"
                     if "mongo_args" not in item:
                         item["mongo_args"] = ""
