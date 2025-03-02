@@ -282,7 +282,7 @@ def open_history_message_file(d, f):
 # Misc funcs
 
 def safe_file_name(name):
-    return name.replace(" ", "_").replace(".", "_").replace("/", "_")
+    return str(name).replace(" ", "_").replace(".", "_").replace("/", "_")
 
 def apply_defaults(msg):
     # Those keys are referenced to render templates, so add empty values instead of None
@@ -558,10 +558,12 @@ if __name__ == "__main__":
 
                             # Match type logic
                             if "in" in match_item_val:
-                                if match_item_key not in message or message[match_item_key] not in match_item_val["in"]:
+                                # Use a list comprehension to make sure all list items are strings for match to work
+                                if match_item_key not in message or str(message[match_item_key]) not in [str(x) for x in match_item_val["in"]]:
                                     should_continue = True
                             if "not_in" in match_item_val:
-                                if match_item_key not in message or message[match_item_key] in match_item_val["not_in"]:
+                                # Use a list comprehension to make sure all list items are strings for match to work
+                                if match_item_key not in message or str(message[match_item_key]) in [str(x) for x in match_item_val["not_in"]]:
                                     should_continue = True
 
                         if should_continue:

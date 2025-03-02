@@ -76,6 +76,8 @@ def send_notify_devilry(notify):
     run_cmd = NOTIFY_DEVILRY_CMD
     if args.force_send:
         run_cmd = run_cmd + " --force-send"
+    if args.debug:
+        run_cmd = run_cmd + " --debug"
     run(run_cmd, input=notify_data, shell=True, stdout=FNULL)
 
 # Load YAML config
