@@ -56,3 +56,8 @@
 #declare -A DISK_ALERT_INODE_WARNING
 #DISK_ALERT_INODE_CRITICAL["/mount/point"]="95"
 #DISK_ALERT_INODE_WARNING["/mount/point"]="90"
+
+# Victoria Metrics. If the VMAGENT_URL variable is set, the script will attempt to send metrics
+#VMAGENT_URL="https://victoriametrics.example.org"
+#VMUSER="Basic Auth Username"
+#VMUSER_PWD="Basic Auth Password"
