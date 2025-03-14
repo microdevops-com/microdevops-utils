@@ -4,6 +4,9 @@
 # Lines to grep from df, default is:
 #DISK_ALERT_FILTER="^Filesystem|^tmpfs|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs|^snapfuse|kubernetes.io|volume-subpaths|/var/lib/incus/storage-pools"
 
+# Example for specific tmpfs filtering
+# DISK_ALERT_FILTER="^Filesystem|^tmpfs.*/dev|^tmpfs.*/run|^cdrom|^none|^/dev/loop|^overlay|^shm|^udev|^cgroup|^cgmfs|^snapfuse|kubernetes.io|volume-subpaths|/var/lib/incus/storage-pools"
+
 # Set type of disk usage check: by % of usage or by MB free space left
 # By default = PERCENT
 #DISK_ALERT_USAGE_CHECK="PERCENT"
