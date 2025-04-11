@@ -493,6 +493,15 @@ if __name__ == "__main__":
         with open("{work_dir}/{config_file}".format(work_dir=WORK_DIR, config_file=CONFIG_FILE), 'r') as yaml_file:
             config = yaml.load(yaml_file, Loader=yaml.SafeLoader)
 
+        # Add config["clients_stringified"] by converting all keys in config["clients"] to strings
+        config["clients_stringified"] = {}
+        for client in config["clients"]:
+            config["clients_stringified"][str(client)] = config["clients"][client]
+
+        # Remove config["clients"] and replace it with config["clients_stringified"]
+        config["clients"] = config["clients_stringified"]
+        config["clients_stringified"] = None
+
         # Check if enabled in config
         if config["enabled"] != True:
             logger.error("{name} not enabled in config, exiting".format(name=NAME))
@@ -524,7 +533,7 @@ if __name__ == "__main__":
                 logger.error("Found not unique token {token} for client {client}".format(token=config["clients"][client]["token"], client=client))
                 sys.exit(1)
             # Add token
-            token_to_client[config["clients"][client]["token"]] = client
+            token_to_client[config["clients"][client]["token"]] = str(client)
 
         # Global vars
         heartbeats = {}
