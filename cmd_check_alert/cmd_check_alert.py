@@ -216,8 +216,8 @@ if __name__ == "__main__":
                     process.wait()
                     raise
                 retcode = process.poll()
-                stdout = stdout.decode()
-                stderr = stderr.decode()
+                stdout = stdout.decode(errors="ignore")
+                stderr = stderr.decode(errors="ignore")
                 logger.info("Check retcode on attempt {attempt}: {retcode}".format(attempt=attempt, retcode=retcode))
                 logger.info("Check stdout on attempt {attempt}:".format(attempt=attempt))
                 logger.info(stdout)
