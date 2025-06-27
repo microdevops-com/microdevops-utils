@@ -147,6 +147,7 @@ make_deb_v1:
        builds/v1/deb/sysadmws-utils-v1/opt/microdevops/catch_server_mail
     # misc old
     cp misc/mysql_dump_all_dbs_to_files.sh \
+       misc/mysql_master_status.sh \
        misc/postgresql_dump_all_dbs_to_files.sh \
        misc/mysql_table_extractor.sh \
        misc/mysql_create_new_database.sh \
