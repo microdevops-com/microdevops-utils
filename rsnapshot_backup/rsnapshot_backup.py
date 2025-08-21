@@ -1070,11 +1070,13 @@ if __name__ == "__main__":
                                             show_dbs_part = "echo show dbs"
                                         script_dump_part = textwrap.dedent(
                                             """\
-                                            if command -v mongo >/dev/null 2>&1; then                                                                                                                                                                         
-                                                    {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt                                                                         
-                                            else                                                                                                                                                                                                              
-                                                    mongosh --quiet --eval "load('$HOME/.mongoshrc.js');db.adminCommand('listDatabases').databases.forEach(d=>print(d.name))" {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump
-                                            fi          
+                                            if command -v mongo >/dev/null 2>&1; then
+                                                    {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            elif command -v mongosh >/dev/null 2>&1; then
+                                                    mongosh --quiet --eval "load('$HOME/.mongoshrc.js');db.adminCommand('listDatabases').databases.forEach(d=>print(d.name))" {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            else
+                                                    exit 1
+
                                             WAS_ERR=0
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     set +e
