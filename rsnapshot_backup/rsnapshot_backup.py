@@ -1076,6 +1076,7 @@ if __name__ == "__main__":
                                                     mongosh --quiet --eval "load('$HOME/.mongoshrc.js');db.adminCommand('listDatabases').databases.forEach(d=>print(d.name))" {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
                                             else
                                                     exit 1
+                                            fi
 
                                             WAS_ERR=0
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
