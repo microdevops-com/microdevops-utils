@@ -1068,7 +1068,6 @@ if __name__ == "__main__":
                                             )
                                         else:
                                             show_dbs_part = "echo show dbs"
-                                            mongosh_command = "db.adminCommand('listDatabases').databases.forEach(d=>print(d.name))"
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if command -v mongo >/dev/null 2>&1; then
