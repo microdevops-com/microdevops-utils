@@ -1070,7 +1070,11 @@ if __name__ == "__main__":
                                             show_dbs_part = "echo show dbs"
                                         script_dump_part = textwrap.dedent(
                                             """\
-                                            {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            if command -v mongo >/dev/null 2>&1; then
+                                                    {show_dbs_part} | mongo --quiet {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            else                    
+                                                    mongosh --quiet --eval "db.adminCommand({listDatabases}).databases.forEach(d=>print(d.name))" {mongo_args} | cut -f1 -d" " | grep -v -e local {grep_db_filter} > {mongodb_dump_dir}/db_list.txt
+                                            fi 
                                             WAS_ERR=0
                                             for db in $(cat {mongodb_dump_dir}/db_list.txt); do
                                                     set +e
@@ -1109,7 +1113,8 @@ if __name__ == "__main__":
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
                                             grep_db_filter=grep_db_filter,
-                                            dump_attempts=item["dump_attempts"]
+                                            dump_attempts=item["dump_attempts"],
+                                            listDatabases="{listDatabases:1}"
                                         )
                                     else:
                                         script_dump_part = textwrap.dedent(
