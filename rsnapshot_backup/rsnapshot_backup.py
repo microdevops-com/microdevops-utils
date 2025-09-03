@@ -270,6 +270,16 @@ if __name__ == "__main__":
                     if "xtrabackup_args" not in item:
                         item["xtrabackup_args"] = ""
 
+                    # Використано те ж що й для xtrabackup
+                    if "mariadb_backup_throttle" not in item:
+                        item["mariadb_backup_throttle"] = "20"
+                    if "mariadb_backup_parallel" not in item:
+                        item["mariadb_backup_parallel"] = "2"
+                    if "mariadb_backup_compress_threads" not in item:
+                        item["mariadb_backup_compress_threads"] = "2"
+                    if "mariadb_backup_args" not in item:
+                        item["mariadb_backup_args"] = ""
+
                     if "mysqlsh_connect_args" not in item:
                         item["mysqlsh_connect_args"] = ""
                     if "mysqlsh_args" not in item:
@@ -644,6 +654,131 @@ if __name__ == "__main__":
                                             mmin="59" if "retain_hourly" in item else "720",
                                             script_dump_part=script_dump_part
                                         )
+
+                                    elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mariadb-backup":
+
+                                        if "exclude" in item:
+                                            databases_exclude = "--databases-exclude=\""
+                                            databases_exclude += " ".join(item["exclude"])
+                                            databases_exclude += "\""
+                                        else:
+                                            databases_exclude = ""
+
+                                        mariadb_backup_output_filter = 'grep -v -e "log scanned up to" -e "Skipping" -e "Compressing" -e "...done"'
+
+                                        if item["source"] == "ALL":
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                WAS_ERR=0
+                                                set +e
+                                                if [[ ! -d {mysql_dump_dir}/all.mariadb-backup ]]; then
+                                                        {exec_before_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
+                                                            {dump_prefix_cmd} mariadb-backup --backup --compress --throttle={mariadb_backup_throttle} --parallel={mariadb_backup_parallel} --compress-threads={mariadb_backup_compress_threads} --target-dir={mysql_dump_dir}/all.mariadb-backup {databases_exclude} {mariadb_backup_args} 2>&1 | {mariadb_backup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
+                                                fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
+                                                """
+                                                ).format(
+                                                    mariadb_backup_throttle=item["mariadb_backup_throttle"],
+                                                    mariadb_backup_parallel=item["mariadb_backup_parallel"],
+                                                    mariadb_backup_compress_threads=item["mariadb_backup_compress_threads"],
+                                                    mysql_dump_dir=item["mysql_dump_dir"],
+                                                    databases_exclude=databases_exclude,
+                                                    dump_prefix_cmd=item["dump_prefix_cmd"],
+                                                    exec_before_dump=item["exec_before_dump"],
+                                                    exec_after_dump=item["exec_after_dump"],
+                                                    mariadb_backup_args=item["mariadb_backup_args"],
+                                                    mariadb_backup_output_filter=mariadb_backup_output_filter,
+                                                    dump_attempts=item["dump_attempts"]
+                                                )
+                                        else:
+                                            script_dump_part = textwrap.dedent().format(
+                                                """\
+                                                WAS_ERR=0
+                                                set +e
+                                                if [[ ! -d {mysql_dump_dir}/{source}.mariadb-backup ]]; then
+                                                        {exec_before_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
+                                                            {dump_prefix_cmd} mariadb-backup --backup --compress --throttle={mariadb_backup_throttle} --parallel={mariadb_backup_parallel} --compress-threads={mariadb_backup_compress_threads} --target-dir={mysql_dump_dir}/{source}.mariadb-backup --databases={source} {mariadb_backup_args} 2>&1 | {mariadb_backup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
+                                                fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
+                                                """
+                                            ).format(
+                                                mariadb_backup_throttle=item["mariadb_backup_throttle"],
+                                                mariadb_backup_parallel=item["mariadb_backup_parallel"],
+                                                mariadb_backup_compress_threads=item["mariadb_backup_compress_threads"],
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                source=item["source"],
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
+                                                exec_before_dump=item["exec_before_dump"],
+                                                exec_after_dump=item["exec_after_dump"],
+                                                mariadb_backup_args=item["mariadb_backup_args"],
+                                                mariadb_backup_output_filter=mariadb_backup_output_filter,
+                                                dump_attempts=item["dump_attempts"]
+                                            )
+
+                                        # If hourly retains are used keep dumps only for 59 minutes
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+
+                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                                set -x
+                                                set -e
+                                                set -o pipefail
+                                                mkdir -p {mysql_dump_dir}
+                                                chmod 700 {mysql_dump_dir}
+                                                while [[ -d {mysql_dump_dir}/dump.lock ]]; do
+                                                        sleep 5
+                                                done
+                                                mkdir {mysql_dump_dir}/dump.lock
+                                                trap "rm -rf {mysql_dump_dir}/dump.lock" 0
+                                                cd {mysql_dump_dir}
+                                                find {mysql_dump_dir} -type d -name "*.xtrabackup" -mmin +{mmin} -exec rm -rf {{}} +
+                                                {script_dump_part}
+                                            '
+                                            """
+                                        ).format(
+                                            ssh_args=ssh_args,
+                                            port=item["connect_port"],
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            mysql_dump_dir=item["mysql_dump_dir"],
+                                            mmin="59" if "retain_hourly" in item else "720",
+                                            script_dump_part=script_dump_part
+                                        )
+
 
                                     elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
 
