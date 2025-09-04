@@ -1358,6 +1358,19 @@ if __name__ == "__main__":
                                             snapshot_root=item["path"],
                                             mysql_dump_dir=item["mysql_dump_dir"]
                                         )
+                                    elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mariadb-backup":
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -delete
+                                            fi
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            mysql_dump_dir=item["mysql_dump_dir"]
+                                        )
                                     elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
                                         script = textwrap.dedent(
                                             """\
