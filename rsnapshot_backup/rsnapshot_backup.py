@@ -270,6 +270,16 @@ if __name__ == "__main__":
                     if "xtrabackup_args" not in item:
                         item["xtrabackup_args"] = ""
 
+                    # mariadb-backup is a xtrabackup fork and has the same options
+                    if "mariadb-backup_throttle" not in item:
+                        item["mariadb-backup_throttle"] = "20"
+                    if "mariadb-backup_parallel" not in item:
+                        item["mariadb-backup_parallel"] = "2"
+                    if "mariadb-backup_compress_threads" not in item:
+                        item["mariadb-backup_compress_threads"] = "2"
+                    if "mariadb-backup_args" not in item:
+                        item["mariadb-backup_args"] = ""
+
                     if "mysqlsh_connect_args" not in item:
                         item["mysqlsh_connect_args"] = ""
                     if "mysqlsh_args" not in item:
@@ -632,6 +642,130 @@ if __name__ == "__main__":
                                                 trap "rm -rf {mysql_dump_dir}/dump.lock" 0
                                                 cd {mysql_dump_dir}
                                                 find {mysql_dump_dir} -type d -name "*.xtrabackup" -mmin +{mmin} -exec rm -rf {{}} +
+                                                {script_dump_part}
+                                            '
+                                            """
+                                        ).format(
+                                            ssh_args=ssh_args,
+                                            port=item["connect_port"],
+                                            user=item["connect_user"],
+                                            host=item["connect_host"],
+                                            mysql_dump_dir=item["mysql_dump_dir"],
+                                            mmin="59" if "retain_hourly" in item else "720",
+                                            script_dump_part=script_dump_part
+                                        )
+
+                                    elif "mysql_dump_type" in item and item["mysql_dump_type"] == "mariadb-backup":
+
+                                        if "exclude" in item:
+                                            databases_exclude = "--databases-exclude=\""
+                                            databases_exclude += " ".join(item["exclude"])
+                                            databases_exclude += "\""
+                                        else:
+                                            databases_exclude = ""
+
+                                        mariadb_backup_output_filter = 'grep -v -e "log scanned up to" -e "Skipping" -e "Compressing" -e "...done"'
+
+                                        if item["source"] == "ALL":
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                WAS_ERR=0
+                                                set +e
+                                                if [[ ! -d {mysql_dump_dir}/all.mariadb-backup ]]; then
+                                                        {exec_before_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
+                                                            {dump_prefix_cmd} mariadb-backup --backup --compress --throttle={mariadb_backup_throttle} --parallel={mariadb_backup_parallel} --compress-threads={mariadb_backup_compress_threads} --target-dir={mysql_dump_dir}/all.mariadb-backup {databases_exclude} {mariadb_backup_args} 2>&1 | {mariadb_backup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
+                                                fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
+                                                """
+                                            ).format(
+                                                mariadb_backup_throttle=item["mariadb-backup_throttle"],
+                                                mariadb_backup_parallel=item["mariadb-backup_parallel"],
+                                                mariadb_backup_compress_threads=item["mariadb-backup_compress_threads"],
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                databases_exclude=databases_exclude,
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
+                                                exec_before_dump=item["exec_before_dump"],
+                                                exec_after_dump=item["exec_after_dump"],
+                                                mariadb_backup_args=item["mariadb-backup_args"],
+                                                mariadb_backup_output_filter=mariadb_backup_output_filter,
+                                                dump_attempts=item["dump_attempts"]
+                                            )
+                                        else:
+                                            script_dump_part = textwrap.dedent(
+                                                """\
+                                                WAS_ERR=0
+                                                set +e
+                                                if [[ ! -d {mysql_dump_dir}/{source}.mariadb-backup ]]; then
+                                                        {exec_before_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
+                                                            {dump_prefix_cmd} mariadb-backup --backup --compress --throttle={mariadb_backup_throttle} --parallel={mariadb_backup_parallel} --compress-threads={mariadb_backup_compress_threads} --target-dir={mysql_dump_dir}/{source}.mariadb-backup --databases={source} {mariadb_backup_args} 2>&1 | {mariadb_backup_output_filter}
+                                                            if [[ $? -ne 0 ]]; then
+                                                                WAS_ERR=1
+                                                                echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                            else
+                                                                echo "NOTICE: Dump succeeded, attempt $DUMP_ATTEMPT of {dump_attempts}"
+                                                                break
+                                                            fi
+                                                        done
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                        {exec_after_dump}
+                                                        if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                else
+                                                    echo "NOTICE: Valid dump already exists, skipping"
+                                                fi
+                                                set -e
+                                                if [[ $WAS_ERR -ne 0 ]]; then false; else true; fi
+                                                """
+                                            ).format(
+                                                mariadb_backup_throttle=item["mariadb-backup_throttle"],
+                                                mariadb_backup_parallel=item["mariadb-backup_parallel"],
+                                                mariadb_backup_compress_threads=item["mariadb-backup_compress_threads"],
+                                                mysql_dump_dir=item["mysql_dump_dir"],
+                                                source=item["source"],
+                                                dump_prefix_cmd=item["dump_prefix_cmd"],
+                                                exec_before_dump=item["exec_before_dump"],
+                                                exec_after_dump=item["exec_after_dump"],
+                                                mariadb_backup_args=item["mariadb-backup_args"],
+                                                mariadb_backup_output_filter=mariadb_backup_output_filter,
+                                                dump_attempts=item["dump_attempts"]
+                                            )
+
+                                        # If hourly retains are used keep dumps only for 59 minutes
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+
+                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                                set -x
+                                                set -e
+                                                set -o pipefail
+                                                mkdir -p {mysql_dump_dir}
+                                                chmod 700 {mysql_dump_dir}
+                                                while [[ -d {mysql_dump_dir}/dump.lock ]]; do
+                                                        sleep 5
+                                                done
+                                                mkdir {mysql_dump_dir}/dump.lock
+                                                trap "rm -rf {mysql_dump_dir}/dump.lock" 0
+                                                cd {mysql_dump_dir}
+                                                find {mysql_dump_dir} -type d -name "*.mariadb-backup" -mmin +{mmin} -exec rm -rf {{}} +
                                                 {script_dump_part}
                                             '
                                             """
@@ -1216,7 +1350,20 @@ if __name__ == "__main__":
                                             #!/bin/bash
                                             set -e
                                             if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
-                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -delete
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -or -name "*.zst.*" -delete
+                                            fi
+                                            """
+                                        ).format(
+                                            snapshot_root=item["path"],
+                                            mysql_dump_dir=item["mysql_dump_dir"]
+                                        )
+                                    if "mysql_dump_type" in item and item["mysql_dump_type"] == "mariadb-backup":
+                                        script = textwrap.dedent(
+                                            """\
+                                            #!/bin/bash
+                                            set -e
+                                            if [[ -d {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} ]]; then
+                                                find {snapshot_root}/.sync/rsnapshot{mysql_dump_dir} -type f -name "*.qp.*" -or -name "*.zst.*" -delete
                                             fi
                                             """
                                         ).format(
@@ -1344,21 +1491,21 @@ if __name__ == "__main__":
                                         )
 
                             if item["type"] == "MYSQL_SSH":
-                                # We do not need rsync compression as xtrabackup or mysqlsh dumps are already compressed
+                                # We do not need rsync compression as xtrabackup or mariadb-backup or mysqlsh dumps are already compressed
                                 # With compress it takes 10-12 times longer
                                 if item["host"] == SELF_HOSTNAME:
                                     conf_backup_lines += conf_backup_line_template_self.format(
                                         source=item["mysql_dump_dir"],
-                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
-                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
+                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mariadb-backup" or item["mysql_dump_type"] == "mysqlsh") else "",
+                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mariadb-backup" or item["mysql_dump_type"] == "mysqlsh") else ""
                                     )
                                 else:
                                     conf_backup_lines += conf_backup_line_template_ssh.format(
                                         user=item["connect_user"],
                                         host=item["connect_host"],
                                         source=item["mysql_dump_dir"],
-                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else "",
-                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh") else ""
+                                        tab_before_rsync_long_args="\t" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mariadb-backup" or item["mysql_dump_type"] == "mysqlsh") else "",
+                                        rsync_long_args="+rsync_long_args=--no-compress" if "mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mariadb-backup" or item["mysql_dump_type"] == "mysqlsh") else ""
                                     )
                             if item["type"] == "POSTGRESQL_SSH":
                                 if item["host"] == SELF_HOSTNAME:
@@ -1757,6 +1904,106 @@ if __name__ == "__main__":
                                     log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
                                     errors += 1
 
+                            # mariadb-backup
+                            if item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and "mysql_dump_type" in item and item["mysql_dump_type"] == "mariadb-backup":
+
+                                if item["source"] == "ALL":
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/all.mariadb-backup".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"])
+                                else:
+                                    dump_dir = "{path}/.sync/rsnapshot{db_dump_dir}/{source}.mariadb-backup".format(path=item["path"], db_dump_dir=item["mysql_dump_dir"], source=item["source"])
+
+                                # Check dump dir exists
+                                if os.path.isdir(dump_dir):
+
+                                    log_and_print("NOTICE", "{dump_dir} dump dir exists on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    oks += 1
+
+                                    # Check if ibdata1.qp or ibdata1.zst exist
+                                    if os.path.exists("{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)):
+                                        # Should be at least 100 Kb
+                                        if os.stat("{dump_dir}/ibdata1.qp".format(dump_dir=dump_dir)).st_size > 100000:
+                                            log_and_print("NOTICE", "Found ibdata1.qp file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                            oks += 1
+                                    elif os.path.exists("{dump_dir}/ibdata1.zst".format(dump_dir=dump_dir)):
+                                        # Should be at least 100 Kb
+                                        if os.stat("{dump_dir}/ibdata1.zst".format(dump_dir=dump_dir)).st_size > 100000:
+                                            log_and_print("NOTICE", "Found ibdata1.zst file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                            oks += 1
+                                    else:
+                                        log_and_print("ERROR", "Found no ibdata1.qp or ibdata1.zst file larger than 100 Kb in dump dir on item number {number}".format(number=item["number"]), logger)
+                                        errors += 1
+
+                                    # Read xtrabackup_info.qp or xtrabackup_info.zst - mariadb-backup is a xtrabackup fork, so the file name is xtrabackup_info
+                                    if os.path.exists("{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)):
+                                        xtrabackup_info_file = "{dump_dir}/xtrabackup_info.qp".format(dump_dir=dump_dir)
+                                        qpress_cmd = "qpress -do {xtrabackup_info_file}".format(xtrabackup_info_file=xtrabackup_info_file)
+                                        xtrabackup_end_time = None
+                                        log_and_print("NOTICE", "Found {xtrabackup_info_file} file in dump dir on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
+                                        oks += 1
+
+                                        try:
+
+                                            retcode, stdout, stderr = run_cmd_pipe(qpress_cmd)
+                                            if retcode == 0:
+
+                                                for xtrabackup_info_line in stdout.split("\n"):
+                                                    if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
+                                                        xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
+
+                                            else:
+                                                log_and_print("ERROR", "qpress cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                errors += 1
+
+                                        except Exception as e:
+                                            logger.exception(e)
+                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                    elif os.path.exists("{dump_dir}/xtrabackup_info.zst".format(dump_dir=dump_dir)):
+                                        xtrabackup_info_file = "{dump_dir}/xtrabackup_info.zst".format(dump_dir=dump_dir)
+                                        zstd_cmd = "zstd -d -c {xtrabackup_info_file}".format(xtrabackup_info_file=xtrabackup_info_file)
+                                        xtrabackup_end_time = None
+                                        log_and_print("NOTICE", "Found {xtrabackup_info_file} file in dump dir on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
+                                        oks += 1
+
+                                        try:
+
+                                            retcode, stdout, stderr = run_cmd_pipe(zstd_cmd)
+                                            if retcode == 0:
+
+                                                for xtrabackup_info_line in stdout.split("\n"):
+                                                    if xtrabackup_info_line.lstrip().rstrip().split(" = ")[0] == "end_time":
+                                                        xtrabackup_end_time = xtrabackup_info_line.lstrip().rstrip().split(" = ")[1]
+
+                                            else:
+                                                log_and_print("ERROR", "zstd cmd failed on item number {number}".format(number=item["number"]), logger)
+                                                errors += 1
+
+                                        except Exception as e:
+                                            logger.exception(e)
+                                            raise Exception("Caught exception on subprocess.run execution")
+
+                                    else:
+                                        log_and_print("ERROR", "Found no xtrabackup_info.qp or xtrabackup_info.zst file in dump dir on item number {number}".format(number=item["number"]), logger)
+                                        errors += 1
+
+                                    # Check xtrabackup end_time
+                                    if xtrabackup_end_time is not None:
+                                        seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
+                                        # Dump files shouldn't be older than 1 day
+                                        if seconds_between_end_time_and_now < 60*60*24:
+                                            log_and_print("NOTICE", "Dump mariadb-backup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            oks += 1
+                                        else:
+                                            log_and_print("ERROR", "Dump mariadb-backup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            errors += 1
+                                    else:
+                                        log_and_print("ERROR", "There is no mariadb-backup end_time signature in file {xtrabackup_info_file} on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
+                                        errors += 1
+
+                                else:
+                                    log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
+                                    errors += 1
+
                             # mysqlsh
                             if item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and "mysql_dump_type" in item and item["mysql_dump_type"] == "mysqlsh":
 
@@ -1948,7 +2195,7 @@ if __name__ == "__main__":
 
                             # Native DB dumps have similiar logic
                             if (
-                                    (item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and not ("mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mysqlsh")))
+                                    (item["type"] == "MYSQL_SSH" and check["type"] == "MYSQL" and not ("mysql_dump_type" in item and (item["mysql_dump_type"] == "xtrabackup" or item["mysql_dump_type"] == "mariadb-backup" or item["mysql_dump_type"] == "mysqlsh")))
                                     or
                                     (item["type"] == "POSTGRESQL_SSH" and check["type"] == "POSTGRESQL" and not ("postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory"))
                                     or
