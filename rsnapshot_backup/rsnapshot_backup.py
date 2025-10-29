@@ -260,6 +260,8 @@ if __name__ == "__main__":
                         item["mongodump_args"] = item["mongo_args"]
                     if "mongo_secondary_ok" not in item:
                         item["mongo_secondary_ok"] = False
+                    if "mongodump_skip_tar" not in item:
+                        item["mongodump_skip_tar"] = False
 
                     if "xtrabackup_throttle" not in item:
                         item["xtrabackup_throttle"] = "20" # 20 MB IO limit by default https://www.percona.com/doc/percona-xtrabackup/2.3/advanced/throttling_backups.html
@@ -1202,6 +1204,18 @@ if __name__ == "__main__":
                                             )
                                         else:
                                             show_dbs_part = "echo show dbs"
+                                        if item["mongodump_skip_tar"]:
+                                            tar_part = ""
+                                        else:
+                                            tar_part = textwrap.dedent(
+                                                """\
+                                                tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
+                                                if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                rm -rf {mongodb_dump_dir}/$db
+                                                """
+                                            ).format(
+                                                mongodb_dump_dir=item["mongodb_dump_dir"]
+                                            )
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             if command -v mongo >/dev/null 2>&1; then
@@ -1227,8 +1241,7 @@ if __name__ == "__main__":
                                                             done
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             cd {mongodb_dump_dir}
-                                                            tar zcvf {mongodb_dump_dir}/$db.tar.gz $db
-                                                            rm -rf {mongodb_dump_dir}/$db
+                                                            {tar_part}
                                                             {exec_after_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     else
@@ -1243,6 +1256,7 @@ if __name__ == "__main__":
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             exec_before_dump=item["exec_before_dump"],
+                                            tar_part=tar_part,
                                             exec_after_dump=item["exec_after_dump"],
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
@@ -1251,6 +1265,19 @@ if __name__ == "__main__":
                                             listDatabases="{listDatabases:1}"
                                         )
                                     else:
+                                        if item["mongodump_skip_tar"]:
+                                            tar_part = ""
+                                        else:
+                                            tar_part = textwrap.dedent(
+                                                """\
+                                                tar zcvf {mongodb_dump_dir}/{source}.tar.gz {source}
+                                                if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
+                                                rm -rf {mongodb_dump_dir}/{source}
+                                                """
+                                            ).format(
+                                                mongodb_dump_dir=item["mongodb_dump_dir"],
+                                                source=item["source"]
+                                            )
                                         script_dump_part = textwrap.dedent(
                                             """\
                                             WAS_ERR=0
@@ -1270,8 +1297,7 @@ if __name__ == "__main__":
                                                     done
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     cd {mongodb_dump_dir}
-                                                    tar zcvf {mongodb_dump_dir}/{source}.tar.gz {source}
-                                                    rm -rf {mongodb_dump_dir}/{source}
+                                                    {tar_part}
                                                     {exec_after_dump}
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                             else
@@ -1284,6 +1310,7 @@ if __name__ == "__main__":
                                             mongodb_dump_dir=item["mongodb_dump_dir"],
                                             dump_prefix_cmd=item["dump_prefix_cmd"],
                                             exec_before_dump=item["exec_before_dump"],
+                                            tar_part=tar_part,
                                             exec_after_dump=item["exec_after_dump"],
                                             mongo_args=item["mongo_args"],
                                             mongodump_args=item["mongodump_args"],
@@ -2206,13 +2233,16 @@ if __name__ == "__main__":
 
                                 if check["type"] == "MYSQL":
                                     db_dump_dir = item["mysql_dump_dir"]
-                                    db_dump_ext = "gz"
+                                    db_dump_ext = ".gz"
                                 elif check["type"] == "POSTGRESQL":
                                     db_dump_dir = item["postgresql_dump_dir"]
-                                    db_dump_ext = "gz"
+                                    db_dump_ext = ".gz"
                                 elif check["type"] == "MONGODB":
                                     db_dump_dir = item["mongodb_dump_dir"]
-                                    db_dump_ext = "tar.gz"
+                                    if item["mongodump_skip_tar"]:
+                                        db_dump_ext = ""
+                                    else:
+                                        db_dump_ext = ".tar.gz"
 
                                 if item["source"] == "ALL":
 
@@ -2235,51 +2265,51 @@ if __name__ == "__main__":
                                 # Check sources
                                 for source in sources_to_check:
 
-                                    dump_file = "{path}/.sync/rsnapshot{db_dump_dir}/{source}.{db_dump_ext}".format(path=item["path"], db_dump_dir=db_dump_dir, source=source, db_dump_ext=db_dump_ext)
+                                    dump_dir_or_file = "{path}/.sync/rsnapshot{db_dump_dir}/{source}{db_dump_ext}".format(path=item["path"], db_dump_dir=db_dump_dir, source=source, db_dump_ext=db_dump_ext)
 
-                                    # Check dump file exists
-                                    if os.path.exists(dump_file):
+                                    # Check dump dir or file exists
+                                    if os.path.exists(dump_dir_or_file):
 
-                                        log_and_print("NOTICE", "{dump_file} dump file exists on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                        log_and_print("NOTICE", "{dump_dir_or_file} dump dir or file exists on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                         oks += 1
 
-                                        # With MYSQL and POSTGRESQL we read dump files
+                                        # With MYSQL and POSTGRESQL we read dump dir or files
                                         if check["type"] in ["MYSQL", "POSTGRESQL"]:
 
-                                            # Do dump_file_inserts check only if source or ALL is not in empty_db
-                                            dump_file_lines_number = 0
-                                            dump_file_inserts = 0
+                                            # Do dump_dir_or_file_inserts check only if source or ALL is not in empty_db
+                                            dump_dir_or_file_lines_number = 0
+                                            dump_dir_or_file_inserts = 0
                                             dump_completed_date = None
-                                            with gzip.open(dump_file, "r") as dump_file_file:
+                                            with gzip.open(dump_dir_or_file, "r") as dump_dir_or_file_file:
                                                 while True:
-                                                    dump_file_lines_number += 1
-                                                    dump_file_line = dump_file_file.readline()
-                                                    if not dump_file_line:
-                                                        log_and_print("NOTICE", "Read {dump_file_lines_number} lines in dump file {dump_file} on item number {number}".format(dump_file_lines_number=dump_file_lines_number, dump_file=dump_file, number=item["number"]), logger)
+                                                    dump_dir_or_file_lines_number += 1
+                                                    dump_dir_or_file_line = dump_dir_or_file_file.readline()
+                                                    if not dump_dir_or_file_line:
+                                                        log_and_print("NOTICE", "Read {dump_dir_or_file_lines_number} lines in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file_lines_number=dump_dir_or_file_lines_number, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                         break
-                                                    if not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_file_line.decode(errors="ignore")):
-                                                        dump_file_inserts += 1
-                                                    elif not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_file_line.decode(errors="ignore")):
-                                                        dump_file_inserts += 1
-                                                    elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_file_line.decode(errors="ignore")):
-                                                        re_match = re.match("^-- Dump completed on (.+)$", dump_file_line.decode(errors="ignore"))
+                                                    if not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "MYSQL" and re.match("^INSERT INTO", dump_dir_or_file_line.decode(errors="ignore")):
+                                                        dump_dir_or_file_inserts += 1
+                                                    elif not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])) and check["type"] == "POSTGRESQL" and re.match("^COPY.*FROM stdin", dump_dir_or_file_line.decode(errors="ignore")):
+                                                        dump_dir_or_file_inserts += 1
+                                                    elif check["type"] == "MYSQL" and re.match("^-- Dump completed on", dump_dir_or_file_line.decode(errors="ignore")):
+                                                        re_match = re.match("^-- Dump completed on (.+)$", dump_dir_or_file_line.decode(errors="ignore"))
                                                         if re_match:
                                                             dump_completed_date = re_match.group(1)
-                                                    elif check["type"] == "POSTGRESQL" and re.match("^-- Completed on", dump_file_line.decode(errors="ignore")):
-                                                        re_match = re.match("^-- Completed on (.+)$", dump_file_line.decode(errors="ignore"))
+                                                    elif check["type"] == "POSTGRESQL" and re.match("^-- Completed on", dump_dir_or_file_line.decode(errors="ignore")):
+                                                        re_match = re.match("^-- Completed on (.+)$", dump_dir_or_file_line.decode(errors="ignore"))
                                                         if re_match:
                                                             dump_completed_date = re_match.group(1)
 
-                                            # Do dump_file_inserts check only if source or ALL is not in empty_db
+                                            # Do dump_dir_or_file_inserts check only if source or ALL is not in empty_db
                                             if not ("empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"])):
-                                                if dump_file_inserts > 0:
-                                                    log_and_print("NOTICE", "Found {dump_file_inserts} inserts in dump file {dump_file} on item number {number}".format(dump_file_inserts=dump_file_inserts, dump_file=dump_file, number=item["number"]), logger)
+                                                if dump_dir_or_file_inserts > 0:
+                                                    log_and_print("NOTICE", "Found {dump_dir_or_file_inserts} inserts in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file_inserts=dump_dir_or_file_inserts, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Found 0 inserts in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Found 0 inserts in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     errors += 1
                                             else:
-                                                log_and_print("NOTICE", "Skipping dump file inserts check on item number {number} because source or ALL is in empty_db".format(number=item["number"]), logger)
+                                                log_and_print("NOTICE", "Skipping dump dir or file inserts check on item number {number} because source or ALL is in empty_db".format(number=item["number"]), logger)
 
                                             # Check dump completed date
                                             if dump_completed_date is not None:
@@ -2289,51 +2319,62 @@ if __name__ == "__main__":
                                                     seconds_between_dump_completed_date_and_now = (datetime.now() - datetime.strptime(dump_completed_date, "%Y-%m-%d %H:%M:%S %Z")).total_seconds()
                                                 # Dump files shouldn't be older than 1 day
                                                 if seconds_between_dump_completed_date_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", "Dump completion signature age {seconds} secs is less than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    log_and_print("NOTICE", "Dump completion signature age {seconds} secs is less than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     errors += 1
                                             else:
-                                                log_and_print("ERROR", "There is no dump completion signature in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                log_and_print("ERROR", "There is no dump completion signature in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                 errors += 1
 
                                         # With MONGODB we read tar archive
                                         elif check["type"] in ["MONGODB"]:
 
-                                            tarfile_bsons_number = 0
-                                            tarfile_non_zero_sized_bson_date = None
-                                            tarfile_non_zero_sized_bsons_number = 0
-                                            with tarfile.open(dump_file, "r") as dump_file_file:
-                                                for tarfile_member in dump_file_file.getmembers():
-                                                    if "bson" in tarfile_member.name:
-                                                        tarfile_bsons_number += 1
-                                                        if tarfile_member.size > 0:
-                                                            tarfile_non_zero_sized_bsons_number += 1
-                                                            tarfile_non_zero_sized_bson_date = datetime.fromtimestamp(tarfile_member.mtime)
-                                            log_and_print("NOTICE", "Found {tarfile_bsons_number} bsons in dump file {dump_file} on item number {number}".format(tarfile_bsons_number=tarfile_bsons_number, dump_file=dump_file, number=item["number"]), logger)
+                                            tarfile_or_dumpdir_bsons_number = 0
+                                            tarfile_or_dumpdir_non_zero_sized_bson_date = None
+                                            tarfile_or_dumpdir_non_zero_sized_bsons_number = 0
+
+                                            if item["mongodump_skip_tar"]:
+                                                with os.scandir(dump_dir_or_file) as dump_dir_or_file_dir:
+                                                    for dump_dir_or_file_member in dump_dir_or_file_dir:
+                                                        if "bson" in dump_dir_or_file_member.name:
+                                                            tarfile_or_dumpdir_bsons_number += 1
+                                                            if dump_dir_or_file_member.stat().st_size > 0:
+                                                                tarfile_or_dumpdir_non_zero_sized_bsons_number += 1
+                                                                tarfile_or_dumpdir_non_zero_sized_bson_date = datetime.fromtimestamp(dump_dir_or_file_member.stat().st_mtime)
+                                            else:
+                                                with tarfile.open(dump_dir_or_file, "r") as dump_dir_or_file_file:
+                                                    for tarfile_or_dumpdir_member in dump_dir_or_file_file.getmembers():
+                                                        if "bson" in tarfile_or_dumpdir_member.name:
+                                                            tarfile_or_dumpdir_bsons_number += 1
+                                                            if tarfile_or_dumpdir_member.size > 0:
+                                                                tarfile_or_dumpdir_non_zero_sized_bsons_number += 1
+                                                                tarfile_or_dumpdir_non_zero_sized_bson_date = datetime.fromtimestamp(tarfile_or_dumpdir_member.mtime)
+
+                                            log_and_print("NOTICE", "Found {tarfile_or_dumpdir_bsons_number} bsons in dump dir or file {dump_dir_or_file} on item number {number}".format(tarfile_or_dumpdir_bsons_number=tarfile_or_dumpdir_bsons_number, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
 
                                             # Check non zero sized bsons
-                                            if tarfile_non_zero_sized_bsons_number > 0:
-                                                log_and_print("NOTICE", "Found {tarfile_non_zero_sized_bsons_number} non zero sized bsons in dump file {dump_file} on item number {number}".format(tarfile_non_zero_sized_bsons_number=tarfile_non_zero_sized_bsons_number, dump_file=dump_file, number=item["number"]), logger)
+                                            if tarfile_or_dumpdir_non_zero_sized_bsons_number > 0:
+                                                log_and_print("NOTICE", "Found {tarfile_or_dumpdir_non_zero_sized_bsons_number} non zero sized bsons in dump dir or file {dump_dir_or_file} on item number {number}".format(tarfile_or_dumpdir_non_zero_sized_bsons_number=tarfile_or_dumpdir_non_zero_sized_bsons_number, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                 oks += 1
                                             else:
-                                                log_and_print("ERROR", "Found 0 non zero sized bsons in dump file {dump_file} on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                                log_and_print("ERROR", "Found 0 non zero sized bsons in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                 errors += 1
 
                                             # Check dump completed date
-                                            if tarfile_non_zero_sized_bson_date is not None:
-                                                seconds_between_tarfile_non_zero_sized_bson_date_and_now = (datetime.now() - tarfile_non_zero_sized_bson_date).total_seconds()
+                                            if tarfile_or_dumpdir_non_zero_sized_bson_date is not None:
+                                                seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now = (datetime.now() - tarfile_or_dumpdir_non_zero_sized_bson_date).total_seconds()
                                                 # Dump files shouldn't be older than 1 day
-                                                if seconds_between_tarfile_non_zero_sized_bson_date_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", "Dump bsons age {seconds} secs is less than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_tarfile_non_zero_sized_bson_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                if seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now < 60*60*24:
+                                                    log_and_print("NOTICE", "Dump bsons age {seconds} secs is less than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Dump bsons age {seconds} secs is more than 1d for the dump file {dump_file} on item number {number}".format(seconds=int(seconds_between_tarfile_non_zero_sized_bson_date_and_now), dump_file=dump_file, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Dump bsons age {seconds} secs is more than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     errors += 1
 
                                     else:
-                                        log_and_print("ERROR", "{dump_file} dump file is missing on item number {number}".format(dump_file=dump_file, number=item["number"]), logger)
+                                        log_and_print("ERROR", "{dump_dir_or_file} dump dir or file is missing on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                         errors += 1
 
                             # .backup and FILE_AGE
