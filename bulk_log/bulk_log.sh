@@ -38,10 +38,10 @@ echo " "
 echo "### ethtool"
 ethtool eth0 2>&1
 echo " "
-echo "### ethtool"
+echo "### ethtool -S"
 ethtool -S eth0 2>&1
 echo " "
-echo "### netstat"
+echo "### netstat -ia"
 netstat -ia 2>&1
 echo " "
 echo "### netstat -nr"
