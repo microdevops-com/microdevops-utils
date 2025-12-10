@@ -17,7 +17,7 @@ from pprint import pprint
 @click.option("--critical", type=click.INT, default=(7 * 24 * 60), help="Minutes to critical, default 7 * 24 * 60 (1 week)")
 @click.option("--no-cache", is_flag=True, default=False, help="Do not use cache file, optional")
 @click.option("--server", type=click.STRING, default=None, help="Whois server to use, optional")
-def main(domain, warning, critical, no_cache):
+def main(domain, warning, critical, no_cache, server):
 
     exit_code = 0
     try:
