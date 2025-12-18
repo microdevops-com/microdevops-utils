@@ -57,9 +57,12 @@ def main(dir):
                                 print(line)
                             exit_code = 1
 
-                        # Check that database.sql.gz ends with last line:
+                        # Check that database.sql.gz ends with such lines:
+                        # --
                         # -- PostgreSQL database dump complete
                         # --
+                        # <newline>
+                        # \unrestrict <random text>
                         # <newline>
                         f.seek(0, os.SEEK_END)
                         f_size = f.tell()
@@ -68,21 +71,29 @@ def main(dir):
                             buffer_size = f_size
                         f.seek(f_size - buffer_size)
                         lines = f.readlines()
-                        last_three_lines = [line.strip() for line in lines[-3:]]
+                        last_six_lines = [line.strip() for line in lines[-6:]]
                         expected_end_lines = [
+                            "--",
                             "-- PostgreSQL database dump complete",
                             "--",
+                            "",
+                            r"\unrestrict ",
                             ""
                         ]
-                        if last_three_lines == expected_end_lines:
+                        if (last_six_lines[0] == expected_end_lines[0] and
+                            last_six_lines[1] == expected_end_lines[1] and
+                            last_six_lines[2] == expected_end_lines[2] and
+                            last_six_lines[3] == expected_end_lines[3] and
+                            last_six_lines[4].startswith(expected_end_lines[4]) and
+                            last_six_lines[5] == expected_end_lines[5]):
                             print("SUCCESS: database.sql.gz has the expected footer lines.")
                             print("Found lines:")
-                            for line in last_three_lines:
+                            for line in last_six_lines:
                                 print(line)
                         else:
                             print("ERROR: database.sql.gz does not have the expected footer lines.")
                             print("Found lines:")
-                            for line in last_three_lines:
+                            for line in last_six_lines:
                                 print(line)
                             exit_code = 1
 
