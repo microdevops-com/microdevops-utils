@@ -213,6 +213,8 @@ if __name__ == "__main__":
                         item["mysql_noevents"] = False
                     if "postgresql_noclean" not in item:
                         item["postgresql_noclean"] = False
+                    if "postgresql_skip_globals" not in item:
+                        item["postgresql_skip_globals"] = False
 
                     if "native_txt_check" not in item:
                         item["native_txt_check"] = False
@@ -1177,7 +1179,7 @@ if __name__ == "__main__":
                                             cd {postgresql_dump_dir}
                                             find {postgresql_dump_dir} {find_part} -mmin +{mmin} -exec rm -rf {{}} +
                                             {exec_before_dump}
-                                            su - postgres -c "pg_dumpall --clean --if-exists --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
+                                            {comment_out_pg_dumpall}su - postgres -c "pg_dumpall --clean --if-exists --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
                                             {exec_after_dump}
                                             {script_dump_part}
                                         '
@@ -1194,7 +1196,8 @@ if __name__ == "__main__":
                                         exec_before_dump=item["exec_before_dump"],
                                         exec_after_dump=item["exec_after_dump"],
                                         find_part=find_part,
-                                        chown_part=chown_part
+                                        chown_part=chown_part,
+                                        comment_out_pg_dumpall="#" if item["postgresql_skip_globals"] else ""
                                     )
 
                                 if item["type"] == "MONGODB_SSH":
