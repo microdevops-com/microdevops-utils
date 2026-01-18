@@ -26,7 +26,6 @@ WORK_DIR = "/opt/sysadmws/rsnapshot_backup"
 CONFIG_FILE = "rsnapshot_backup.yaml"
 LOG_DIR = "/opt/sysadmws/rsnapshot_backup/log"
 LOG_FILE = "rsnapshot_backup.log"
-SELF_HOSTNAME = socket.gethostname()
 # Keep lock file in /run tmpfs - for stale lock file cleanup on reboot
 LOCK_FILE = "/run/rsnapshot_backup"
 RSNAPSHOT_CONF = "/opt/sysadmws/rsnapshot_backup/rsnapshot.conf"
@@ -153,6 +152,11 @@ if __name__ == "__main__":
             logger.info("{LOGO} not enabled in config, exiting".format(LOGO=LOGO))
             sys.exit(0)
 
+        # Check for self hostname override in config
+        if "hostname_override" in config:
+            SELF_HOSTNAME = config["hostname_override"]
+        else:
+            SELF_HOSTNAME = socket.gethostname()
         log_and_print("NOTICE", "Starting {LOGO} on {hostname}".format(LOGO=LOGO, hostname=SELF_HOSTNAME), logger)
 
         # Chdir to work dir
