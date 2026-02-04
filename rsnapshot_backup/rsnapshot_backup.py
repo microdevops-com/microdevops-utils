@@ -299,6 +299,11 @@ if __name__ == "__main__":
                     if "mysqlsh_threads" not in item:
                         item["mysqlsh_threads"] = "2"
 
+                    if "docker_mode" not in item:
+                        item["docker_mode"] = False
+                    if "docker_container" not in item:
+                        item["docker_container"] = ""
+
                     # Check before_backup_check and skip item if failed
                     # It is needed for both rotations and sync
                     if "before_backup_check" in item:
@@ -1049,7 +1054,7 @@ if __name__ == "__main__":
 
                                         script_dump_part = textwrap.dedent(
                                             """\
-                                            su - postgres -c "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
+                                            $PG_RUN "echo SELECT datname FROM pg_database | psql --no-align -t template1" {grep_db_filter} | grep -v -e template0 -e template1 > {postgresql_dump_dir}/db_list.txt
                                             WAS_ERR=0
                                             for db in $(cat {postgresql_dump_dir}/db_list.txt); do
                                                     set +e
@@ -1058,7 +1063,7 @@ if __name__ == "__main__":
                                                             {exec_before_dump}
                                                             if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                             for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                                su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose $db" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
+                                                                $PG_RUN "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose $db" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
                                                                 if [[ $? -ne 0 ]]; then
                                                                     WAS_ERR=1
                                                                     echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -1114,7 +1119,7 @@ if __name__ == "__main__":
                                                     {exec_before_dump}
                                                     if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                     for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                        su - postgres -c "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose {source}" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
+                                                        $PG_RUN "{dump_prefix_cmd} pg_dump --create {postgresql_clean} {pg_dump_args} {pg_dump_format_part} --verbose {source}" 2> >({pg_dump_filter}) {pg_dump_line_pipe_part}
                                                         if [[ $? -ne 0 ]]; then
                                                             WAS_ERR=1
                                                             echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -1168,6 +1173,14 @@ if __name__ == "__main__":
                                             set -x
                                             set -e
                                             set -o pipefail
+
+                                            docker_mode={docker_mode}
+                                            if [[ "$docker_mode" -eq 1 ]]; then
+                                                PG_RUN="docker exec -u postgres {docker_container} sh -lc"
+                                            else
+                                                PG_RUN="su - postgres -c"
+                                            fi
+
                                             mkdir -p {postgresql_dump_dir}
                                             chmod 700 {postgresql_dump_dir}
                                             {chown_part}
@@ -1179,7 +1192,7 @@ if __name__ == "__main__":
                                             cd {postgresql_dump_dir}
                                             find {postgresql_dump_dir} {find_part} -mmin +{mmin} -exec rm -rf {{}} +
                                             {exec_before_dump}
-                                            {comment_out_pg_dumpall}su - postgres -c "pg_dumpall --clean --if-exists --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
+                                            {comment_out_pg_dumpall}$PG_RUN "pg_dumpall --clean --if-exists --schema-only --verbose" 2> >({pg_dump_filter}) | gzip > {postgresql_dump_dir}/globals.gz
                                             {exec_after_dump}
                                             {script_dump_part}
                                         '
@@ -1197,7 +1210,9 @@ if __name__ == "__main__":
                                         exec_after_dump=item["exec_after_dump"],
                                         find_part=find_part,
                                         chown_part=chown_part,
-                                        comment_out_pg_dumpall="#" if item["postgresql_skip_globals"] else ""
+                                        comment_out_pg_dumpall="#" if item["postgresql_skip_globals"] else "",
+                                        docker_mode=1 if item["docker_mode"] else 0,
+                                        docker_container=item["docker_container"]
                                     )
 
                                 if item["type"] == "MONGODB_SSH":
