@@ -1098,8 +1098,8 @@ if __name__ == "__main__":
                                             pg_dump_format_part=pg_dump_format_part,
                                             if_exists_part=if_exists_part,
                                             mkdir_chown_part=mkdir_chown_part,
-                                            pg_run=f'docker exec -u postgres {item["docker_container"]} sh -lc' if item["docker_mode"] else "su - postgres -c",
-                                            pg_user=f'-U {item["db_user"]}' if item["db_user"] else ""
+                                            pg_run="docker exec -u postgres {container} sh -lc".format(container=item["docker_container"]) if item["docker_mode"] else "su - postgres -c",
+                                            pg_user="-U {db_user}".format(db_user=item["db_user"]) if item["db_user"] else ""
                                         )
                                     else:
 
@@ -1156,8 +1156,8 @@ if __name__ == "__main__":
                                             pg_dump_format_part=pg_dump_format_part,
                                             if_exists_part=if_exists_part,
                                             mkdir_chown_part=mkdir_chown_part,
-                                            pg_run=f'docker exec -u postgres {item["docker_container"]} sh -lc' if item["docker_mode"] else "su - postgres -c",
-                                            pg_user=f'-U {item["db_user"]}' if item["db_user"] else ""
+                                            pg_run="docker exec -u postgres {container} sh -lc".format(container=item["docker_container"]) if item["docker_mode"] else "su - postgres -c",
+                                            pg_user="-U {db_user}".format(db_user=item["db_user"]) if item["db_user"] else ""
                                         )
 
                                     if "postgresql_dump_type" in item and item["postgresql_dump_type"] == "directory":
@@ -1209,8 +1209,8 @@ if __name__ == "__main__":
                                         find_part=find_part,
                                         chown_part=chown_part,
                                         comment_out_pg_dumpall="#" if item["postgresql_skip_globals"] else "",
-                                        pg_run=f'docker exec -u postgres {item["docker_container"]} sh -lc' if item["docker_mode"] else "su - postgres -c",
-                                        pg_user=f'-U {item["db_user"]}' if item["db_user"] else ""
+                                        pg_run="docker exec -u postgres {container} sh -lc".format(container=item["docker_container"]) if item["docker_mode"] else "su - postgres -c",
+                                        pg_user="-U {db_user}".format(db_user=item["db_user"]) if item["db_user"] else ""
                                     )
 
                                 if item["type"] == "MONGODB_SSH":
