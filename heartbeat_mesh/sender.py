@@ -19,7 +19,10 @@ except ImportError:
 # Constants
 WORK_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh"
 CONFIG_FILE = "sender.yaml"
-LOG_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\log" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh/log"
+if "LOG_DIR" in os.environ:
+    LOG_DIR = os.environ["LOG_DIR"]
+else:
+    LOG_DIR = "c:\\opt\\sysadmws\\heartbeat_mesh\\log" if os.name == "nt" else "/opt/sysadmws/heartbeat_mesh/log"
 LOG_FILE = "sender.log"
 LOGO = "💔 ➔ ✉"
 NAME = "heartbeat_mesh/sender"
