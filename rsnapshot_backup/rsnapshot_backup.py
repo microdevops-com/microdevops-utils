@@ -925,7 +925,7 @@ if __name__ == "__main__":
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
-                                                mysql --defaults-file=/etc/mysql/debian.cnf --skip-column-names --batch -e "SHOW DATABASES;" | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
+                                                {dump_run} 'mysql {dump_creds} --skip-column-names --batch -e "SHOW DATABASES;"' | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
                                                 WAS_ERR=0
                                                 for db in $(cat {mysql_dump_dir}/db_list.txt); do
                                                         set +e
@@ -933,7 +933,7 @@ if __name__ == "__main__":
                                                                 {exec_before_dump}
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                                 for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                                    {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $db --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/$db.gz
+                                                                    {dump_run} '{dump_prefix_cmd} mysqldump {dump_creds} --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $1 --max_allowed_packet=1G {mysqldump_args}' -- $db | gzip > {mysql_dump_dir}/$db.gz
                                                                     if [[ $? -ne 0 ]]; then
                                                                         WAS_ERR=1
                                                                         echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -960,7 +960,9 @@ if __name__ == "__main__":
                                                 exec_after_dump=item["exec_after_dump"],
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
-                                                dump_attempts=item["dump_attempts"]
+                                                dump_attempts=item["dump_attempts"],
+                                                dump_run="docker exec {container} sh -lc".format(container=item["docker_container"]) if item["docker_mode"] else "bash -c",
+                                                dump_creds="-u\"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\"" if item["docker_mode"] else "--defaults-file=/etc/mysql/debian.cnf"
                                             )
                                         else:
                                             script_dump_part = textwrap.dedent(
@@ -971,7 +973,7 @@ if __name__ == "__main__":
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                            {dump_prefix_cmd} mysqldump --defaults-file=/etc/mysql/debian.cnf --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args} | gzip > {mysql_dump_dir}/{source}.gz
+                                                            {dump_run} '{dump_prefix_cmd} mysqldump {dump_creds} --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args}' | gzip > {mysql_dump_dir}/{source}.gz
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
                                                                 echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -998,7 +1000,9 @@ if __name__ == "__main__":
                                                 mysqldump_args=item["mysqldump_args"],
                                                 grep_db_filter=grep_db_filter,
                                                 source=item["source"],
-                                                dump_attempts=item["dump_attempts"]
+                                                dump_attempts=item["dump_attempts"],
+                                                dump_run="docker exec {container} sh -lc".format(container=item["docker_container"]) if item["docker_mode"] else "bash -c",
+                                                dump_creds="-u\"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\"" if item["docker_mode"] else "--defaults-file=/etc/mysql/debian.cnf"
                                             )
 
                                         # If hourly retains are used keep dumps only for 59 minutes
@@ -1007,7 +1011,7 @@ if __name__ == "__main__":
                                             #!/bin/bash
                                             set -e
 
-                                            ssh {ssh_args} -p {port} {user}@{host} '
+                                            ssh {ssh_args} -p {port} {user}@{host} bash -se <<'EOF'
                                                 set -x
                                                 set -e
                                                 set -o pipefail
@@ -1021,7 +1025,7 @@ if __name__ == "__main__":
                                                 cd {mysql_dump_dir}
                                                 find {mysql_dump_dir} -type f -name "*.gz" -mmin +{mmin} -delete
                                                 {script_dump_part}
-                                            '
+                                            EOF
                                             """
                                         ).format(
                                             ssh_args=ssh_args,
