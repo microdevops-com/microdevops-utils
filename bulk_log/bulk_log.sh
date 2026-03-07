@@ -10,6 +10,8 @@ BULK_LOG_LOCK_FILE="${BULK_LOG_LOCK_FILE:-${SCRIPT_DIR}/bulk_log.lock}"
 BULK_LOG_TIMEOUT_SECONDS="${BULK_LOG_TIMEOUT_SECONDS:-30}"
 BULK_LOG_PING_TARGET="${BULK_LOG_PING_TARGET:-1.1.1.1}"
 BULK_LOG_PING_COUNT="${BULK_LOG_PING_COUNT:-10}"
+BULK_LOG_DNS_TEST_ENABLED="${BULK_LOG_DNS_TEST_ENABLED:-1}"
+BULK_LOG_DNS_TEST_NAME="${BULK_LOG_DNS_TEST_NAME:-www.google.com}"
 BULK_LOG_GW_PING_ENABLED="${BULK_LOG_GW_PING_ENABLED:-1}"
 BULK_LOG_GW_PING_COUNT="${BULK_LOG_GW_PING_COUNT:-4}"
 BULK_LOG_IFACE="${BULK_LOG_IFACE:-}"
@@ -273,6 +275,34 @@ run_os_release_section() {
     fi
 }
 
+run_dns_section() {
+    if [[ "$BULK_LOG_DNS_TEST_ENABLED" != "1" ]]; then
+        echo " "
+        echo "### dns lookup"
+        echo "SKIP: DNS lookup disabled (BULK_LOG_DNS_TEST_ENABLED=${BULK_LOG_DNS_TEST_ENABLED})"
+        return 0
+    fi
+
+    if [[ -z "$BULK_LOG_DNS_TEST_NAME" ]]; then
+        echo " "
+        echo "### dns lookup"
+        echo "SKIP: BULK_LOG_DNS_TEST_NAME is empty"
+        return 0
+    fi
+
+    if has_cmd getent; then
+        run_section "dns getent ${BULK_LOG_DNS_TEST_NAME}" getent getent ahosts "$BULK_LOG_DNS_TEST_NAME"
+    elif has_cmd host; then
+        run_section "dns host ${BULK_LOG_DNS_TEST_NAME}" host host "$BULK_LOG_DNS_TEST_NAME"
+    elif has_cmd nslookup; then
+        run_section "dns nslookup ${BULK_LOG_DNS_TEST_NAME}" nslookup nslookup "$BULK_LOG_DNS_TEST_NAME"
+    else
+        echo " "
+        echo "### dns lookup"
+        echo "SKIP: no DNS lookup command found (getent/host/nslookup)"
+    fi
+}
+
 acquire_lock
 
 GW_IP_ADDRESS="$(get_default_gateway)"
@@ -296,6 +326,7 @@ run_section "vmstat" vmstat vmstat 1 5
 run_section "mpstat" mpstat mpstat -P ALL 1 1
 run_section "iostat" iostat iostat -xz 1 3
 run_section "ping" ping ping -n -c "$BULK_LOG_PING_COUNT" "$BULK_LOG_PING_TARGET"
+run_dns_section
 run_connection_section
 run_section "ss -s" ss ss -s
 run_ping_gateway_section "$GW_IP_ADDRESS"

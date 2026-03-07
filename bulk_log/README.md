@@ -7,6 +7,8 @@
 - Per-command timeout: `BULK_LOG_TIMEOUT_SECONDS` (default: `30`)
 - External ping target: `BULK_LOG_PING_TARGET` (default: `1.1.1.1`)
 - External ping count: `BULK_LOG_PING_COUNT` (default: `10`)
+- DNS test enabled: `BULK_LOG_DNS_TEST_ENABLED` (`1` or `0`, default: `1`)
+- DNS test hostname: `BULK_LOG_DNS_TEST_NAME` (default: `www.google.com`)
 - Gateway ping enabled: `BULK_LOG_GW_PING_ENABLED` (`1` or `0`, default: `1`)
 - Gateway ping count: `BULK_LOG_GW_PING_COUNT` (default: `4`)
 - Force interface for `ethtool`: `BULK_LOG_IFACE` (default: auto-detected)
@@ -41,6 +43,7 @@ Alongside classic sections (`top`, `ps`, `ping`, network info), the utility now 
 
 - `uname -a`, `/etc/os-release`
 - `vmstat`, `mpstat`, `iostat`
+- DNS lookup (`getent`/`host`/`nslookup` fallback)
 - `ss -s`
 - `dmesg` tail
 - `systemctl --failed`, warning-level `journalctl` tail
