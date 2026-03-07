@@ -55,8 +55,9 @@ EOS
 }
 
 run_bulk_log() {
+  local test_path="${BULK_LOG_TEST_PATH:-$STUB_BIN:/usr/bin:/bin}"
   run env \
-    BULK_LOG_PATH="$STUB_BIN:/usr/bin:/bin" \
+    BULK_LOG_PATH="$test_path" \
     BULK_LOG_TIMEOUT_SECONDS="${BULK_LOG_TIMEOUT_SECONDS:-2}" \
     BULK_LOG_LEGACY_NET_TOOLS_ENABLED="${BULK_LOG_LEGACY_NET_TOOLS_ENABLED:-0}" \
     BULK_LOG_IOTOP_ENABLED="${BULK_LOG_IOTOP_ENABLED:-0}" \
@@ -162,6 +163,7 @@ EOS
 @test "continues with explicit SKIP messages when commands are missing" {
   install_basic_stubs
   BULK_LOG_IOTOP_ENABLED=1
+  BULK_LOG_TEST_PATH="$STUB_BIN"
 
   run_bulk_log
 
