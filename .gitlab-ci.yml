@@ -2,6 +2,7 @@
 # This brakes parallelism but makes things much clearer and simplier.
 
 stages:
+- test
 - make_deb
 - make_tgz
 - add_repo_deb
@@ -11,6 +12,16 @@ stages:
 cache:
   paths:
     - builds
+
+test_bulk_log_v1:
+  tags:
+    - dev1.sysadm.ws
+  stage: test
+  only:
+    refs:
+      - master
+  script: |
+    bulk_log/tests/run.sh
 
 make_deb_v1:
   tags:
