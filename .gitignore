@@ -8,3 +8,4 @@ Session.vim
 # temporary
 .netrwhist
 *~
+bulk_log/bulk_log.lock
