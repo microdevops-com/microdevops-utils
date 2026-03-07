@@ -253,11 +253,12 @@ acquire_lock
 GW_IP_ADDRESS="$(get_default_gateway)"
 DEFAULT_IFACE="$(get_default_iface)"
 
-echo "#########################################################################################################"
-date -u +"%Y-%m-%dT%H:%M:%SZ"
+echo "===== bulk_log snapshot ====="
+echo "ts: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "host: $(hostname -f 2>/dev/null || hostname)"
 echo "iface: ${DEFAULT_IFACE:-unknown}"
 echo "gateway: ${GW_IP_ADDRESS:-unknown}"
+echo "============================="
 
 COLUMNS=250 run_section "top" top top -b -n 1 -c
 run_section "ps" ps ps aux
