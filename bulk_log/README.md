@@ -34,3 +34,17 @@ bulk_log/tests/run.sh
 ```
 
 This runs `bash -n`, then `shellcheck` and `bats` when available.
+
+## Collected diagnostics
+
+Alongside classic sections (`top`, `ps`, `ping`, network info), the utility now also attempts:
+
+- `uname -a`, `/etc/os-release`
+- `vmstat`, `mpstat`, `iostat`
+- `ss -s`
+- `dmesg` tail
+- `systemctl --failed`, warning-level `journalctl` tail
+- `lsof` head
+- `who -b`, `last -x` head
+
+All sections are best-effort and automatically skipped if command is missing.

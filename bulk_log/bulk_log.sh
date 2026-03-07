@@ -248,6 +248,31 @@ run_routes_section() {
     fi
 }
 
+run_shell_section() {
+    local title="$1"
+    local required_cmd="$2"
+    local shell_expr="$3"
+
+    if ! has_cmd "$required_cmd"; then
+        echo " "
+        echo "### ${title}"
+        echo "SKIP: command '${required_cmd}' not found"
+        return 0
+    fi
+
+    run_section "$title" bash bash -c "$shell_expr"
+}
+
+run_os_release_section() {
+    if [[ -r /etc/os-release ]]; then
+        run_section "/etc/os-release" cat cat /etc/os-release
+    else
+        echo " "
+        echo "### /etc/os-release"
+        echo "SKIP: /etc/os-release is not readable"
+    fi
+}
+
 acquire_lock
 
 GW_IP_ADDRESS="$(get_default_gateway)"
@@ -260,13 +285,19 @@ echo "iface: ${DEFAULT_IFACE:-unknown}"
 echo "gateway: ${GW_IP_ADDRESS:-unknown}"
 echo "============================="
 
+run_section "uname -a" uname uname -a
+run_os_release_section
 COLUMNS=250 run_section "top" top top -b -n 1 -c
 run_section "ps" ps ps aux
 run_iotop_section
 run_section "free" free free -m
 run_section "uptime" uptime uptime
+run_section "vmstat" vmstat vmstat 1 5
+run_section "mpstat" mpstat mpstat -P ALL 1 1
+run_section "iostat" iostat iostat -xz 1 3
 run_section "ping" ping ping -n -c "$BULK_LOG_PING_COUNT" "$BULK_LOG_PING_TARGET"
 run_connection_section
+run_section "ss -s" ss ss -s
 run_ping_gateway_section "$GW_IP_ADDRESS"
 run_neighbors_section
 run_addresses_section
@@ -282,6 +313,9 @@ fi
 
 run_interface_stats_section
 run_routes_section
+run_shell_section "dmesg -T | tail -n 200" dmesg 'dmesg -T | tail -n 200'
+run_section "systemctl --failed" systemctl systemctl --failed --no-pager
+run_section "journalctl warning tail" journalctl journalctl -p warning -n 200 --no-pager
 
 if [[ "$BULK_LOG_LEGACY_NET_TOOLS_ENABLED" = "1" ]]; then
     run_section "netstat -ia (legacy)" netstat netstat -ia
@@ -290,5 +324,8 @@ if [[ "$BULK_LOG_LEGACY_NET_TOOLS_ENABLED" = "1" ]]; then
     run_section "ifconfig -a (legacy)" ifconfig ifconfig -a
 fi
 
+run_shell_section "lsof -nP | head -n 300" lsof 'lsof -nP | head -n 300'
+run_section "who -b" who who -b
+run_shell_section "last -x | head -n 20" last 'last -x | head -n 20'
 run_section "w" w w
 run_section "df" df df -h
