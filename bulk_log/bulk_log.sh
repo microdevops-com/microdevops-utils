@@ -17,6 +17,7 @@ BULK_LOG_GW_PING_COUNT="${BULK_LOG_GW_PING_COUNT:-4}"
 BULK_LOG_IFACE="${BULK_LOG_IFACE:-}"
 BULK_LOG_LEGACY_NET_TOOLS_ENABLED="${BULK_LOG_LEGACY_NET_TOOLS_ENABLED:-1}"
 BULK_LOG_IOTOP_ENABLED="${BULK_LOG_IOTOP_ENABLED:-1}"
+BULK_LOG_LAST_WAS_NOTE=0
 
 has_cmd() {
     command -v "$1" >/dev/null 2>&1
@@ -77,8 +78,11 @@ run_section() {
 
     local start_epoch end_epoch duration rc started_at ended_at
 
-    echo " "
+    if [[ "$BULK_LOG_LAST_WAS_NOTE" != "1" ]]; then
+        echo " "
+    fi
     echo "### ${title}"
+    BULK_LOG_LAST_WAS_NOTE=0
 
     if ! has_cmd "$required_cmd"; then
         echo "SKIP: command '${required_cmd}' not found"
@@ -256,13 +260,22 @@ run_shell_section() {
     local shell_expr="$3"
 
     if ! has_cmd "$required_cmd"; then
-        echo " "
+        if [[ "$BULK_LOG_LAST_WAS_NOTE" != "1" ]]; then
+            echo " "
+        fi
         echo "### ${title}"
+        BULK_LOG_LAST_WAS_NOTE=0
         echo "SKIP: command '${required_cmd}' not found"
         return 0
     fi
 
     run_section "$title" bash bash -c "$shell_expr"
+}
+
+run_note() {
+    echo " "
+    echo "### note: $1"
+    BULK_LOG_LAST_WAS_NOTE=1
 }
 
 run_os_release_section() {
@@ -322,12 +335,16 @@ run_section "ps" ps ps aux
 run_iotop_section
 run_section "free" free free -m
 run_section "uptime" uptime uptime
+run_note "vmstat gives a short trend of CPU run queue, memory pressure, and swap/IO waits."
 run_section "vmstat" vmstat vmstat 1 5
+run_note "mpstat breaks CPU utilization down per core to spot a single hot CPU."
 run_section "mpstat" mpstat mpstat -P ALL 1 1
+run_note "iostat -xz highlights storage latency/utilization and queue depth."
 run_section "iostat" iostat iostat -xz 1 3
 run_section "ping" ping ping -n -c "$BULK_LOG_PING_COUNT" "$BULK_LOG_PING_TARGET"
 run_dns_section
 run_connection_section
+run_note "ss -s is a compact socket-state summary (good quick connection pressure signal)."
 run_section "ss -s" ss ss -s
 run_ping_gateway_section "$GW_IP_ADDRESS"
 run_neighbors_section
@@ -335,6 +352,7 @@ run_addresses_section
 
 if [[ -n "$DEFAULT_IFACE" ]]; then
     run_section "ethtool ${DEFAULT_IFACE}" ethtool ethtool "$DEFAULT_IFACE"
+    run_note "ethtool -S exposes NIC counters (drops/errors/resets) from the driver."
     run_section "ethtool -S ${DEFAULT_IFACE}" ethtool ethtool -S "$DEFAULT_IFACE"
 else
     echo " "
@@ -344,8 +362,10 @@ fi
 
 run_interface_stats_section
 run_routes_section
+run_note "dmesg tail captures recent kernel messages (driver, OOM, filesystem, networking warnings)."
 run_shell_section "dmesg -T | tail -n 200" dmesg 'dmesg -T | tail -n 200'
 run_section "systemctl --failed" systemctl systemctl --failed --no-pager
+run_note "journalctl warning tail shows recent warning-priority logs across services."
 run_section "journalctl warning tail" journalctl journalctl -p warning -n 200 --no-pager
 
 if [[ "$BULK_LOG_LEGACY_NET_TOOLS_ENABLED" = "1" ]]; then
@@ -355,8 +375,11 @@ if [[ "$BULK_LOG_LEGACY_NET_TOOLS_ENABLED" = "1" ]]; then
     run_section "ifconfig -a (legacy)" ifconfig ifconfig -a
 fi
 
-run_shell_section "lsof -nPlw | head -n 300" lsof 'lsof -nPlw | head -n 300'
+run_note "lsof +L1 lists open-but-deleted files that still consume disk until the process exits/reopens."
+run_shell_section "lsof -nPlw +L1 | head -n 300" lsof 'lsof -nPlw +L1 | head -n 300'
+run_note "who -b shows last system boot time."
 run_section "who -b" who who -b
+run_note "last -x includes reboot/shutdown/runlevel history for quick restart timeline checks."
 run_shell_section "last -x | head -n 20" last 'last -x | head -n 20'
 run_section "w" w w
 run_section "df" df df -h
