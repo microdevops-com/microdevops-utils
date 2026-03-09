@@ -920,7 +920,8 @@ if __name__ == "__main__":
                                             script_dump_part=script_dump_part
                                         )
 
-                                    elif item["docker_mode"]:
+                                    elif "docker_mode" in item and item["docker_mode"]:
+
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
@@ -1033,6 +1034,9 @@ if __name__ == "__main__":
                                             mmin="59" if "retain_hourly" in item else "720",
                                             script_dump_part=script_dump_part
                                         )
+
+                                    # Mysqldump default
+                                    else:
 
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
