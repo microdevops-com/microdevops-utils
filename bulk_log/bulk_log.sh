@@ -355,7 +355,7 @@ if [[ "$BULK_LOG_LEGACY_NET_TOOLS_ENABLED" = "1" ]]; then
     run_section "ifconfig -a (legacy)" ifconfig ifconfig -a
 fi
 
-run_shell_section "lsof -nP | head -n 300" lsof 'lsof -nP | head -n 300'
+run_shell_section "lsof -nPlw | head -n 300" lsof 'lsof -nPlw | head -n 300'
 run_section "who -b" who who -b
 run_shell_section "last -x | head -n 20" last 'last -x | head -n 20'
 run_section "w" w w
