@@ -2355,11 +2355,15 @@ if __name__ == "__main__":
                                             if toc_table_data_count > 0:
                                                 log_and_print("NOTICE", "Found {toc_table_data_count} TABLE DATA entries in dump dir on item number {number}".format(toc_table_data_count=toc_table_data_count, number=item["number"]), logger)
                                                 oks += 1
-                                            elif "empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"]):
-                                                log_and_print("NOTICE", "Skipping TABLE DATA entries check for empty_db source {source} in dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
                                             else:
-                                                log_and_print("ERROR", "Found 0 TABLE DATA entries in dump dir on item number {number}".format(number=item["number"]), logger)
-                                                errors += 1
+                                                empty_db = check.get("empty_db")
+                                                if not isinstance(empty_db, list):
+                                                    empty_db = []
+                                                if source in empty_db or "ALL" in empty_db:
+                                                    log_and_print("NOTICE", "Skipping TABLE DATA entries check for empty_db source {source} in dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
+                                                else:
+                                                    log_and_print("ERROR", "Found 0 TABLE DATA entries in dump dir on item number {number}".format(number=item["number"]), logger)
+                                                    errors += 1
 
                                     else:
                                         log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
