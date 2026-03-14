@@ -2264,10 +2264,16 @@ if __name__ == "__main__":
                                             oks += 1
 
                                             # Check toc.dat at least 10 Kb
+                                            # Skip this check for databases in empty_db
+                                            empty_db = check.get("empty_db")
+                                            if not isinstance(empty_db, (list, tuple, set)):
+                                                empty_db = []
                                             toc_dat_file = "{dump_dir}/toc.dat".format(dump_dir=dump_dir)
                                             if os.path.exists(toc_dat_file) and os.stat(toc_dat_file).st_size > 10000:
                                                 log_and_print("NOTICE", "Found {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
                                                 oks += 1
+                                            elif "empty_db" in check and (source in empty_db or "ALL" in empty_db):
+                                                log_and_print("NOTICE", "Skipping toc.dat size check for empty_db source {source} in dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
                                             else:
                                                 log_and_print("ERROR", "Found no {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
                                                 errors += 1
@@ -2345,12 +2351,19 @@ if __name__ == "__main__":
                                                     errors += 1
 
                                             # Check toc_table_data_count is not empty
+                                            # Skip this check for databases in empty_db
                                             if toc_table_data_count > 0:
                                                 log_and_print("NOTICE", "Found {toc_table_data_count} TABLE DATA entries in dump dir on item number {number}".format(toc_table_data_count=toc_table_data_count, number=item["number"]), logger)
                                                 oks += 1
                                             else:
-                                                log_and_print("ERROR", "Found 0 TABLE DATA entries in dump dir on item number {number}".format(number=item["number"]), logger)
-                                                errors += 1
+                                                empty_db = check.get("empty_db")
+                                                if not isinstance(empty_db, list):
+                                                    empty_db = []
+                                                if source in empty_db or "ALL" in empty_db:
+                                                    log_and_print("NOTICE", "Skipping TABLE DATA entries check for empty_db source {source} in dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
+                                                else:
+                                                    log_and_print("ERROR", "Found 0 TABLE DATA entries in dump dir on item number {number}".format(number=item["number"]), logger)
+                                                    errors += 1
 
                                     else:
                                         log_and_print("ERROR", "{dump_dir} dump dir is missing on item number {number}".format(dump_dir=dump_dir, number=item["number"]), logger)
