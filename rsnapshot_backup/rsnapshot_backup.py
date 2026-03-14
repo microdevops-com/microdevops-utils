@@ -2265,11 +2265,14 @@ if __name__ == "__main__":
 
                                             # Check toc.dat at least 10 Kb
                                             # Skip this check for databases in empty_db
+                                            empty_db = check.get("empty_db")
+                                            if not isinstance(empty_db, (list, tuple, set)):
+                                                empty_db = []
                                             toc_dat_file = "{dump_dir}/toc.dat".format(dump_dir=dump_dir)
                                             if os.path.exists(toc_dat_file) and os.stat(toc_dat_file).st_size > 10000:
                                                 log_and_print("NOTICE", "Found {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
                                                 oks += 1
-                                            elif "empty_db" in check and (source in check["empty_db"] or "ALL" in check["empty_db"]):
+                                            elif "empty_db" in check and (source in empty_db or "ALL" in empty_db):
                                                 log_and_print("NOTICE", "Skipping toc.dat size check for empty_db source {source} in dump dir {dump_dir} on item number {number}".format(source=source, dump_dir=dump_dir, number=item["number"]), logger)
                                             else:
                                                 log_and_print("ERROR", "Found no {toc_dat_file} file larger than 10 Kb in dump dir on item number {number}".format(toc_dat_file=toc_dat_file, number=item["number"]), logger)
