@@ -39,7 +39,7 @@ def rdap_get_expiration(domain):
         if event.get("eventAction") == "expiration":
             dt = datetime.datetime.fromisoformat(event["eventDate"].replace("Z", "+00:00"))
             if dt.tzinfo is not None:
-                dt = dt.replace(tzinfo=None)
+                dt = dt.astimezone().replace(tzinfo=None)
             return dt
 
     return None
