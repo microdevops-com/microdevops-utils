@@ -9,6 +9,8 @@
 import click
 import whoisdomain # pip3 install whoisdomain
 import datetime
+import json
+import os
 import requests
 import time
 from pprint import pprint
@@ -17,20 +19,13 @@ RDAP_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json"
 RDAP_BOOTSTRAP_TTL_SECONDS = 3600
 RDAP_BOOTSTRAP_RETRIES = 3
 RDAP_BOOTSTRAP_BACKOFF_SECONDS = 1
-
-_rdap_bootstrap_cache = None
-_rdap_bootstrap_cache_time = 0
+RDAP_BOOTSTRAP_CACHE_FILE = "/opt/microdevops/misc/check_domain_expiration_rdap_bootstrap.cache"
 
 def _get_rdap_bootstrap():
-    global _rdap_bootstrap_cache
-    global _rdap_bootstrap_cache_time
-
-    now = time.time()
-    if (
-        _rdap_bootstrap_cache is not None and
-        (now - _rdap_bootstrap_cache_time) < RDAP_BOOTSTRAP_TTL_SECONDS
-    ):
-        return _rdap_bootstrap_cache
+    if os.path.exists(RDAP_BOOTSTRAP_CACHE_FILE):
+        if (time.time() - os.path.getmtime(RDAP_BOOTSTRAP_CACHE_FILE)) < RDAP_BOOTSTRAP_TTL_SECONDS:
+            with open(RDAP_BOOTSTRAP_CACHE_FILE) as f:
+                return json.load(f)
 
     last_exc = None
     for attempt in range(RDAP_BOOTSTRAP_RETRIES):
@@ -38,8 +33,9 @@ def _get_rdap_bootstrap():
             bootstrap_resp = requests.get(RDAP_BOOTSTRAP_URL, timeout=10)
             bootstrap_resp.raise_for_status()
             bootstrap = bootstrap_resp.json()
-            _rdap_bootstrap_cache = bootstrap
-            _rdap_bootstrap_cache_time = time.time()
+            os.makedirs(os.path.dirname(RDAP_BOOTSTRAP_CACHE_FILE), exist_ok=True)
+            with open(RDAP_BOOTSTRAP_CACHE_FILE, "w") as f:
+                json.dump(bootstrap, f)
             return bootstrap
         except requests.RequestException as exc:
             last_exc = exc
