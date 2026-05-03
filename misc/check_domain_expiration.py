@@ -10,16 +10,48 @@ import click
 import whoisdomain # pip3 install whoisdomain
 import datetime
 import requests
+import time
 from pprint import pprint
 
 RDAP_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json"
+RDAP_BOOTSTRAP_TTL_SECONDS = 3600
+RDAP_BOOTSTRAP_RETRIES = 3
+RDAP_BOOTSTRAP_BACKOFF_SECONDS = 1
+
+_rdap_bootstrap_cache = None
+_rdap_bootstrap_cache_time = 0
+
+def _get_rdap_bootstrap():
+    global _rdap_bootstrap_cache
+    global _rdap_bootstrap_cache_time
+
+    now = time.time()
+    if (
+        _rdap_bootstrap_cache is not None and
+        (now - _rdap_bootstrap_cache_time) < RDAP_BOOTSTRAP_TTL_SECONDS
+    ):
+        return _rdap_bootstrap_cache
+
+    last_exc = None
+    for attempt in range(RDAP_BOOTSTRAP_RETRIES):
+        try:
+            bootstrap_resp = requests.get(RDAP_BOOTSTRAP_URL, timeout=10)
+            bootstrap_resp.raise_for_status()
+            bootstrap = bootstrap_resp.json()
+            _rdap_bootstrap_cache = bootstrap
+            _rdap_bootstrap_cache_time = time.time()
+            return bootstrap
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < (RDAP_BOOTSTRAP_RETRIES - 1):
+                time.sleep(RDAP_BOOTSTRAP_BACKOFF_SECONDS * (2 ** attempt))
+
+    raise last_exc
 
 def rdap_get_expiration(domain):
     tld = domain.split(".")[-1].lower()
 
-    bootstrap_resp = requests.get(RDAP_BOOTSTRAP_URL, timeout=10)
-    bootstrap_resp.raise_for_status()
-    bootstrap = bootstrap_resp.json()
+    bootstrap = _get_rdap_bootstrap()
 
     rdap_server = None
     for tlds, servers in bootstrap["services"]:
