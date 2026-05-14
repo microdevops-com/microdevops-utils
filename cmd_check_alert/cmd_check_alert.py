@@ -192,11 +192,13 @@ if __name__ == "__main__":
             check_env = os.environ.copy()
             check_env["PATH"] = "/usr/local/sbin:/usr/sbin:/sbin:/snap/bin:" + check_env["PATH"]
 
+            defaults = config.get("defaults", {})
+
             # Attempts in check, by default 1 attempt
             if "attempts" in check:
                 attempts = check["attempts"]
-            elif "attempts" in config["defaults"]:
-                attempts = config["defaults"]["attempts"]
+            elif "attempts" in defaults:
+                attempts = defaults["attempts"]
             else:
                 attempts = 1
 
@@ -244,17 +246,17 @@ if __name__ == "__main__":
                 elif "severity_per_retcode" in check and str(retcode) in check["severity_per_retcode"]:
                     notify["severity"] = check["severity_per_retcode"][str(retcode)]
                 # severity_per_retcode in defaults
-                elif "severity_per_retcode" in config["defaults"] and retcode in config["defaults"]["severity_per_retcode"]:
-                    notify["severity"] = config["defaults"]["severity_per_retcode"][retcode]
+                elif "severity_per_retcode" in defaults and retcode in defaults["severity_per_retcode"]:
+                    notify["severity"] = defaults["severity_per_retcode"][retcode]
                 # severity_per_retcode in defaults for str hack
-                elif "severity_per_retcode" in config["defaults"] and str(retcode) in config["defaults"]["severity_per_retcode"]:
-                    notify["severity"] = config["defaults"]["severity_per_retcode"][str(retcode)]
+                elif "severity_per_retcode" in defaults and str(retcode) in defaults["severity_per_retcode"]:
+                    notify["severity"] = defaults["severity_per_retcode"][str(retcode)]
                 # severity in check
                 elif "severity" in check:
                     notify["severity"] = check["severity"]
                 # severity in defaults
-                elif "severity" in config["defaults"]:
-                    notify["severity"] = config["defaults"]["severity"]
+                elif "severity" in defaults:
+                    notify["severity"] = defaults["severity"]
                 # fallback to major severity in the end
                 else:
                     notify["severity"] = SEVERITY_CRITICAL
@@ -275,8 +277,8 @@ if __name__ == "__main__":
             if "group" in check:
                 notify["group"] = check["group"]
             # default group
-            elif "group" in config["defaults"]:
-                notify["group"] = config["defaults"]["group"]
+            elif "group" in defaults:
+                notify["group"] = defaults["group"]
             else:
                 notify["group"] = SELF_HOSTNAME
 
@@ -293,43 +295,43 @@ if __name__ == "__main__":
             notify["origin"] = SELF_ORIGIN
 
             # default service
-            if "service" in config["defaults"]:
-                notify["service"] = config["defaults"]["service"]
+            if "service" in defaults:
+                notify["service"] = defaults["service"]
             # override with in check
             if "service" in check:
                 notify["service"] = check["service"]
 
             # default type
-            if "type" in config["defaults"]:
-                notify["type"] = config["defaults"]["type"]
+            if "type" in defaults:
+                notify["type"] = defaults["type"]
             # override with in check
             if "type" in check:
                 notify["type"] = check["type"]
 
             # default environment
-            if "environment" in config["defaults"]:
-                notify["environment"] = config["defaults"]["environment"]
+            if "environment" in defaults:
+                notify["environment"] = defaults["environment"]
             # override with in check
             if "environment" in check:
                 notify["environment"] = check["environment"]
 
             # default client
-            if "client" in config["defaults"]:
-                notify["client"] = config["defaults"]["client"]
+            if "client" in defaults:
+                notify["client"] = defaults["client"]
             # override with in check
             if "client" in check:
                 notify["client"] = check["client"]
 
             # default location
-            if "location" in config["defaults"]:
-                notify["attributes"]["location"] = config["defaults"]["location"]
+            if "location" in defaults:
+                notify["attributes"]["location"] = defaults["location"]
             # override with in check
             if "location" in check:
                 notify["attributes"]["location"] = check["location"]
 
             # default description
-            if "description" in config["defaults"]:
-                notify["attributes"]["description"] = config["defaults"]["description"]
+            if "description" in defaults:
+                notify["attributes"]["description"] = defaults["description"]
             # override with in check
             if "description" in check:
                 notify["attributes"]["description"] = check["description"]
@@ -413,7 +415,7 @@ if __name__ == "__main__":
                     check_threads[check_name] = thread
 
                     # Decide which timeout to use
-                    check_timeout = check["timeout"] if "timeout" in check else config["defaults"]["timeout"]
+                    check_timeout = check["timeout"] if "timeout" in check else config.get("defaults", {}).get("timeout", seconds_left)
                     logger.info("Check {name} timeout to use: {timeout}".format(name=check_name, timeout=check_timeout))
                     logger.info("Total script run time: {time}, time limit: {limit}, seconds left: {left}".format(time=running_seconds, limit=config["limits"]["time"], left=seconds_left))
                     
