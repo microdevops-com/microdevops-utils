@@ -925,7 +925,7 @@ if __name__ == "__main__":
                                         if item["source"] == "ALL":
                                             script_dump_part = textwrap.dedent(
                                                 """\
-                                                docker exec {container} sh -lc 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --skip-column-names --batch -e "SHOW DATABASES;"' | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
+                                                docker exec {container} sh -lc '$(command -v mysql || command -v mariadb) -u"${{MYSQL_USER:-root}}" -p"${{MYSQL_PASSWORD:-$MARIADB_ROOT_PASSWORD}}" --skip-column-names --batch -e "SHOW DATABASES;"' | grep -v -e information_schema -e performance_schema {grep_db_filter} > {mysql_dump_dir}/db_list.txt
                                                 WAS_ERR=0
                                                 for db in $(cat {mysql_dump_dir}/db_list.txt); do
                                                         set +e
@@ -933,7 +933,7 @@ if __name__ == "__main__":
                                                                 {exec_before_dump}
                                                                 if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                                 for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                                    docker exec {container} sh -lc '{dump_prefix_cmd} mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $1 --max_allowed_packet=1G {mysqldump_args}' -- $db | gzip > {mysql_dump_dir}/$db.gz
+                                                                    docker exec {container} sh -lc '{dump_prefix_cmd} $(command -v mysqldump || command -v mariadb-dump) -u"${{MYSQL_USER:-root}}" -p"${{MYSQL_PASSWORD:-$MARIADB_ROOT_PASSWORD}}" --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases $1 --max_allowed_packet=1G {mysqldump_args}' -- $db | gzip > {mysql_dump_dir}/$db.gz
                                                                     if [[ $? -ne 0 ]]; then
                                                                         WAS_ERR=1
                                                                         echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
@@ -972,7 +972,7 @@ if __name__ == "__main__":
                                                         {exec_before_dump}
                                                         if [[ $? -ne 0 ]]; then WAS_ERR=1; fi
                                                         for DUMP_ATTEMPT in $(seq 1 {dump_attempts}); do
-                                                            docker exec {container} sh -lc '{dump_prefix_cmd} mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args}' | gzip > {mysql_dump_dir}/{source}.gz
+                                                            docker exec {container} sh -lc '{dump_prefix_cmd} $(command -v mysqldump || command -v mariadb-dump) -u"${{MYSQL_USER:-root}}" -p"${{MYSQL_PASSWORD:-$MARIADB_ROOT_PASSWORD}}" --force --opt --single-transaction --quick --skip-lock-tables {mysql_events} --databases {source} --max_allowed_packet=1G {mysqldump_args}' | gzip > {mysql_dump_dir}/{source}.gz
                                                             if [[ $? -ne 0 ]]; then
                                                                 WAS_ERR=1
                                                                 echo "ERROR: Dump failed, attempt $DUMP_ATTEMPT of {dump_attempts}"
