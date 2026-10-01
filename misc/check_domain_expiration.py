@@ -119,6 +119,8 @@ def main(domain, warning, critical, no_cache, server, rdap):
                 exit_code = 2
             else:
                 expiration_date = query.expiration_date
+                if expiration_date.tzinfo is not None:
+                    expiration_date = expiration_date.astimezone().replace(tzinfo=None)
                 minutes = int((expiration_date - datetime.datetime.now()).total_seconds() / 60)
                 if minutes < critical:
                     print("CRITICAL: Domain {domain} expires in {minutes} minutes ({days} days)".format(domain=domain, minutes=minutes, days=int(minutes / 60 / 24)))
