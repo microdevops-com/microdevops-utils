@@ -1,0 +1,131 @@
+{
+  "family": "copy-fail",
+  "title": "Copy Fail: Linux kernel AF_ALG (algif_aead) local privilege escalation",
+  "kind": "kernel",
+  "references": [
+    "https://ubuntu.com/security/CVE-2026-31431",
+    "https://security-tracker.debian.org/tracker/CVE-2026-31431",
+    "https://access.redhat.com/security/vulnerabilities/RHSB-2026-002",
+    "https://ubuntu.com/security/CVE-2025-39964"
+  ],
+  "modules": ["algif_aead"],
+  "cves": {
+    "CVE-2026-31431": {
+      "public": "2026-04-22",
+      "affected_from": "4.14",
+      "affected_before": "7.0.0",
+      "modules": ["algif_aead"]
+    },
+    "CVE-2025-39964": {
+      "public": "2025-10-13",
+      "affected_before": "6.17.0",
+      "modules": ["algif_aead", "algif_skcipher", "algif_hash"],
+      "fixed": {
+        "ubuntu": [
+          {"match": "^6\\.14\\.0-\\d+-(generic|lowlatency)", "fixed": "6.14.0-37"},
+          {"match": "^6\\.8\\.0-\\d+-(generic|lowlatency)", "fixed": "6.8.0-90"},
+          {"match": "^5\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "5.15.0-164"},
+          {"match": "^5\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": "5.4.0-224"},
+          {"match": "^4\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "4.15.0-245"},
+          {"match": "^4\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": "4.4.0-276"},
+          {"match": "^6\\.14\\.0-\\d+-aws", "fixed": "6.14.0-1018"},
+          {"match": "^6\\.8\\.0-\\d+-aws", "fixed": "6.8.0-1044"},
+          {"match": "^5\\.15\\.0-\\d+-aws", "fixed": "5.15.0-1098"},
+          {"match": "^5\\.4\\.0-\\d+-aws", "fixed": "5.4.0-1153"},
+          {"match": "^4\\.15\\.0-\\d+-aws", "fixed": "4.15.0-1187"},
+          {"match": "^6\\.14\\.0-\\d+-azure", "fixed": "6.14.0-1017"},
+          {"match": "^6\\.8\\.0-\\d+-azure", "fixed": "6.8.0-1044"},
+          {"match": "^5\\.15\\.0-\\d+-azure", "fixed": "5.15.0-1102"},
+          {"match": "^5\\.4\\.0-\\d+-azure", "fixed": "5.4.0-1156"},
+          {"match": "^4\\.15\\.0-\\d+-azure", "fixed": "4.15.0-1195"},
+          {"match": "^6\\.14\\.0-\\d+-gcp", "fixed": "6.14.0-1021"},
+          {"match": "^6\\.8\\.0-\\d+-gcp", "fixed": "6.8.0-1045"},
+          {"match": "^5\\.15\\.0-\\d+-gcp", "fixed": "5.15.0-1098"},
+          {"match": "^5\\.4\\.0-\\d+-gcp", "fixed": "5.4.0-1156"},
+          {"match": "^4\\.15\\.0-\\d+-gcp", "fixed": "4.15.0-1180"}
+        ],
+        "debian": [
+          {"release": "11", "match": "^5\\.10\\.", "fixed": "5.10.247-1"},
+          {"release": "11", "match": "^6\\.1\\.", "fixed": "6.1.158-1~deb11u1"},
+          {"release": "12", "match": "^6\\.1\\.", "fixed": "6.1.158-1"},
+          {"release": "13", "match": "^6\\.12\\.", "fixed": "6.12.57-1"},
+          {"match": "^6\\.16\\.", "fixed": "6.16.9-1"}
+        ],
+        "rpm": [
+          {"match": "^4\\.18\\.0-553\\.", "fixed": "4.18.0-553.166.1.el8_10"},
+          {"match": "^5\\.14\\.0-687\\.", "fixed": "5.14.0-687.50.1.el9_8"},
+          {"match": "^6\\.12\\.0-211\\.", "fixed": "6.12.0-211.58.1.el10_2"},
+          {"match": "^4\\.18\\.0-", "fixed": "4.18.0-553.166.1.el8_10"},
+          {"match": "^5\\.14\\.0-", "fixed": "5.14.0-687.50.1.el9_8"},
+          {"match": "^6\\.12\\.0-", "fixed": "6.12.0-211.58.1.el10_2"}
+        ]
+      }
+    }
+  },
+  "fixed": {
+    "ubuntu": [
+      {"match": "^6\\.17\\.0-\\d+-(generic|lowlatency)", "fixed": "6.17.0-29"},
+      {"match": "^6\\.8\\.0-\\d+-(generic|lowlatency)", "fixed": "6.8.0-117"},
+      {"match": "^5\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "5.15.0-179"},
+      {"match": "^5\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": "5.4.0-230"},
+      {"match": "^4\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "4.15.0-250"},
+      {"match": "^6\\.17\\.0-\\d+-aws", "fixed": "6.17.0-1015"},
+      {"match": "^6\\.8\\.0-\\d+-aws", "fixed": "6.8.0-1055"},
+      {"match": "^5\\.15\\.0-\\d+-aws", "fixed": "5.15.0-1108"},
+      {"match": "^5\\.4\\.0-\\d+-aws", "fixed": "5.4.0-1159"},
+      {"match": "^4\\.15\\.0-\\d+-aws", "fixed": "4.15.0-1192"},
+      {"match": "^6\\.17\\.0-\\d+-azure", "fixed": "6.17.0-1015"},
+      {"match": "^6\\.8\\.0-\\d+-azure", "fixed": "6.8.0-1056"},
+      {"match": "^5\\.15\\.0-\\d+-azure", "fixed": "5.15.0-1114"},
+      {"match": "^5\\.4\\.0-\\d+-azure", "fixed": "5.4.0-1163"},
+      {"match": "^4\\.15\\.0-\\d+-azure", "fixed": "4.15.0-1201"},
+      {"match": "^6\\.17\\.0-\\d+-gcp", "fixed": "6.17.0-1018"},
+      {"match": "^6\\.8\\.0-\\d+-gcp", "fixed": "6.8.0-1058"},
+      {"match": "^5\\.15\\.0-\\d+-gcp", "fixed": "5.15.0-1108"},
+      {"match": "^5\\.4\\.0-\\d+-gcp", "fixed": "5.4.0-1162"},
+      {"match": "^4\\.15\\.0-\\d+-gcp", "fixed": "4.15.0-1185"},
+      {"match": "^6\\.17\\.0-\\d+-oracle", "fixed": "6.17.0-1014"},
+      {"match": "^6\\.8\\.0-\\d+-oracle", "fixed": "6.8.0-1054"},
+      {"match": "^5\\.15\\.0-\\d+-oracle", "fixed": "5.15.0-1105"},
+      {"match": "^5\\.4\\.0-\\d+-oracle", "fixed": "5.4.0-1157"},
+      {"match": "^4\\.15\\.0-\\d+-oracle", "fixed": "4.15.0-1154"},
+      {"match": "^5\\.15\\.0-\\d+-kvm", "fixed": "5.15.0-1100"},
+      {"match": "^5\\.4\\.0-\\d+-kvm", "fixed": "5.4.0-1146"},
+      {"match": "^4\\.15\\.0-\\d+-kvm", "fixed": "4.15.0-1174"},
+      {"match": "^6\\.17\\.0-\\d+-raspi", "fixed": "6.17.0-1017"},
+      {"match": "^6\\.8\\.0-\\d+-raspi", "fixed": "6.8.0-1056"},
+      {"match": "^5\\.15\\.0-\\d+-raspi", "fixed": "5.15.0-1102"},
+      {"match": "^5\\.4\\.0-\\d+-raspi", "fixed": "5.4.0-1143"},
+      {"match": "^6\\.8\\.0-\\d+-ibm", "fixed": "6.8.0-1055"},
+      {"match": "^5\\.15\\.0-\\d+-ibm", "fixed": "5.15.0-1102"},
+      {"match": "^5\\.4\\.0-\\d+-ibm", "fixed": "5.4.0-1105"},
+      {"match": "^6\\.8\\.0-\\d+-gke", "fixed": "6.8.0-1054"},
+      {"match": "^5\\.15\\.0-\\d+-gke", "fixed": "5.15.0-1104"}
+    ],
+    "debian": [
+      {"release": "11", "match": "^5\\.10\\.", "fixed": "5.10.251-3"},
+      {"release": "11", "match": "^6\\.1\\.", "fixed": "6.1.170-1~deb11u1"},
+      {"release": "12", "match": "^6\\.1\\.", "fixed": "6.1.170-1"},
+      {"release": "13", "match": "^6\\.12\\.", "fixed": "6.12.85-1"},
+      {"match": "^6\\.19\\.", "fixed": "6.19.12-1"}
+    ],
+    "rpm": [
+      {"match": "^4\\.18\\.0-305\\.", "fixed": "4.18.0-305.190.1.el8_4"},
+      {"match": "^4\\.18\\.0-372\\.", "fixed": "4.18.0-372.191.1.el8_6"},
+      {"match": "^4\\.18\\.0-477\\.", "fixed": "4.18.0-477.139.1.el8_8"},
+      {"match": "^4\\.18\\.0-553\\.", "fixed": "4.18.0-553.123.1.el8_10"},
+      {"match": "^5\\.14\\.0-70\\.", "fixed": "5.14.0-70.178.1.el9_0"},
+      {"match": "^5\\.14\\.0-284\\.", "fixed": "5.14.0-284.169.1.el9_2"},
+      {"match": "^5\\.14\\.0-427\\.", "fixed": "5.14.0-427.124.1.el9_4"},
+      {"match": "^5\\.14\\.0-570\\.", "fixed": "5.14.0-570.112.1.el9_6"},
+      {"match": "^5\\.14\\.0-611\\.", "fixed": "5.14.0-611.54.1.el9_7"},
+      {"match": "^5\\.14\\.0-687\\.", "fixed": "5.14.0-687.5.3.el9_8"},
+      {"match": "^6\\.12\\.0-55\\.", "fixed": "6.12.0-55.71.1.el10_0"},
+      {"match": "^6\\.12\\.0-124\\.", "fixed": "6.12.0-124.55.1.el10_1"},
+      {"match": "^6\\.12\\.0-211\\.", "fixed": "6.12.0-211.7.3.el10_2"},
+      {"match": "^4\\.18\\.0-", "fixed": "4.18.0-553.123.1.el8_10"},
+      {"match": "^5\\.14\\.0-", "fixed": "5.14.0-611.54.1.el9_7"},
+      {"match": "^6\\.12\\.0-", "fixed": "6.12.0-124.55.1.el10_1"}
+    ]
+  }
+}
