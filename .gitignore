@@ -9,3 +9,5 @@ Session.vim
 .netrwhist
 *~
 bulk_log/bulk_log.lock
+# python
+__pycache__/

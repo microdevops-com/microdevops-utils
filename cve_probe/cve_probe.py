@@ -869,6 +869,8 @@ def _kernel_fixed_by_table(rule, cdef, image, host):
             continue
         if not re.search(entry["match"], image.release) and not re.search(entry["match"], subject):
             continue
+        if entry.get("fixed") is None:
+            return False, "%s: vendor lists this kernel series as vulnerable, no fix released (table)" % subject
         r = vercmp(subject, entry["fixed"])
         if r >= 0:
             return True, "%s >= fixed %s (table)" % (subject, entry["fixed"])

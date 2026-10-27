@@ -1,0 +1,82 @@
+{
+  "family": "ebt-snat",
+  "title": "ebtables SNAT ARP rewrite into spliced file pages, local privilege escalation",
+  "kind": "kernel",
+  "references": [
+    "https://ubuntu.com/security/CVE-2026-53266",
+    "https://security-tracker.debian.org/tracker/CVE-2026-53266",
+    "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-53266.json"
+  ],
+  "affected_from": "5.4",
+  "affected_before": "7.1.0",
+  "modules": ["ebt_snat"],
+  "sysctl_mitigations": [
+    {"key": "user.max_user_namespaces", "value": "0"}
+  ],
+  "cves": {
+    "CVE-2026-53266": {
+      "public": "2026-06-01",
+      "summary": "ebt_snat rewrites the ARP sender hardware address inside a nonlinear skb fragment backed by a splice-imported file page; same page-cache write class as Dirty Frag / Copy Fail; needs bridge + ebtables rules, which an unprivileged user can set up in an own network namespace",
+      "not_affected_distros": {"ubuntu": ["18.04", "16.04", "14.04"]},
+      "fixed": {
+        "ubuntu": [
+          {"match": "^7\\.0\\.0-\\d+-(generic|lowlatency)", "fixed": "7.0.0-31"},
+          {"match": "^6\\.17\\.0-\\d+-(generic|lowlatency)", "fixed": null},
+          {"match": "^6\\.8\\.0-\\d+-(generic|lowlatency)", "fixed": "6.8.0-146"},
+          {"match": "^5\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "5.15.0-198"},
+          {"match": "^5\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-aws", "fixed": "7.0.0-1012"},
+          {"match": "^6\\.8\\.0-\\d+-aws", "fixed": "6.8.0-1066"},
+          {"match": "^5\\.15\\.0-\\d+-aws", "fixed": "5.15.0-1117"},
+          {"match": "^5\\.4\\.0-\\d+-aws", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-azure", "fixed": "7.0.0-1014"},
+          {"match": "^6\\.8\\.0-\\d+-azure", "fixed": "6.8.0-1070"},
+          {"match": "^5\\.15\\.0-\\d+-azure", "fixed": "5.15.0-1123"},
+          {"match": "^5\\.4\\.0-\\d+-azure", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-gcp", "fixed": "7.0.0-1011"},
+          {"match": "^6\\.8\\.0-\\d+-gcp", "fixed": "6.8.0-1070"},
+          {"match": "^5\\.15\\.0-\\d+-gcp", "fixed": "5.15.0-1118"},
+          {"match": "^5\\.4\\.0-\\d+-gcp", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-gke", "fixed": "7.0.0-1006"},
+          {"match": "^6\\.8\\.0-\\d+-gke", "fixed": "6.8.0-1065"},
+          {"match": "^5\\.15\\.0-\\d+-gke", "fixed": "5.15.0-1113"},
+          {"match": "^7\\.0\\.0-\\d+-ibm", "fixed": "7.0.0-1013"},
+          {"match": "^6\\.8\\.0-\\d+-ibm", "fixed": "6.8.0-1066"},
+          {"match": "^5\\.15\\.0-\\d+-ibm", "fixed": "5.15.0-1111"},
+          {"match": "^5\\.4\\.0-\\d+-ibm", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-oracle", "fixed": "7.0.0-1011"},
+          {"match": "^6\\.8\\.0-\\d+-oracle", "fixed": "6.8.0-1063"},
+          {"match": "^5\\.15\\.0-\\d+-oracle", "fixed": "5.15.0-1114"},
+          {"match": "^5\\.4\\.0-\\d+-oracle", "fixed": null},
+          {"match": "^5\\.15\\.0-\\d+-kvm", "fixed": "5.15.0-1109"},
+          {"match": "^5\\.4\\.0-\\d+-kvm", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-raspi", "fixed": "7.0.0-1019"},
+          {"match": "^6\\.8\\.0-\\d+-raspi", "fixed": "6.8.0-1067"},
+          {"match": "^5\\.15\\.0-\\d+-raspi", "fixed": "5.15.0-1112"},
+          {"match": "^5\\.4\\.0-\\d+-raspi", "fixed": null}
+        ],
+        "debian": [
+          {"release": "11", "match": "^5\\.10\\.", "fixed": "5.10.259-1"},
+          {"release": "12", "match": "^6\\.1\\.", "fixed": "6.1.176-1"},
+          {"release": "13", "match": "^6\\.12\\.", "fixed": "6.12.94-1"},
+          {"match": "^7\\.0\\.", "fixed": "7.0.13-1"}
+        ],
+        "rpm": [
+          {"match": "^4\\.18\\.0-305\\.", "fixed": "4.18.0-305.209.1.el8_4"},
+          {"match": "^4\\.18\\.0-372\\.", "fixed": "4.18.0-372.217.1.el8_6"},
+          {"match": "^4\\.18\\.0-477\\.", "fixed": "4.18.0-477.169.1.el8_8"},
+          {"match": "^4\\.18\\.0-553\\.", "fixed": "4.18.0-553.143.1.el8_10"},
+          {"match": "^5\\.14\\.0-284\\.", "fixed": "5.14.0-284.194.1.el9_2"},
+          {"match": "^5\\.14\\.0-427\\.", "fixed": "5.14.0-427.152.1.el9_4"},
+          {"match": "^5\\.14\\.0-570\\.", "fixed": "5.14.0-570.143.1.el9_6"},
+          {"match": "^5\\.14\\.0-687\\.", "fixed": "5.14.0-687.23.1.el9_8"},
+          {"match": "^6\\.12\\.0-55\\.", "fixed": "6.12.0-55.106.1.el10_0"},
+          {"match": "^6\\.12\\.0-211\\.", "fixed": "6.12.0-211.59.1.el10_2"},
+          {"match": "^4\\.18\\.0-", "fixed": "4.18.0-553.143.1.el8_10"},
+          {"match": "^5\\.14\\.0-", "fixed": "5.14.0-687.23.1.el9_8"},
+          {"match": "^6\\.12\\.0-", "fixed": "6.12.0-211.59.1.el10_2"}
+        ]
+      }
+    }
+  }
+}

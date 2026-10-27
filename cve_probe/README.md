@@ -95,7 +95,8 @@ Kernel `fixed` tables, keyed by distro id (`ubuntu`, `debian`) or family (`rpm`)
 ```
 
 `match` is a regex over `uname -r`; entries are tried in order, so put specific streams
-before catch-alls. The compared string is the Ubuntu ABI (`6.8.0-107`), the Debian package
+before catch-alls. `"fixed": null` means the vendor lists the series as vulnerable with no
+fix released (the kernel is reported vulnerable regardless of version). The compared string is the Ubuntu ABI (`6.8.0-107`), the Debian package
 version from `/proc/version`, or the RHEL version-release without arch.
 
 PHP rules: `fixed_upstream` per branch, `eol_branches`, `fixed_packages` per origin
