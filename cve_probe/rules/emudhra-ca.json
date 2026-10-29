@@ -1,0 +1,28 @@
+{
+  "family": "emudhra-ca",
+  "title": "eMudhra intermediate CA key compromise: trust store still contains the affected roots",
+  "kind": "trust_store",
+  "references": [
+    "https://ubuntu.com/security/notices/USN-8944-1",
+    "https://ubuntu.com/security/notices/USN-8944-2",
+    "https://lists.debian.org/debian-security-announce/2026/msg00487.html",
+    "https://www.openwall.com/lists/oss-security/2026/10/20/30"
+  ],
+  "public": "2026-10-20",
+  "remedy": "upgrade ca-certificates (USN-8944-1/2, DSA-6572, DLA-4845, RHEL 2026.2.92, Alpine 20261020-r0); no vendor fix available: prefix both entries with ! in /etc/ca-certificates.conf and run update-ca-certificates; rebuild container images",
+  "cves": {
+    "EMUDHRA-CA-2026": {
+      "public": "2026-10-20",
+      "summary": "eight eMudhra intermediate CAs (EM DV/OV/EV TLS CA - G3B/G3C, EM OV CS CA - G3B/G3C) were issued with recoverable private keys, so anyone can mint a certificate for any name; non-browser TLS clients do not check revocation, so a trust store containing either root accepts man-in-the-middle certificates",
+      "certs": [
+        {"name": "emSign ECC Root CA - G3",
+         "sha256": "86A1ECBA089C4A8D3BBE2734C612BA341D813E043CF9E8A862CD5C57A36BBE6B",
+         "files": ["mozilla/emSign_ECC_Root_CA_-_G3.crt"]},
+        {"name": "AAA Certificate Services",
+         "sha256": "D7A7A0FB5D7E2731D771E9484EBCDEF71D5F0C3E0A2948782BC83EE0EA699EF4",
+         "files": ["mozilla/Comodo_AAA_Services_root.crt"],
+         "note": "Sectigo legacy root; six of the eight intermediates are cross-signed under it, removing only the emSign root is not enough"}
+      ]
+    }
+  }
+}

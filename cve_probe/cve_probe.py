@@ -11,7 +11,10 @@
 # In particular it never loads kernel modules (modprobe is only used with -n, dry run).
 
 import argparse
+import base64
+import binascii
 import glob
+import hashlib
 import gzip
 import json
 import os
@@ -22,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.0"
+VERSION = "1.1"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -105,19 +108,36 @@ def parse_os_release(text):
 
 
 def in_root(root, path):
-    """Resolve path inside another root (e.g. /proc/PID/root), following one level
-    of symlink without escaping the root. Good enough for dpkg doc dir symlinks."""
-    full = os.path.join(root, path.lstrip("/"))
-    try:
-        if os.path.islink(full):
+    """Resolve path inside another root (e.g. /proc/PID/root), following symlinks without
+    escaping the root: every hop is normalised as an absolute path *inside* the root, so
+    leading ".." collapse at the root's top. Bounded, so a loop cannot hang the probe."""
+    cur = os.path.normpath("/" + path.lstrip("/"))
+    for _ in range(8):
+        full = os.path.join(root, cur.lstrip("/"))
+        try:
+            if not os.path.islink(full):
+                break
             target = os.readlink(full)
-            if target.startswith("/"):
-                full = os.path.join(root, target.lstrip("/"))
-            else:
-                full = os.path.normpath(os.path.join(os.path.dirname(full), target))
-    except OSError:
-        pass
-    return full
+        except OSError:
+            break
+        if target.startswith("/"):
+            cur = os.path.normpath(target)
+        else:
+            cur = os.path.normpath(os.path.join(os.path.dirname(cur), target))
+    return os.path.join(root, cur.lstrip("/"))
+
+
+def apk_version(db, names):
+    """(package, version) of the first of `names` installed per an Alpine /lib/apk/db/installed."""
+    found = {}
+    for block in (db or "").split("\n\n"):
+        rec = dict((l[0], l[2:]) for l in block.splitlines() if len(l) > 2 and l[1] == ":")
+        if rec.get("P") in names:
+            found[rec["P"]] = rec.get("V")
+    for n in names:
+        if n in found:
+            return (n, found[n])
+    return None
 
 
 # dpkg-compatible version comparison (also fine for rpm-style EVRs we meet here).
@@ -488,8 +508,9 @@ class KernelFacts(object):
                     st["state"] = "blacklisted"
                     st["evidence"] = "blacklist line only (%s); alias autoload blocked, explicit load still possible" % blacklist[0]
             elif rc == 0 and not text:
-                # modprobe prints nothing for builtin modules it knows about; treat as builtin if the
-                # kconfig says =y, otherwise loadable.
+                # modprobe prints nothing for a builtin module, but builtins are normally caught above
+                # via modules.builtin; module names do not map to kconfig symbols generically, so
+                # without that file the honest answer is unknown (major: somebody has to look).
                 st["state"] = "unknown"
                 st["evidence"] = "modprobe -n printed nothing"
             else:
@@ -518,6 +539,85 @@ SAPI_FOR_EXE = [
     (re.compile(r"^(apache2|httpd)"), "apache2handler"),
 ]
 CGROUP_ID_RE = re.compile(r"([0-9a-f]{64})")
+_CONTAINER_META = {}     # full container id -> (runtime, name, image) as the CLI reports it
+_DEAD_CLI = set()        # (cli, endpoint) that timed out once: never called again this run
+_PREFILLED = []          # non-empty once _prefill_container_meta ran
+CRICTL_ENDPOINTS = (None, "unix:///run/containerd/containerd.sock", "unix:///run/k0s/containerd.sock")
+
+
+def _cli_run(cli, args, endpoint=None, timeout=10):
+    if (cli, endpoint) in _DEAD_CLI or not which(cli):
+        return (-1, "", "unavailable")
+    cmd = [cli] + (["--runtime-endpoint", endpoint] if endpoint else []) + args
+    rc, out, err = run(cmd, timeout=timeout)
+    if rc == -9:
+        _DEAD_CLI.add((cli, endpoint))
+        log("%s timed out, not calling it again" % " ".join(cmd[:3]))
+    return rc, out, err
+
+
+def _prefill_container_meta():
+    """One `ps` per runtime fills the name cache up front, instead of one `inspect` per
+    container; on a node with 150 containers and a hung daemon that is the difference
+    between one timeout and 150."""
+    if _PREFILLED:
+        return
+    _PREFILLED.append(True)
+    for cli in ("docker", "podman"):
+        rc, out, _ = _cli_run(cli, ["ps", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}"])
+        if rc != 0:
+            continue
+        for line in out.splitlines():
+            parts = (line.split("\t") + ["", ""])[:3]
+            if CGROUP_ID_RE.match(parts[0]) and parts[0] not in _CONTAINER_META:
+                _CONTAINER_META[parts[0]] = (cli, parts[1].lstrip("/"), parts[2])
+    if which("crictl"):
+        for ep in CRICTL_ENDPOINTS:
+            rc, out, _ = _cli_run("crictl", ["ps", "-o", "json"], endpoint=ep)
+            if rc != 0:
+                continue
+            try:
+                conts = json.loads(out).get("containers", [])
+            except ValueError:
+                continue
+            if not conts:
+                continue   # an endpoint that answers but hosts nothing is not the one we want
+            for c in conts:
+                labels = c.get("labels", {})
+                name = "%s/%s/%s" % (labels.get("io.kubernetes.pod.namespace", "?"),
+                                     labels.get("io.kubernetes.pod.name", "?"),
+                                     c.get("metadata", {}).get("name") or labels.get("io.kubernetes.container.name", "?"))
+                _CONTAINER_META.setdefault(c.get("id", ""), ("containerd", name, c.get("image", {}).get("image")))
+            break
+
+
+def describe_container(pid, cid):
+    """(runtime, name, image) for a container id. Runtime comes from the cgroup path, the
+    name from the runtime CLI when one answers, else from the container's own HOSTNAME.
+    No CLI is ever required."""
+    _prefill_container_meta()
+    cg = read_file("/proc/%d/cgroup" % pid, "") or ""
+    if "libpod-" in cg:
+        runtime = "podman"
+    elif "cri-containerd" in cg or "kubepods" in cg:
+        runtime = "containerd"
+    elif "docker" in cg:
+        runtime = "docker"
+    else:
+        runtime = "unknown"
+    if cid not in _CONTAINER_META and runtime in ("docker", "podman", "unknown"):
+        for cli in ("docker", "podman"):
+            rc, out, _ = _cli_run(cli, ["inspect", "--format", "{{.Name}}\t{{.Config.Image}}", cid])
+            if rc == 0 and out.strip():
+                name, image = (out.strip().split("\t") + [""])[:2]
+                _CONTAINER_META[cid] = (cli, name.lstrip("/"), image)
+                break
+    if cid not in _CONTAINER_META:
+        # No CLI available: the container's own hostname (pod name on k8s, short id on docker).
+        m = re.search(r"(?:^|\0)HOSTNAME=([^\0]+)", read_file("/proc/%d/environ" % pid, "") or "")
+        _CONTAINER_META[cid] = (runtime, m.group(1) if m else cid[:12], None)
+    cli_runtime, name, image = _CONTAINER_META[cid]
+    return (runtime if runtime != "unknown" else cli_runtime, name, image)
 
 
 def _clk_tck():
@@ -593,43 +693,7 @@ class PhpInstance(object):
     def _container_meta(self):
         if not self.container_id:
             return
-        cg = read_file("/proc/%d/cgroup" % self.pid, "") or ""
-        if "libpod-" in cg:
-            self.runtime = "podman"
-        elif "cri-containerd" in cg or "kubepods" in cg:
-            self.runtime = "containerd"
-        elif "docker" in cg:
-            self.runtime = "docker"
-        else:
-            self.runtime = "unknown"
-        cid = self.container_id
-        if self.runtime in ("docker", "podman", "unknown"):
-            for cli in ("docker", "podman"):
-                if not which(cli):
-                    continue
-                rc, out, _ = run([cli, "inspect", "--format", "{{.Name}}\t{{.Config.Image}}", cid], timeout=10)
-                if rc == 0 and out.strip():
-                    name, image = (out.strip().split("\t") + [""])[:2]
-                    self.container_name, self.image = name.lstrip("/"), image
-                    if self.runtime == "unknown":
-                        self.runtime = cli
-                    return
-        if self.runtime in ("containerd", "unknown") and which("crictl"):
-            for ep in (None, "unix:///run/containerd/containerd.sock", "unix:///run/k0s/containerd.sock"):
-                cmd = ["crictl"] + (["--runtime-endpoint", ep] if ep else []) + ["inspect", cid]
-                rc, out, _ = run(cmd, timeout=10)
-                if rc == 0:
-                    try:
-                        d = json.loads(out)
-                        labels = d.get("status", {}).get("labels", {})
-                        self.container_name = "%s/%s" % (labels.get("io.kubernetes.pod.namespace", "?"),
-                                                         labels.get("io.kubernetes.pod.name", cid[:12]))
-                        self.image = d.get("status", {}).get("image", {}).get("image")
-                    except ValueError:
-                        pass
-                    return
-        if self.container_name is None:
-            self.container_name = cid[:12]
+        self.runtime, self.container_name, self.image = describe_container(self.pid, self.container_id)
 
     def _package(self):
         base = os.path.basename(self.exe_path)
@@ -666,20 +730,11 @@ class PhpInstance(object):
                     self.package = (name, ver, "sury" if sury else "distro")
                     return
         elif fam == "apk":
-            db = read_file(os.path.join(self.root, "lib/apk/db/installed"))
-            if not db:
-                return
             m = re.match(r"php-fpm(\d+)$", base)
             wanted = ["php%s-fpm" % m.group(1), "php%s" % m.group(1)] if m else ["php-fpm", "php"]
-            cur = {}
-            for block in db.split("\n\n"):
-                rec = dict((l[0], l[2:]) for l in block.splitlines() if len(l) > 2 and l[1] == ":")
-                if rec.get("P") in wanted:
-                    cur[rec["P"]] = rec.get("V")
-            for w in wanted:
-                if w in cur:
-                    self.package = (w, cur[w], "alpine")
-                    return
+            found = apk_version(read_file(os.path.join(self.root, "lib/apk/db/installed")), wanted)
+            if found:
+                self.package = (found[0], found[1], "alpine")
 
     @staticmethod
     def _dpkg_version(status, name):
@@ -795,9 +850,7 @@ def discover_php(host):
             continue
         cg = read_file("/proc/%d/cgroup" % pid, "") or ""
         m = CGROUP_ID_RE.search(cg)
-        cid = m.group(1) if m else None
-        if host.is_container and cid is None:
-            pass  # inside an LXC minion everything is "host"
+        cid = m.group(1) if m else None   # None also inside an LXC minion: everything there is "host"
         key = (cid, exe)
         if key in groups:
             groups[key].pids.append(pid)
@@ -814,6 +867,134 @@ def discover_php(host):
         inst.collect()
         instances.append(inst)
     return sorted(instances, key=lambda i: (i.container_id or "", i.exe))
+
+
+# ----------------------------------------------------------------------------
+# Trust stores (the host and every container root), for CA compromise rules
+# ----------------------------------------------------------------------------
+
+TRUST_BUNDLES = [
+    "/etc/ssl/certs/ca-certificates.crt",                 # Debian, Ubuntu, Alpine
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",  # RHEL family
+    "/etc/ssl/ca-bundle.pem",                             # SUSE
+    "/etc/ssl/cert.pem",                                  # symlink on Alpine/RHEL, real file elsewhere
+]
+PEM_CERT_RE = re.compile(r"-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", re.S)
+
+
+def pem_fingerprints(text):
+    """SHA-256 fingerprints (upper-case hex, no colons) of every certificate in a PEM bundle."""
+    fps = []
+    for m in PEM_CERT_RE.finditer(text or ""):
+        try:
+            der = base64.b64decode("".join(m.group(1).split()))
+        except (binascii.Error, ValueError):
+            continue
+        fps.append(hashlib.sha256(der).hexdigest().upper())
+    return fps
+
+
+class TrustStore(object):
+    """The CA bundle of one root: the host, or a container seen through /proc/PID/root."""
+
+    def __init__(self, root, container_id=None, pid=None):
+        self.root = root
+        self.container_id = container_id
+        self.pid = pid
+        self.runtime = None
+        self.container_name = None
+        self.image = None
+        self.os = parse_os_release(read_file(os.path.join(root, "etc/os-release"), ""))
+        self.bundle = None
+        self.fingerprints = []
+        self.package = None
+        self.disabled = []   # Debian/Ubuntu: entries prefixed with "!" in /etc/ca-certificates.conf
+
+    def collect(self):
+        if self.container_id:
+            self.runtime, self.container_name, self.image = describe_container(self.pid, self.container_id)
+        for p in TRUST_BUNDLES:
+            full = in_root(self.root, p)
+            if os.path.isfile(full):
+                fps = pem_fingerprints(read_file(full, ""))
+                if fps:
+                    self.bundle, self.fingerprints = p, fps
+                    break
+        conf = read_file(os.path.join(self.root, "etc/ca-certificates.conf"), "") or ""
+        self.disabled = [l[1:].strip() for l in conf.splitlines() if l.startswith("!")]
+        fam = Host._family(self.os.get("ID", ""), self.os.get("ID_LIKE", ""))
+        if fam == "deb":
+            status = read_file(os.path.join(self.root, "var/lib/dpkg/status"))
+            if status:
+                self.package = PhpInstance._dpkg_version(status, "ca-certificates")
+        elif fam == "apk":
+            found = apk_version(read_file(os.path.join(self.root, "lib/apk/db/installed")),
+                                ["ca-certificates-bundle", "ca-certificates"])
+            if found:
+                self.package = found[1]
+        elif fam == "rpm" and self.container_id is None:
+            rc, out, _ = run(["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "ca-certificates"], timeout=10)
+            if rc == 0:
+                self.package = out.strip()
+
+    def label(self):
+        return "host" if not self.container_id else "%s:%s" % (self.runtime, self.container_name)
+
+    def as_dict(self):
+        return {"where": self.label(), "container_id": self.container_id, "runtime": self.runtime,
+                "container": self.container_name, "image": self.image,
+                "os": "%s %s" % (self.os.get("ID", "?"), self.os.get("VERSION_ID", "")),
+                "bundle": self.bundle, "certificates": len(self.fingerprints), "package": self.package,
+                "disabled": self.disabled}
+
+
+def discover_containers():
+    """Candidate pids (lowest first, at most three) per container id seen in /proc/PID/cgroup.
+    Pids in the probe's own mount namespace are skipped: conmon, shims or the probe's own
+    ancestors can carry a container id in their cgroup while seeing the host filesystem."""
+    try:
+        own_mnt = os.readlink("/proc/self/ns/mnt")
+    except OSError:
+        own_mnt = None
+    cands = {}
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        pid = int(d)
+        m = CGROUP_ID_RE.search(read_file("/proc/%d/cgroup" % pid, "") or "")
+        if not m:
+            continue
+        try:
+            if own_mnt and os.readlink("/proc/%d/ns/mnt" % pid) == own_mnt:
+                continue
+        except OSError:
+            continue
+        lst = cands.setdefault(m.group(1), [])
+        if len(lst) < 3 or pid < lst[-1]:
+            lst.append(pid)
+            lst.sort()
+            del lst[3:]
+    return cands
+
+
+def discover_trust_stores():
+    stores = [TrustStore("/")]
+    for cid, pids in sorted(discover_containers().items(), key=lambda kv: kv[1][0]):
+        for pid in pids:
+            if os.path.isdir("/proc/%d/root/etc" % pid):
+                stores.append(TrustStore("/proc/%d/root" % pid, cid, pid))
+                break
+        else:
+            log("container %s: no readable root among pids %s, skipped" % (cid[:12], pids))
+    out = []
+    for st in stores:
+        st.collect()
+        if st.bundle is None and st.container_id:
+            log("trust store %s: no CA bundle (pause or distroless image), skipped" % st.container_id[:12])
+            continue
+        log("trust store %s: %s certs=%d pkg=%s" % (st.label(), st.bundle, len(st.fingerprints), st.package))
+        out.append(st)
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -1056,6 +1237,56 @@ def eval_php_rule(rule, host, instances):
     return findings
 
 
+# --- trust store rules -------------------------------------------------------
+
+def _cert_disabled(cert, store):
+    """True when the root is shipped by the package but switched off locally with a "!" line
+    in /etc/ca-certificates.conf. A vendor fix writes the same "!" line and deletes the file,
+    so a missing file means removed, not disabled."""
+    files = cert.get("files", []) + ["mozilla/%s.crt" % cert["name"].replace(" ", "_")]
+    return any(d in files and os.path.exists(os.path.join(store.root, "usr/share/ca-certificates", d))
+               for d in store.disabled)
+
+
+def eval_trust_rule(rule, host, stores):
+    """One finding per (status, set of trusted bad roots) covering the host and all its
+    containers, so a node with 150 containers produces a few lines, not 150."""
+    findings = []
+    for cve, cdef in sorted(rule["cves"].items()):
+        certs = cdef.get("certs", rule.get("certs", []))
+        groups = {}
+        for st in stores:
+            if st.bundle is None:
+                key = ("unknown", ())
+            else:
+                present = tuple(c["name"] for c in certs if c["sha256"].replace(":", "").upper() in st.fingerprints)
+                key = ("vulnerable", present) if present else ("fixed", ())
+            groups.setdefault(key, []).append(st)
+        for (status, present), members in sorted(groups.items()):
+            hosts = [st for st in members if not st.container_id]
+            conts = [st for st in members if st.container_id]
+            subject = "trust store: " + " + ".join(
+                (["host"] if hosts else []) + (["%d container%s" % (len(conts), "s" if len(conts) != 1 else "")] if conts else []))
+            where = []
+            for st in hosts:
+                how = "disabled in /etc/ca-certificates.conf" if status == "fixed" and any(_cert_disabled(c, st) for c in certs) else None
+                det = ", ".join(x for x in (how, "ca-certificates %s" % st.package if st.package else None) if x)
+                where.append("host (%s)" % det if det else "host")
+            where += [st.label() for st in conts[:10]]
+            if len(conts) > 10:
+                where.append("+%d more" % (len(conts) - 10))
+            extra = {"present": list(present), "stores": [st.as_dict() for st in members]}
+            if status == "vulnerable":
+                remedy = cdef.get("remedy", rule.get("remedy", "remove the certificates from the trust store"))
+                ev = "still trusts %s: %s; %s" % (", ".join(present), ", ".join(where), remedy)
+            elif status == "fixed":
+                ev = "none of the %d listed roots trusted: %s" % (len(certs), ", ".join(where))
+            else:
+                ev = "no CA bundle found (looked at %s): %s" % (", ".join(TRUST_BUNDLES), ", ".join(where))
+            findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
+    return findings
+
+
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
@@ -1107,6 +1338,9 @@ def main():
         log("kernel: %s" % kf.as_dict())
     if "php" in kinds and not args.kernel_only:
         instances = discover_php(host)
+    stores = []
+    if "trust_store" in kinds and not args.kernel_only and not args.php_only:
+        stores = discover_trust_stores()
 
     findings = []
     for rule in rules:
@@ -1114,6 +1348,8 @@ def main():
             findings.extend(eval_kernel_rule(rule, host, kf))
         elif rule.get("kind") == "php" and not args.kernel_only:
             findings.extend(eval_php_rule(rule, host, instances))
+        elif rule.get("kind") == "trust_store" and stores:
+            findings.extend(eval_trust_rule(rule, host, stores))
 
     sev = worst(findings)
     report = {
@@ -1125,7 +1361,8 @@ def main():
     }
     if args.facts:
         report["facts"] = {"kernel": kf.as_dict() if kf else None,
-                           "php": [i.as_dict() for i in instances]}
+                           "php": [i.as_dict() for i in instances],
+                           "trust_stores": [s.as_dict() for s in stores]}
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -1142,6 +1379,8 @@ def main():
                 len(inst.pids), " STALE" if inst.stale() else ""))
             for e in inst.errors:
                 print("    error: %s" % e)
+        if stores:
+            print("trust stores: host%s" % (" + %d containers" % (len(stores) - 1) if len(stores) > 1 else ""))
         print("")
         hidden = 0
         for f in sorted(findings, key=lambda f: (-SEVERITY_RANK[f.severity], f.family, f.cve)):

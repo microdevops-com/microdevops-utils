@@ -7,7 +7,8 @@ right now, and through what? It is not a scanner. It only knows the CVEs describ
 Why it exists: package-based CVE scanners report thousands of matches per host. The handful
 of CVEs that actually got our clients hacked (kernel local privilege escalations, PHP RCE)
 need a different question: running kernel vs installed, module blacklists, sysctl
-mitigations, PHP inside containers, php.ini hardening, end-of-life branches with no fix.
+mitigations, PHP inside containers, php.ini hardening, end-of-life branches with no fix,
+compromised CA roots still present in a trust store.
 
 Constraints: Python 3.5 syntax, standard library only, runs as root, changes nothing.
 Kernel modules are never loaded (`modprobe` is used with `-n` only).
@@ -72,12 +73,24 @@ PHP (`kind: php` rules), discovered from running processes, not from installed p
    upstream version is compared.
 5. Staleness: binary mtime newer than process start, or exe deleted.
 
+Trust store (`kind: trust_store` rules), for CA compromises such as eMudhra 2026:
+
+1. The host bundle (`/etc/ssl/certs/ca-certificates.crt`, RHEL
+   `/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem`, `/etc/ssl/cert.pem`) and the bundle of
+   every container found via `/proc/PID/cgroup`, read through `/proc/PID/root`. Containers
+   without a bundle (pause, distroless) are skipped.
+2. Every certificate in the bundle is SHA-256 fingerprinted and compared with the rule's list,
+   so a manual removal (`!` in `/etc/ca-certificates.conf`, RHEL blocklist) counts as fixed
+   without any version table. Any listed root present means `vulnerable`.
+3. Not covered: trust stores bundled by runtimes (Java cacerts, Node, Python certifi).
+
 ## Rule files
 
-One JSON file per CVE family in `rules/`. Keys:
+One JSON file per CVE family in `rules/`. Entries under `cves` are keyed by CVE id, or by an
+advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 
 ```
-family, title, kind (kernel|php), references[], public (YYYY-MM-DD)
+family, title, kind (kernel|php|trust_store), references[], public (YYYY-MM-DD)
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
                      not_affected_distros{}, fixed{}, mitigations[] } }
 ```
@@ -98,6 +111,9 @@ Kernel `fixed` tables, keyed by distro id (`ubuntu`, `debian`) or family (`rpm`)
 before catch-alls. `"fixed": null` means the vendor lists the series as vulnerable with no
 fix released (the kernel is reported vulnerable regardless of version). The compared string is the Ubuntu ABI (`6.8.0-107`), the Debian package
 version from `/proc/version`, or the RHEL version-release without arch.
+
+Trust store rules: `certs` per entry (`name`, `sha256` fingerprint, optional `files` as named
+in `/etc/ca-certificates.conf`) and a `remedy` sentence printed with the finding.
 
 PHP rules: `fixed_upstream` per branch, `eol_branches`, `fixed_packages` per origin
 (`sury` per branch, distro id per release per source package), and per-CVE `mitigations`
