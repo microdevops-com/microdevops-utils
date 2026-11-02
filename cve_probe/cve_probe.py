@@ -25,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.1"
+VERSION = "1.2"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -395,6 +395,8 @@ class KernelFacts(object):
         self.modprobe_conf = self._modprobe_conf()
         self.sysctl = {}
         self._module_cache = {}
+        self._fw_rules = None       # collected on first use, only rules with firewall_mitigations need it
+        self._foreign_netns = None
 
     def _installed(self):
         rels = set()
@@ -519,11 +521,294 @@ class KernelFacts(object):
         self._module_cache[mod] = st
         return st
 
+    def firewall_rules(self):
+        """netfilter rules reachable from the input/forward/prerouting hooks (nft + iptables).
+        A listing tool is only run when its kernel backend is already present: nft and
+        iptables-nft need nf_tables, legacy iptables needs ip_tables; running them otherwise
+        would autoload the module, which this probe promises not to do."""
+        if self._fw_rules is None:
+            nft_ok = "nf_tables" in self.loaded or "nf_tables" in self.builtin
+            legacy_ok = "ip_tables" in self.loaded or "ip_tables" in self.builtin
+            self._fw_rules = _nft_ruleset(nft_ok) + _iptables_ruleset(nft_ok, legacy_ok)
+            log("firewall: %d rules on input/forward/prerouting hooks (nft backend %s, legacy %s)" %
+                (len(self._fw_rules), nft_ok, legacy_ok))
+        return self._fw_rules
+
+    def foreign_netns(self):
+        """Number of other network namespaces with processes and a non-loopback interface:
+        containers of any kind (OCI, LXC, Incus) whose sockets live on this kernel and receive
+        routed traffic through our forward hook. Host-network containers share our namespace."""
+        if self._foreign_netns is None:
+            try:
+                own = os.readlink("/proc/self/ns/net")
+            except OSError:
+                own = None
+            seen = {}
+            for d in os.listdir("/proc"):
+                if not d.isdigit():
+                    continue
+                try:
+                    ns = os.readlink("/proc/%s/ns/net" % d)
+                except OSError:
+                    continue
+                if ns == own or ns in seen:
+                    continue
+                dev = read_file("/proc/%s/net/dev" % d, "") or ""
+                ifaces = [l.split(":")[0].strip() for l in dev.splitlines()[2:] if ":" in l]
+                seen[ns] = bool([i for i in ifaces if i != "lo"])
+            self._foreign_netns = len([v for v in seen.values() if v])
+        return self._foreign_netns
+
+    def firewall_coverage(self, specs):
+        """Match firewall_mitigations specs against the ruleset. Returns (hits, problem):
+        hits are the rules that close the path on every hook an inbound SYN can take here:
+        input, plus forward when other network namespaces receive routed traffic; a prerouting
+        rule covers both. problem explains why found rules are not enough; (None) when nothing
+        resembling the mitigation exists at all."""
+        matched, partial = [], []
+        for r in self.firewall_rules():
+            for sp in specs:
+                if sp.get("tool") != r["tool"] or not re.search(sp["match"], r["text"]):
+                    continue
+                if sp.get("unless") and re.search(sp["unless"], r["text"]):
+                    partial.append(r)
+                else:
+                    matched.append(r)
+                break
+        if not matched and not partial:
+            return [], None
+        need = set(["input"])
+        nforeign = 0 if self.host.is_container else self.foreign_netns()
+        if nforeign:
+            need.add("forward")
+        covered = set()
+        good, problems = [], []
+        for r in matched:
+            if not r["effective"]:
+                problems.append("%s %s rule '%s' sits behind accept rule '%s', SYNs can be accepted before it" %
+                                (r["tool"], r["where"], r["text"], r["after"]))
+                continue
+            hooks = set(r["hooks"])
+            if "prerouting" in hooks:
+                hooks.update(["input", "forward"])
+            covered.update(hooks)
+            good.append(r)
+        for r in partial[:2]:
+            problems.append("%s %s rule '%s' is limited by interface, address or port, not counted" %
+                            (r["tool"], r["where"], r["text"]))
+        missing = need - covered
+        if missing:
+            if good:
+                why = []
+                if "input" in missing:
+                    why.append("input (this host's own sockets) is open")
+                if "forward" in missing:
+                    why.append("forward is open and %d other network namespaces (containers) receive routed traffic through it" % nforeign)
+                problems.append("%s rule covers only %s hook(s); %s; use raw PREROUTING" %
+                                (good[0]["tool"], "/".join(sorted(covered)), "; ".join(why)))
+            return [], "; ".join(problems)
+        return good, None
+
     def as_dict(self):
-        return {"running": self.running.as_dict(), "installed": self.installed,
-                "newest_installed": self.newest.as_dict() if self.newest else None,
-                "modules_dir_present": self.modules_dir_present,
-                "kconfig_available": bool(self.kconfig)}
+        d = {"running": self.running.as_dict(), "installed": self.installed,
+             "newest_installed": self.newest.as_dict() if self.newest else None,
+             "modules_dir_present": self.modules_dir_present,
+             "kconfig_available": bool(self.kconfig)}
+        if self._fw_rules is not None:
+            d["firewall_rules_on_hooks"] = len(self._fw_rules)
+        return d
+
+
+# ----------------------------------------------------------------------------
+# Firewall rules: netfilter mitigations read from `nft list ruleset` and `iptables-save`
+# ----------------------------------------------------------------------------
+
+FW_HOOKS = ("input", "forward", "prerouting")
+IPT_BUILTIN_HOOK = {"INPUT": "input", "FORWARD": "forward", "PREROUTING": "prerouting"}
+NFT_TABLE_RE = re.compile(r"^table\s+(\S+)\s+(\S+)\s*\{")
+NFT_CHAIN_RE = re.compile(r"^\s+chain\s+(\S+)\s*\{")
+NFT_HOOK_RE = re.compile(r"^\s+type\s+(\S+)\s+hook\s+(\S+)\s")
+NFT_JUMP_RE = re.compile(r"^(?:counter(?:\s+packets\s+\d+\s+bytes\s+\d+)?\s+)?(?:jump|goto)\s+(\S+)$")
+IPT_JUMP_RE = re.compile(r"^-A\s+\S+\s+-j\s+(\S+)$")
+IPT_COMMENT_RE = re.compile(r"\s+-m\s+comment\s+--comment\s+(\"[^\"]*\"|\S+)")
+NFT_COMMENT_RE = re.compile(r"\s+comment\s+\"[^\"]*\"$")
+
+
+def _hooked_rules(tool, chains, jump_of, is_accept):
+    """Flatten chains into rule dicts carrying the hooks each rule is reachable from.
+    chains: key -> {"hook", "type", "rules"}; key is a tuple whose last item is the chain name.
+    A chain is reachable from a hook when it is a filter base chain of that hook, or when a
+    reachable chain jumps to it unconditionally. A rule is "effective" when nothing before it
+    on the way from the hook can accept the packet: neither an accept rule nor a jump into a
+    chain that (transitively) contains one, in its own chain or in the chains it was entered
+    through. An earlier accept, typically ct state established, passes a retransmitted SYN
+    before the mitigation sees it; a loopback accept passes local users."""
+    def chain_accept(key):
+        """First accept reachable inside a chain (own rule or through a jump), memoised; None if none."""
+        ch = chains[key]
+        if "accept_text" in ch:
+            return ch["accept_text"]
+        ch["accept_text"] = None          # set before recursing: cycles resolve to None
+        for t in ch["rules"]:
+            if is_accept(t):
+                ch["accept_text"] = t
+                break
+            dst = jump_of(t)
+            dkey = key[:-1] + (dst,) if dst else None
+            if dkey in chains and chain_accept(dkey):
+                ch["accept_text"] = "%s -> %s" % (t, chains[dkey]["accept_text"])
+                break
+        return ch["accept_text"]
+
+    first_accept = {}          # key -> (index of first accepting rule or jump, its text)
+    for key, ch in chains.items():
+        first_accept[key] = (len(ch["rules"]), None)
+        for i, t in enumerate(ch["rules"]):
+            if is_accept(t):
+                first_accept[key] = (i, t)
+                break
+            dst = jump_of(t)
+            dkey = key[:-1] + (dst,) if dst else None
+            if dkey in chains and chain_accept(dkey):
+                first_accept[key] = (i, "%s -> %s" % (t, chains[dkey]["accept_text"]))
+                break
+    reach, clean, blocked = {}, {}, {}
+    for key, ch in chains.items():
+        if ch.get("hook") in FW_HOOKS and ch.get("type", "filter") == "filter":
+            reach[key] = set([ch["hook"]])
+            clean[key] = set([ch["hook"]])
+    changed = True
+    while changed:
+        changed = False
+        for key in list(reach.keys()):
+            fa, fatext = first_accept[key]
+            for i, t in enumerate(chains[key]["rules"]):
+                dst = jump_of(t)
+                dkey = key[:-1] + (dst,) if dst else None
+                if dkey not in chains:
+                    continue
+                if reach[key] - reach.get(dkey, set()):
+                    reach.setdefault(dkey, set()).update(reach[key])
+                    changed = True
+                if key in clean and i <= fa:
+                    # the jump at index fa is the first-accept item itself: its target is still
+                    # entered before anything accepted, so the target's leading rules count
+                    if clean[key] - clean.get(dkey, set()):
+                        clean.setdefault(dkey, set()).update(clean[key])
+                        changed = True
+                elif dkey not in clean and dkey not in blocked:
+                    blocked[dkey] = fatext if key in clean else blocked.get(key)
+                    changed = True
+    rules = []
+    for key, hooks in reach.items():
+        fa, fatext = first_accept[key]
+        for i, t in enumerate(chains[key]["rules"]):
+            eff = key in clean and i < fa
+            rules.append({"tool": tool, "where": "/".join(key[-2:]), "hooks": sorted(clean.get(key) or hooks),
+                          "text": t, "effective": eff,
+                          "after": None if eff else (fatext if key in clean else blocked.get(key))})
+    return rules
+
+
+def _nft_ruleset(nft_ok):
+    """Rules from `nft list ruleset`, ip and inet families only (hdrlength etc. are IPv4).
+    Rules wrapped over several lines (long sets) are joined until braces balance."""
+    if not nft_ok or not which("nft"):
+        return []
+    rc, out, _ = run(["nft", "list", "ruleset"])
+    if rc != 0:
+        return []
+    chains = {}
+    cur = None
+    fam = tab = None
+    pending = ""
+    for line in out.splitlines():
+        if pending:
+            pending += " " + line.strip()
+            if pending.count("{") > pending.count("}"):
+                continue
+            cur["rules"].append(pending)
+            pending = ""
+            continue
+        m = NFT_TABLE_RE.match(line)
+        if m:
+            fam, tab = m.group(1), m.group(2)
+            cur = None
+            continue
+        m = NFT_CHAIN_RE.match(line)
+        if m:
+            cur = None
+            if fam in ("ip", "inet"):
+                cur = chains.setdefault((fam, tab, m.group(1)), {"hook": None, "type": None, "rules": []})
+            continue
+        st = line.strip()
+        if st == "}":
+            cur = None
+            continue
+        if cur is None or not st:
+            continue
+        m = NFT_HOOK_RE.match(line)
+        if m:
+            cur["type"], cur["hook"] = m.group(1), m.group(2)
+            continue
+        if st.startswith(("policy ", "comment ", "flags ", "devices ")):
+            continue
+        if st.count("{") > st.count("}"):
+            pending = st
+            continue
+        cur["rules"].append(st)
+
+    def jump_of(t):
+        m = NFT_JUMP_RE.match(NFT_COMMENT_RE.sub("", t))
+        return m.group(1) if m else None
+    return _hooked_rules("nft", chains, jump_of,
+                         lambda t: re.search(r"\baccept\b", NFT_COMMENT_RE.sub("", t)) is not None)
+
+
+def _iptables_backend(cli):
+    """'nft' or 'legacy' for an iptables-save flavour, from `iptables --version` (no kernel access).
+    iptables before 1.8 prints no backend: legacy."""
+    if cli == "iptables-legacy-save":
+        return "legacy"
+    if cli == "iptables-nft-save":
+        return "nft"
+    rc, out, _ = run([which("iptables") or "iptables", "--version"]) if which("iptables") else (1, "", "")
+    return "nft" if "nf_tables" in out else "legacy"
+
+
+def _iptables_ruleset(nft_ok, legacy_ok):
+    """Rules from iptables-save (and the legacy/nft variants when they show something else).
+    nat table chains are not hooks here: they only see the first packet of a flow."""
+    chains = {}
+    seen = []
+    for cli in ("iptables-save", "iptables-legacy-save", "iptables-nft-save"):
+        if not which(cli):
+            continue
+        backend = _iptables_backend(cli)
+        if (backend == "legacy" and not legacy_ok) or (backend == "nft" and not nft_ok):
+            continue
+        rc, out, _ = run([cli])
+        if rc != 0 or out in seen:
+            continue
+        seen.append(out)
+        table = None
+        for line in out.splitlines():
+            if line.startswith("*"):
+                table = line[1:].strip()
+            elif line.startswith(":") and table:
+                name = line[1:].split()[0]
+                chains.setdefault((cli, table, name), {"hook": None if table == "nat" else IPT_BUILTIN_HOOK.get(name),
+                                                       "type": "filter", "rules": []})
+            elif line.startswith("-A ") and table:
+                name = line.split()[1]
+                chains.setdefault((cli, table, name), {"hook": None if table == "nat" else IPT_BUILTIN_HOOK.get(name),
+                                                       "type": "filter", "rules": []})["rules"].append(line)
+
+    def jump_of(t):
+        m = IPT_JUMP_RE.match(IPT_COMMENT_RE.sub("", t))
+        return m.group(1) if m else None
+    return _hooked_rules("iptables", chains, jump_of,
+                         lambda t: re.search(r"\s-j\s+ACCEPT\b", t) is not None)
 
 
 # ----------------------------------------------------------------------------
@@ -1116,13 +1401,26 @@ def eval_kernel_rule(rule, host, kf):
             if v is not None and str(v) == str(sm["value"]):
                 mitigated_by.append("sysctl %s=%s" % (sm["key"], v))
                 blocked_all = True
+        fw_specs = cdef.get("firewall_mitigations") or rule.get("firewall_mitigations") or []
+        fw_problem = None
+        if fw_specs and status != "fixed":
+            fw_hits, fw_problem = kf.firewall_coverage(fw_specs)
+            if fw_hits:
+                mitigated_by.extend("firewall %s %s: %s" % (r["tool"], r["where"], r["text"]) for r in fw_hits[:2])
+                blocked_all = True
+            extra["firewall"] = [r["text"] for r in fw_hits] if fw_hits else []
+        remedy = cdef.get("remedy") or rule.get("remedy")
         loaded = [st["module"] for st in mod_states if st["state"] == "loaded"]
         builtin = [st["module"] for st in mod_states if st["state"] == "builtin"]
         extra["modules"] = dict((st["module"], st["state"]) for st in mod_states)
         if host.is_container:
-            if status in ("vulnerable", "unknown"):
+            if status in ("vulnerable", "unknown") and fw_specs and blocked_all and not loaded and not builtin and mitigated_by:
+                findings.append(Finding(rule["family"], cve, subject, "mitigated",
+                                        "running inside %s container, kernel belongs to the host; by version: %s; this container's own netfilter closes the path: %s" % (host.virt, ev, "; ".join(mitigated_by)), extra))
+            elif status in ("vulnerable", "unknown"):
                 findings.append(Finding(rule["family"], cve, subject, "host_managed",
-                                        "running inside %s container, kernel belongs to the host; by version: %s; mitigation state on host not visible" % (host.virt, ev), extra))
+                                        "running inside %s container, kernel belongs to the host; by version: %s; mitigation state on host not visible%s" %
+                                        (host.virt, ev, "; firewall mitigation incomplete: " + fw_problem if fw_problem else ""), extra))
             else:
                 findings.append(Finding(rule["family"], cve, subject, status, ev + " (kernel belongs to %s host)" % host.virt, extra))
             continue
@@ -1137,6 +1435,8 @@ def eval_kernel_rule(rule, host, kf):
         if blocked_all and not loaded and not builtin and mitigated_by:
             findings.append(Finding(rule["family"], cve, subject, "mitigated", ev + "; mitigated by " + "; ".join(mitigated_by), extra))
             continue
+        if fw_problem:
+            ev += "; firewall mitigation incomplete: " + fw_problem
         if kf.newest:
             nst, nev = _kernel_status_for_image(rule, cve, kf.newest, host)
             if nst == "fixed":
@@ -1150,6 +1450,8 @@ def eval_kernel_rule(rule, host, kf):
             continue
         if kf.newest and kf.newest.release != run_img.release and vercmp(kf.newest.release, run_img.release) < 0:
             ev += "; WARNING next boot kernel %s is older than the running one" % kf.newest.release
+        if status == "vulnerable" and remedy:
+            ev += "; remedy: " + remedy
         findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
     return findings
 

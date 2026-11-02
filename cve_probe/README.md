@@ -23,6 +23,7 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `dirty-frag` | CVE-2026-43284, CVE-2026-43500, CVE-2026-46300 | Dirty Frag / Fragnesia: XFRM ESP (`esp4`/`esp6`) and RxRPC page-cache write, local privilege escalation | kernel |
 | `ipv6-frag-escape` | CVE-2026-53362 | IPv6 UDP send path heap overflow, local privilege escalation / container escape, in CISA KEV | kernel |
 | `ebt-snat` | CVE-2026-53266 | ebtables SNAT ARP rewrite into spliced file pages, local privilege escalation | kernel |
+| `tcp-ireq-opt-uaf` | CVE-2026-98432 | IPv4 TCP request socket IP-options use-after-free, remote and unauthenticated on any listening port; firewall drop of TCP with IP options counts as mitigated | kernel |
 | `php2shell` | CVE-2026-109618, CVE-2026-109619 | PHP2Shell: unauthenticated remote code execution in PHP HTTP SAPIs, on the host and inside containers | php |
 | `emudhra-ca` | EMUDHRA-CA-2026 (USN-8944-1/2, DSA-6572) | eMudhra CA key compromise: `emSign ECC Root CA - G3` or Sectigo `AAA Certificate Services` still in a trust store, host and containers | trust_store |
 
@@ -53,8 +54,8 @@ Statuses:
 
 - `vulnerable` - no fix installed, no mitigation in place.
 - `mitigated` - unpatched, but the attack path is closed: module blocked via modprobe.d
-  `install ... /bin/false`, module files absent for the running kernel, sysctl set, or the
-  php.ini mitigation applied.
+  `install ... /bin/false`, module files absent for the running kernel, sysctl set, a
+  netfilter rule from the rule file active on the right hooks, or the php.ini mitigation applied.
 - `reboot_pending` - a fixed kernel is installed, the running one is not.
 - `stale_workers` - fixed PHP binary on disk, running processes started before it.
 - `host_managed` - running inside an LXC/Incus container: the kernel is vulnerable by version
@@ -73,7 +74,18 @@ Kernel (`kind: kernel` rules):
 4. Kernel build date (`uname -v`) before the disclosure date means vulnerable.
 5. Mitigations: `modprobe -n -v` per module, `/etc/modprobe.d`, `modules.builtin`,
    `/proc/modules`, sysctl values. Built-in or loaded modules cannot be mitigated.
-6. Newest installed kernel, for `reboot_pending`.
+6. Firewall mitigations (`firewall_mitigations` in the rule): `nft list ruleset` (ip/inet
+   families) and `iptables-save` / `iptables-legacy-save`, parsed into rules reachable from the
+   input, forward and prerouting hooks, including chains entered through unconditional jumps
+   (ufw, DOCKER-USER). Each tool runs only when its kernel backend (`nf_tables`, `ip_tables`) is
+   already loaded, so the listing never autoloads a module. A rule counts only if nothing before
+   it in its chain can accept the packet (an accept rule, or a jump into a chain containing one;
+   `ct state established accept` passes a retransmitted SYN, and a loopback accept passes local
+   users) and if it is not limited by port, interface or address. It must cover `input`, plus
+   `forward` when other network namespaces with interfaces exist (containers of any kind, whose
+   traffic is routed past INPUT); a `prerouting` rule covers both. Inside an LXC/Incus container
+   the container's own ruleset is checked and turns `host_managed` into `mitigated`.
+7. Newest installed kernel, for `reboot_pending`.
 
 PHP (`kind: php` rules), discovered from running processes, not from installed packages:
 
@@ -105,13 +117,19 @@ One JSON file per CVE family in `rules/`. Entries under `cves` are keyed by CVE 
 advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 
 ```
-family, title, kind (kernel|php|trust_store), references[], public (YYYY-MM-DD)
+family, title, kind (kernel|php|trust_store), references[], public (YYYY-MM-DD), remedy
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
-                     not_affected_distros{}, fixed{}, mitigations[] } }
+                     firewall_mitigations[], not_affected_distros{}, fixed{}, mitigations[] } }
 ```
 
-Family-level `modules`, `sysctl_mitigations`, `affected_from`, `fixed` apply to every CVE
-unless the CVE overrides them.
+Family-level `modules`, `sysctl_mitigations`, `firewall_mitigations`, `affected_from`, `fixed`
+and `remedy` apply to every CVE unless the CVE overrides them. `remedy` is appended to
+vulnerable findings.
+
+`firewall_mitigations` entries are `{"tool": "nft"|"iptables", "match": regex, "unless": regex}`
+applied to one rule line as `nft list ruleset` or `iptables-save` prints it (iptables saves
+`--u32` in hex: `0x0>>0x18&0xf=0x6:0xf`). `match` must include the verdict; `unless` rejects
+port-limited variants.
 
 Kernel `fixed` tables, keyed by distro id (`ubuntu`, `debian`) or family (`rpm`):
 

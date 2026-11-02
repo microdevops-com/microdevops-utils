@@ -1,0 +1,88 @@
+{
+  "family": "tcp-ireq-opt-uaf",
+  "title": "IPv4 TCP request socket IP options use-after-free, remote kernel memory corruption",
+  "kind": "kernel",
+  "references": [
+    "https://ubuntu.com/security/CVE-2026-98432",
+    "https://security-tracker.debian.org/tracker/CVE-2026-98432",
+    "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-98432.json",
+    "https://access.redhat.com/security/vulnerabilities/RHSB-2026-016"
+  ],
+  "affected_from": "4.4",
+  "affected_before": "7.3.0",
+  "firewall_mitigations": [
+    {"tool": "nft",
+     "match": "ip hdrlength (> 5|gt 5|!= 5|ne 5|6-15)\\b.*\\b(drop|reject)\\b",
+     "unless": "\\b((tcp|th) [sd]port|iifname|iif|oifname|oif|ip [sd]addr|meta mark|ct mark)\\b"},
+    {"tool": "iptables",
+     "match": "(-m u32 --u32 \"?(0x0|0)>>(0x18|24)&0x0?[fF]=(0x6|6):(0xf|0xF|15)\"?|-m ipv4options --any-opt).*-j (DROP|REJECT)",
+     "unless": "--[sd]ports?\\b|\\s-[isd]\\s|--(in-interface|source|destination|src-range|dst-range|mark)\\b|-m set\\b"}
+  ],
+  "remedy": "upgrade to the fixed kernel where one exists; while none is running, drop inbound TCP carrying IP options before conntrack and DNAT so host and container ports are both covered: iptables -t raw -I PREROUTING 1 -p tcp -m u32 --u32 '0>>24&0x0f=6:15' -j DROP  (nft: chain type filter hook prerouting priority -310, rule: ip protocol tcp ip hdrlength > 5 counter drop)",
+  "cves": {
+    "CVE-2026-98432": {
+      "public": "2026-10-15",
+      "summary": "ireq_opt of an IPv4 TCP request socket is freed without RCU grace period and reused by a retransmitted SYN that carries IP options; remote, unauthenticated, any listening TCP port; secondary path via tcp_migrate_req; fixed upstream by freeing with kfree_rcu (7.3-rc7, stable 5.10.272 5.15.223 6.1.190 6.6.159 6.12.113 6.18.56 7.2.10)",
+      "not_affected_distros": {"ubuntu": ["14.04"]},
+      "fixed": {
+        "ubuntu": [
+          {"match": "^7\\.3\\.0-\\d+-(generic|lowlatency)", "fixed": "7.3.0-10"},
+          {"match": "^7\\.0\\.0-\\d+-(generic|lowlatency)", "fixed": "7.0.0-43"},
+          {"match": "^6\\.17\\.0-\\d+-(generic|lowlatency)", "fixed": null},
+          {"match": "^6\\.8\\.0-\\d+-(generic|lowlatency)", "fixed": "6.8.0-149"},
+          {"match": "^5\\.15\\.0-\\d+-lowlatency", "fixed": "5.15.0-198"},
+          {"match": "^5\\.15\\.0-\\d+-generic", "fixed": "5.15.0-203"},
+          {"match": "^5\\.4\\.0-", "fixed": null},
+          {"match": "^4\\.15\\.0-", "fixed": null},
+          {"match": "^4\\.4\\.0-", "fixed": null},
+          {"match": "^4\\.(8|10|11|13)\\.0-", "fixed": null},
+          {"match": "^7\\.3\\.0-\\d+-aws", "fixed": "7.3.0-1004"},
+          {"match": "^7\\.0\\.0-\\d+-aws", "fixed": "7.0.0-1017"},
+          {"match": "^6\\.8\\.0-\\d+-aws", "fixed": "6.8.0-1069"},
+          {"match": "^5\\.15\\.0-\\d+-aws", "fixed": "5.15.0-1120"},
+          {"match": "^5\\.4\\.0-\\d+-aws", "fixed": null},
+          {"match": "^7\\.3\\.0-\\d+-azure", "fixed": "7.3.0-1004"},
+          {"match": "^7\\.0\\.0-\\d+-azure", "fixed": "7.0.0-1020"},
+          {"match": "^6\\.8\\.0-\\d+-azure", "fixed": "6.8.0-1073"},
+          {"match": "^5\\.15\\.0-\\d+-azure", "fixed": "5.15.0-1126"},
+          {"match": "^5\\.4\\.0-\\d+-azure", "fixed": null},
+          {"match": "^7\\.3\\.0-\\d+-gcp", "fixed": "7.3.0-1004"},
+          {"match": "^7\\.0\\.0-\\d+-gcp", "fixed": "7.0.0-1017"},
+          {"match": "^6\\.8\\.0-\\d+-gcp", "fixed": "6.8.0-1073"},
+          {"match": "^5\\.15\\.0-\\d+-gcp", "fixed": "5.15.0-1121"},
+          {"match": "^5\\.4\\.0-\\d+-gcp", "fixed": null},
+          {"match": "^7\\.3\\.0-\\d+-oracle", "fixed": "7.3.0-1004"},
+          {"match": "^7\\.0\\.0-\\d+-oracle", "fixed": "7.0.0-1016"},
+          {"match": "^6\\.8\\.0-\\d+-oracle", "fixed": "6.8.0-1067"},
+          {"match": "^5\\.15\\.0-\\d+-oracle", "fixed": "5.15.0-1117"},
+          {"match": "^5\\.4\\.0-\\d+-oracle", "fixed": null},
+          {"match": "^7\\.0\\.0-\\d+-gke", "fixed": "7.0.0-1010"},
+          {"match": "^6\\.8\\.0-\\d+-gke", "fixed": "6.8.0-1068"},
+          {"match": "^5\\.15\\.0-\\d+-gke", "fixed": "5.15.0-1116"},
+          {"match": "^7\\.0\\.0-\\d+-ibm", "fixed": "7.0.0-1018"},
+          {"match": "^6\\.8\\.0-\\d+-ibm", "fixed": "6.8.0-1069"},
+          {"match": "^5\\.15\\.0-\\d+-ibm", "fixed": "5.15.0-1114"},
+          {"match": "^5\\.4\\.0-\\d+-ibm", "fixed": null},
+          {"match": "^5\\.15\\.0-\\d+-kvm", "fixed": "5.15.0-1112"},
+          {"match": "^5\\.4\\.0-\\d+-kvm", "fixed": null},
+          {"match": "^7\\.3\\.0-\\d+-raspi", "fixed": "7.3.0-1004"},
+          {"match": "^(7\\.0|6\\.8|5\\.15|5\\.4)\\.0-\\d+-raspi", "fixed": null}
+        ],
+        "debian": [
+          {"release": "12", "match": "^6\\.1\\.", "fixed": "6.1.190-1"},
+          {"release": "12", "match": "^6\\.12\\.", "fixed": "6.12.113-1~deb12u1"},
+          {"release": "13", "match": "^6\\.12\\.", "fixed": "6.12.113-1"},
+          {"match": "^7\\.2\\.", "fixed": "7.2.12-1"}
+        ],
+        "rpm": [
+          {"match": "^4\\.18\\.0-553\\.", "fixed": "4.18.0-553.182.1.el8_10"},
+          {"match": "^4\\.18\\.0-", "fixed": "4.18.0-553.182.1.el8_10"},
+          {"match": "^5\\.14\\.0-687\\.", "fixed": "5.14.0-687.64.1.el9_8"},
+          {"match": "^5\\.14\\.0-", "fixed": "5.14.0-687.64.1.el9_8"},
+          {"match": "^6\\.12\\.0-211\\.", "fixed": "6.12.0-211.72.1.el10_2"},
+          {"match": "^6\\.12\\.0-", "fixed": "6.12.0-211.72.1.el10_2"}
+        ]
+      }
+    }
+  }
+}
