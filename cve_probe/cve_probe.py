@@ -25,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.2"
+VERSION = "1.3"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -919,6 +919,75 @@ def _btime():
     return None
 
 
+def where_label(container_id, runtime, name):
+    return "host" if not container_id else "%s:%s" % (runtime, name)
+
+
+def process_times(pid, root, exe_path):
+    """(process start time as epoch, mtime of the binary on disk); None where unreadable."""
+    start = mtime = None
+    try:
+        stat = read_file("/proc/%d/stat" % pid, "")
+        rest = stat[stat.rindex(")") + 2:].split()
+        bt = _btime()
+        if bt:
+            start = bt + int(rest[19]) / float(_clk_tck())
+    except (ValueError, IndexError, AttributeError):
+        pass
+    try:
+        mtime = os.stat(os.path.join(root, exe_path.lstrip("/"))).st_mtime
+    except OSError:
+        pass
+    return start, mtime
+
+
+def is_stale(deleted, start_time, exe_mtime):
+    """True when the binary on disk is newer than the running process (restart needed)."""
+    if deleted:
+        return True
+    if start_time and exe_mtime:
+        return exe_mtime > start_time + 1
+    return False
+
+
+def group_processes(classify):
+    """One /proc walk. classify(exe basename) returns a tag or None; processes with a tag are
+    grouped by (container id, exe) -> (tag, sorted pids). The container id is the 64-hex id in
+    /proc/PID/cgroup; None on the host and inside an LXC minion, where everything is "host"."""
+    groups = {}
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        pid = int(d)
+        if pid == os.getpid():
+            continue
+        try:
+            exe = os.readlink("/proc/%d/exe" % pid)
+        except OSError:
+            continue
+        tag = classify(os.path.basename(exe.replace(" (deleted)", "")))
+        if tag is None:
+            continue
+        m = CGROUP_ID_RE.search(read_file("/proc/%d/cgroup" % pid, "") or "")
+        key = (m.group(1) if m else None, exe)
+        groups.setdefault(key, (tag, []))[1].append(pid)
+    for tag, pids in groups.values():
+        pids.sort()
+    return groups
+
+
+def exec_in_root(pid, container_id, argv, errors=None):
+    """Run argv inside the mount/uts/pid namespaces of pid when it is a container process,
+    plainly otherwise. Returns (rc, stdout, stderr); never raises."""
+    if container_id:
+        if not which("nsenter"):
+            if errors is not None:
+                errors.append("nsenter not available, cannot inspect container")
+            return (-1, "", "no nsenter")
+        return run(["nsenter", "-t", str(pid), "-m", "-u", "-p", "--"] + argv, timeout=CMD_TIMEOUT)
+    return run(argv, timeout=CMD_TIMEOUT)
+
+
 class PhpInstance(object):
     """A group of processes sharing one executable inside one root (host or container)."""
 
@@ -961,19 +1030,7 @@ class PhpInstance(object):
         self._classify()
 
     def _times(self):
-        try:
-            stat = read_file("/proc/%d/stat" % self.pid, "")
-            rest = stat[stat.rindex(")") + 2:].split()
-            starttime = int(rest[19])
-            bt = _btime()
-            if bt:
-                self.start_time = bt + starttime / float(_clk_tck())
-        except (ValueError, IndexError, AttributeError):
-            pass
-        try:
-            self.exe_mtime = os.stat(os.path.join(self.root, self.exe_path.lstrip("/"))).st_mtime
-        except OSError:
-            pass
+        self.start_time, self.exe_mtime = process_times(self.pid, self.root, self.exe_path)
 
     def _container_meta(self):
         if not self.container_id:
@@ -1037,12 +1094,7 @@ class PhpInstance(object):
         return m.group(0) if m else None
 
     def _exec_in_root(self, argv):
-        if self.container_id:
-            if not which("nsenter"):
-                self.errors.append("nsenter not available, cannot inspect container")
-                return (-1, "", "no nsenter")
-            return run(["nsenter", "-t", str(self.pid), "-m", "-u", "-p", "--"] + argv, timeout=CMD_TIMEOUT)
-        return run(argv, timeout=CMD_TIMEOUT)
+        return exec_in_root(self.pid, self.container_id, argv, self.errors)
 
     def _version_and_ini(self):
         if self.sapi == "apache2handler":
@@ -1097,16 +1149,11 @@ class PhpInstance(object):
     # --- derived -------------------------------------------------------------
 
     def stale(self):
-        """True when the binary on disk is newer than the running process (restart needed)."""
-        if self.deleted:
-            return True
-        if self.start_time and self.exe_mtime:
-            return self.exe_mtime > self.start_time + 1
-        return False
+        return is_stale(self.deleted, self.start_time, self.exe_mtime)
 
     def label(self):
-        where = "host" if not self.container_id else "%s:%s" % (self.runtime, self.container_name)
-        return "%s %s (%s)" % (os.path.basename(self.exe_path), self.version or "?", where)
+        return "%s %s (%s)" % (os.path.basename(self.exe_path), self.version or "?",
+                               where_label(self.container_id, self.runtime, self.container_name))
 
     def as_dict(self):
         return {"pid": self.pid, "workers": len(self.pids), "exe": self.exe_path, "sapi": self.sapi,
@@ -1119,33 +1166,10 @@ class PhpInstance(object):
 
 
 def discover_php(host):
-    groups = {}
-    for d in os.listdir("/proc"):
-        if not d.isdigit():
-            continue
-        pid = int(d)
-        if pid == os.getpid():
-            continue
-        try:
-            exe = os.readlink("/proc/%d/exe" % pid)
-        except OSError:
-            continue
-        base = os.path.basename(exe.replace(" (deleted)", ""))
-        if not PHP_EXE_RE.match(base):
-            continue
-        cg = read_file("/proc/%d/cgroup" % pid, "") or ""
-        m = CGROUP_ID_RE.search(cg)
-        cid = m.group(1) if m else None   # None also inside an LXC minion: everything there is "host"
-        key = (cid, exe)
-        if key in groups:
-            groups[key].pids.append(pid)
-            if pid < groups[key].pid:
-                groups[key].pid = pid
-                groups[key].root = "/proc/%d/root" % pid
-        else:
-            groups[key] = PhpInstance(pid, exe, cid, host)
     instances = []
-    for inst in groups.values():
+    for (cid, exe), (tag, pids) in group_processes(lambda b: True if PHP_EXE_RE.match(b) else None).items():
+        inst = PhpInstance(pids[0], exe, cid, host)
+        inst.pids = list(pids)
         if inst.sapi == "apache2handler" and not inst._mod_php_lib():
             continue  # apache without mod_php is not a PHP runtime
         log("php instance pid=%d exe=%s container=%s" % (inst.pid, inst.exe, inst.container_id))
@@ -1208,22 +1232,13 @@ class TrustStore(object):
         conf = read_file(os.path.join(self.root, "etc/ca-certificates.conf"), "") or ""
         self.disabled = [l[1:].strip() for l in conf.splitlines() if l.startswith("!")]
         fam = Host._family(self.os.get("ID", ""), self.os.get("ID_LIKE", ""))
-        if fam == "deb":
-            status = read_file(os.path.join(self.root, "var/lib/dpkg/status"))
-            if status:
-                self.package = PhpInstance._dpkg_version(status, "ca-certificates")
-        elif fam == "apk":
-            found = apk_version(read_file(os.path.join(self.root, "lib/apk/db/installed")),
-                                ["ca-certificates-bundle", "ca-certificates"])
-            if found:
-                self.package = found[1]
-        elif fam == "rpm" and self.container_id is None:
-            rc, out, _ = run(["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "ca-certificates"], timeout=10)
-            if rc == 0:
-                self.package = out.strip()
+        found = _package_in_root(self.root, fam, {"deb": ["ca-certificates"], "apk": ["ca-certificates-bundle", "ca-certificates"],
+                                                  "rpm": ["ca-certificates"]}.get(fam), self.container_id)
+        if found:
+            self.package = found[1]
 
     def label(self):
-        return "host" if not self.container_id else "%s:%s" % (self.runtime, self.container_name)
+        return where_label(self.container_id, self.runtime, self.container_name)
 
     def as_dict(self):
         return {"where": self.label(), "container_id": self.container_id, "runtime": self.runtime,
@@ -1262,15 +1277,28 @@ def discover_containers():
     return cands
 
 
+_CONTAINER_ROOTS = None
+
+
+def container_roots():
+    """[(container id, pid)] with a readable /proc/PID/root/etc, one per container, cached."""
+    global _CONTAINER_ROOTS
+    if _CONTAINER_ROOTS is None:
+        _CONTAINER_ROOTS = []
+        for cid, pids in sorted(discover_containers().items(), key=lambda kv: kv[1][0]):
+            for pid in pids:
+                if os.path.isdir("/proc/%d/root/etc" % pid):
+                    _CONTAINER_ROOTS.append((cid, pid))
+                    break
+            else:
+                log("container %s: no readable root among pids %s, skipped" % (cid[:12], pids))
+    return _CONTAINER_ROOTS
+
+
 def discover_trust_stores():
     stores = [TrustStore("/")]
-    for cid, pids in sorted(discover_containers().items(), key=lambda kv: kv[1][0]):
-        for pid in pids:
-            if os.path.isdir("/proc/%d/root/etc" % pid):
-                stores.append(TrustStore("/proc/%d/root" % pid, cid, pid))
-                break
-        else:
-            log("container %s: no readable root among pids %s, skipped" % (cid[:12], pids))
+    for cid, pid in container_roots():
+        stores.append(TrustStore("/proc/%d/root" % pid, cid, pid))
     out = []
     for st in stores:
         st.collect()
@@ -1279,6 +1307,222 @@ def discover_trust_stores():
             continue
         log("trust store %s: %s certs=%d pkg=%s" % (st.label(), st.bundle, len(st.fingerprints), st.package))
         out.append(st)
+    return out
+
+
+# ----------------------------------------------------------------------------
+# Runtime binaries (kind: runtime): processes whose executable vendors a vulnerable library
+# (Node.js, Bun) plus the system copy of that library in every root
+# ----------------------------------------------------------------------------
+
+def listening_sockets(pids):
+    """Listening sockets held by any of these processes: TCP ports as "3000", Unix sockets as
+    "unix:/path". Each distinct network namespace among the pids is read once; socket inodes
+    from /proc/PID/fd are matched against the namespace tables."""
+    inodes = set()
+    ns_pid = {}
+    for pid in pids:
+        try:
+            fds = os.listdir("/proc/%d/fd" % pid)
+        except OSError:
+            continue
+        for fd in fds:
+            try:
+                l = os.readlink("/proc/%d/fd/%s" % (pid, fd))
+            except OSError:
+                continue
+            if l.startswith("socket:["):
+                inodes.add(l[8:-1])
+        try:
+            ns_pid.setdefault(os.readlink("/proc/%d/ns/net" % pid), pid)
+        except OSError:
+            pass
+    out = set()
+    for pid in ns_pid.values():
+        for f in ("tcp", "tcp6"):
+            for line in (read_file("/proc/%d/net/%s" % (pid, f), "") or "").splitlines()[1:]:
+                parts = line.split()
+                if len(parts) > 9 and parts[3] == "0A" and parts[9] in inodes:
+                    out.add(str(int(parts[1].rsplit(":", 1)[1], 16)))
+        for line in (read_file("/proc/%d/net/unix" % pid, "") or "").splitlines()[1:]:
+            parts = line.split()
+            # Num RefCount Protocol Flags Type St Inode Path; Flags 00010000 = ACC (listening)
+            if len(parts) >= 7 and parts[3] == "00010000" and parts[6] in inodes:
+                out.add("unix:" + (parts[7] if len(parts) > 7 else "?"))
+    return sorted(out, key=lambda x: (x.startswith("unix:"), x))
+
+
+def _package_in_root(root, fam, names, container_id):
+    """(name, version) of the first installed package among names inside a root: dpkg status
+    (or distroless status.d), apk db, or rpm on the host. None when none is installed or the
+    database cannot be read (rpm-based containers)."""
+    if not names:
+        return None
+    if isinstance(names, str):
+        names = [names]
+    status = db = None
+    if fam == "deb":
+        status = read_file(os.path.join(root, "var/lib/dpkg/status"))
+    elif fam == "apk":
+        db = read_file(os.path.join(root, "lib/apk/db/installed"))
+    for name in names:
+        ver = None
+        if fam == "deb":
+            if status:
+                ver = PhpInstance._dpkg_version(status, name)
+            else:
+                m = re.search(r"^Version: (\S+)", read_file(os.path.join(root, "var/lib/dpkg/status.d", name), "") or "", re.M)
+                ver = m.group(1) if m else None
+        elif fam == "apk":
+            found = apk_version(db, [name])
+            ver = found[1] if found else None
+        elif fam == "rpm" and container_id is None:
+            rc, out, _ = run(["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}\n", name], timeout=10)
+            ver = out.strip().split("\n")[0] if rc == 0 and out.strip() else None   # first arch on multilib
+        if ver:
+            return (name, ver)
+    return None
+
+
+class RuntimeInstance(object):
+    """A group of processes sharing one runtime executable inside one root."""
+
+    def __init__(self, name, spec, pid, exe, container_id):
+        self.name = name                  # runtime key from the rule, e.g. "node"
+        self.spec = spec
+        self.pid = pid
+        self.pids = [pid]
+        self.exe = exe
+        self.deleted = exe.endswith(" (deleted)")
+        self.exe_path = exe.replace(" (deleted)", "")
+        self.container_id = container_id
+        self.root = "/proc/%d/root" % pid
+        self.runtime = None
+        self.container_name = None
+        self.image = None
+        self.os = parse_os_release(read_file(os.path.join(self.root, "etc/os-release"), ""))
+        self.version = None               # of the binary on disk (what a restart would run)
+        self.package = None               # (name, version) when the binary is a distro package
+        self.listening = []
+        self.start_time = None
+        self.exe_mtime = None
+        self.errors = []
+
+    def collect(self):
+        if self.container_id:
+            self.runtime, self.container_name, self.image = describe_container(self.pid, self.container_id)
+        self.start_time, self.exe_mtime = process_times(self.pid, self.root, self.exe_path)
+        arg = self.spec.get("version_arg", "--version")
+        rc, out, err = exec_in_root(self.pid, self.container_id, [self.exe_path, arg], self.errors)
+        m = re.search(self.spec.get("version_re", r"(\d+\.\d+\.\d+)"), (out or "") + "\n" + (err or ""))
+        if m:
+            self.version = m.group(1)
+        else:
+            self.errors.append("%s %s: rc=%s %s" % (self.exe_path, arg, rc, (err or out or "").strip()[:120]))
+        fam = Host._family(self.os.get("ID", ""), self.os.get("ID_LIKE", ""))
+        if self.exe_path.startswith(("/usr/bin/", "/usr/lib/", "/usr/libexec/", "/bin/")):
+            self.package = _package_in_root(self.root, fam, self.spec.get("packages", {}).get(fam), self.container_id)
+        self.listening = listening_sockets(self.pids)
+
+    def links_system_lib(self, soname):
+        """True when the running process has the shared library mapped (distro builds, as opposed
+        to upstream binaries that vendor a static copy)."""
+        maps = read_file("/proc/%d/maps" % self.pid, "") or ""
+        return bool(soname) and re.search(r"/%s(\.|\s|$)" % re.escape(soname), maps) is not None
+
+    def stale(self):
+        return is_stale(self.deleted, self.start_time, self.exe_mtime)
+
+    def label(self):
+        return "%s %s (%s)" % (self.name, self.version or "?", where_label(self.container_id, self.runtime, self.container_name))
+
+    def as_dict(self):
+        return {"runtime": self.name, "exe": self.exe, "version": self.version, "pids": sorted(self.pids),
+                "where": where_label(self.container_id, self.runtime, self.container_name),
+                "container_id": self.container_id, "container": self.container_name,
+                "image": self.image, "os": "%s %s" % (self.os.get("ID", "?"), self.os.get("VERSION_ID", "")),
+                "package": self.package, "listening": self.listening, "stale": self.stale(), "errors": self.errors}
+
+
+class SystemLibrary(object):
+    """One root's installed copy of a library package (host, or a container via /proc/PID/root)."""
+
+    def __init__(self, root, container_id=None, pid=None):
+        self.root = root
+        self.container_id = container_id
+        self.pid = pid
+        self.runtime = None
+        self.container_name = None
+        self.image = None
+        self.os = parse_os_release(read_file(os.path.join(root, "etc/os-release"), ""))
+        self.family = Host._family(self.os.get("ID", ""), self.os.get("ID_LIKE", ""))
+        self.name = None
+        self.version = None
+        self.present = False
+
+    def collect(self, lib):
+        if self.container_id:
+            self.runtime, self.container_name, self.image = describe_container(self.pid, self.container_id)
+        names = lib.get("packages", {}).get(self.family)
+        found = _package_in_root(self.root, self.family, names, self.container_id)
+        soname = lib.get("soname")
+        if found:
+            self.name, self.version = found
+            self.present = True
+        elif soname:
+            self.name = names[0] if isinstance(names, list) else names
+            self.present = bool(glob.glob(os.path.join(self.root, "usr/lib*", soname + "*")) or
+                                glob.glob(os.path.join(self.root, "usr/lib/*", soname + "*")) or
+                                glob.glob(os.path.join(self.root, "lib*", soname + "*")))
+
+    def label(self):
+        return where_label(self.container_id, self.runtime, self.container_name)
+
+    def as_dict(self):
+        return {"where": self.label(), "container_id": self.container_id, "container": self.container_name,
+                "image": self.image, "os": "%s %s" % (self.os.get("ID", "?"), self.os.get("VERSION_ID", "")),
+                "package": self.name, "version": self.version, "present": self.present}
+
+
+def discover_runtimes(rules):
+    """Processes matching any runtime of the given rules, grouped by (container, exe). The
+    exec details (version_arg, version_re) come from the first rule naming the runtime; the
+    verdict tables are taken per rule at evaluation time."""
+    specs = {}
+    for r in rules:
+        for name, spec in r.get("runtimes", {}).items():
+            specs.setdefault(name, (re.compile(spec["exe"]), spec))
+    if not specs:
+        return []
+
+    def classify(base):
+        for n, (rx, spec) in specs.items():
+            if rx.match(base):
+                return n
+        return None
+    out = []
+    for (cid, exe), (name, pids) in group_processes(classify).items():
+        inst = RuntimeInstance(name, specs[name][1], pids[0], exe, cid)
+        inst.pids = list(pids)
+        inst.collect()
+        log("runtime %s exe=%s container=%s listening=%s pkg=%s stale=%s" % (
+            inst.label(), inst.exe, inst.container_id, inst.listening, inst.package, inst.stale()))
+        out.append(inst)
+    return sorted(out, key=lambda i: (i.container_id or "", i.exe))
+
+
+def discover_libraries(rule):
+    """The rule's library package in the host root and every container root."""
+    lib = rule.get("library")
+    if not lib:
+        return []
+    out = []
+    for root, cid, pid in [("/", None, None)] + [("/proc/%d/root" % pid, cid, pid) for cid, pid in container_roots()]:
+        sl = SystemLibrary(root, cid, pid)
+        sl.collect(lib)
+        if sl.present:
+            out.append(sl)
+    log("library %s: %d roots have it" % (lib.get("packages"), len(out)))
     return out
 
 
@@ -1539,6 +1783,125 @@ def eval_php_rule(rule, host, instances):
     return findings
 
 
+# --- runtime rules -----------------------------------------------------------
+
+def _upstream_part(ver):
+    m = re.match(r"(\d+(?:\.\d+)*)", ver.split(":")[-1])
+    return m.group(1) if m else ver
+
+
+def _library_status(rule, lib):
+    """(status, evidence) for one root's copy of the library."""
+    L = rule.get("library", {})
+    if lib.version is None:
+        return "unknown", "%s present, version not readable" % (lib.name or L.get("soname"))
+    osid, osrel = lib.os.get("ID", "").lower(), lib.os.get("VERSION_ID", "")
+    tbl = L.get("fixed_packages", {})
+    fixed = tbl.get(osid, {}).get(osrel)
+    if fixed is None and lib.family == "rpm":
+        fixed = tbl.get("rpm", {}).get(osrel.split(".")[0])
+    if fixed:
+        r = vercmp(lib.version, fixed)
+        return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (lib.name, lib.version, ">=" if r >= 0 else "<", fixed)
+    up = _upstream_part(lib.version)
+    branch = ".".join(up.split(".")[:2])
+    upfix = L.get("fixed_upstream", {}).get(branch)
+    if upfix:
+        r = vercmp(up, upfix)
+        if r >= 0:
+            return "fixed", "%s %s >= upstream fix %s" % (lib.name, lib.version, upfix)
+        return "vulnerable", "%s %s < upstream fix %s, no distro backport table for %s %s" % (lib.name, lib.version, upfix, osid, osrel)
+    return "unknown", "%s %s: no fixed version known for branch %s" % (lib.name, lib.version, branch)
+
+
+def _runtime_status(rule, inst, libs):
+    spec = rule["runtimes"][inst.name]
+    if inst.version is None:
+        return "unknown", "could not determine %s version: %s" % (inst.name, "; ".join(inst.errors) or "no output")
+    na = spec.get("not_affected_before")
+    if na and vercmp(inst.version, na) < 0:
+        return "not_applicable", "%s %s predates the vendored library (affected from %s)" % (inst.name, inst.version, na)
+    soname = rule.get("library", {}).get("soname")
+    if inst.links_system_lib(soname):
+        same = [l for l in libs if l.container_id == inst.container_id]
+        pkg = "%s %s" % inst.package if inst.package else "%s %s" % (inst.name, inst.version)
+        if same and same[0].version:
+            st, ev = _library_status(rule, same[0])
+            return st, "%s has the system %s mapped: %s" % (pkg, soname, ev)
+        return "unknown", "%s has the system %s mapped but its package version is not readable" % (pkg, soname)
+    major = inst.version.split(".")[0]
+    fixed = spec.get("fixed", {}).get(major)
+    if fixed:
+        r = vercmp(inst.version, fixed)
+        return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (inst.name, inst.version, ">=" if r >= 0 else "<", fixed)
+    if major in [str(x) for x in spec.get("eol_lines", [])]:
+        return "vulnerable", "%s %s is an end-of-life line, no fixed release exists; move to %s" % (
+            inst.name, inst.version, "/".join(sorted(spec.get("fixed", {}).values())))
+    return "unknown", "no fixed version known for %s line %s" % (inst.name, major)
+
+
+def _multi_root_subject(prefix, members, describe, limit=10):
+    """(subject, where-list) for one status across the host root and container roots, so a node
+    with 150 containers yields a few findings, not 150. members have .container_id; describe(m)
+    gives the per-root text."""
+    hosts = [m for m in members if not m.container_id]
+    conts = [m for m in members if m.container_id]
+    subject = prefix + ": " + " + ".join(
+        (["host"] if hosts else []) + (["%d container%s" % (len(conts), "s" if len(conts) != 1 else "")] if conts else []))
+    where = [describe(m) for m in hosts + conts[:limit]]
+    if len(conts) > limit:
+        where.append("+%d more" % (len(conts) - limit))
+    return subject, where
+
+
+def eval_runtime_rule(rule, host, instances, libs):
+    findings = []
+    remedy = rule.get("remedy")
+    for cve, cdef in sorted(rule["cves"].items()):
+        rem = cdef.get("remedy", remedy)
+        for inst in instances:
+            if inst.name not in rule.get("runtimes", {}):
+                continue
+            subject = inst.label()
+            extra = {"runtime": inst.as_dict()}
+            status, ev = _runtime_status(rule, inst, libs)
+            if status == "fixed" and inst.stale():
+                status = "stale_workers"
+                ev += "; running processes predate the binary on disk, restart needed"
+            elif status == "vulnerable":
+                if inst.listening:
+                    ev += "; listening on %s" % ",".join(inst.listening[:6])
+                else:
+                    status = "unknown"
+                    ev += "; no listening socket, exposure depends on fetch()/zlib use on untrusted data"
+                if rem:
+                    ev += "; remedy: " + rem
+            findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
+        # system library: one finding per status across host and containers
+        groups = {}
+        unreadable = [lib for lib in libs if lib.version is None]
+        if unreadable:
+            # library file present but no readable package database (rpm-based image seen from a
+            # dpkg host, image without package manager): informational, in --facts and verbose only
+            log("library %s: version not readable in %s" % (rule["family"], ", ".join(l.label() for l in unreadable[:10])))
+        for lib in libs:
+            if lib.version is None:
+                continue
+            st, ev = _library_status(rule, lib)
+            groups.setdefault(st, []).append((lib, ev))
+        for status, members in sorted(groups.items()):
+            evs = dict((id(lib), ev) for lib, ev in members)
+            subject, where = _multi_root_subject(members[0][0].name, [lib for lib, _ in members],
+                                                 lambda lib: "%s (%s)" % (lib.label(), evs[id(lib)]), limit=6)
+            ev = "; ".join(where)
+            lib_rem = rule.get("library", {}).get("remedy", rem)
+            if status == "vulnerable" and lib_rem:
+                ev += "; remedy: " + lib_rem
+            extra = {"libraries": [lib.as_dict() for lib, _ in members]}
+            findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
+    return findings
+
+
 # --- trust store rules -------------------------------------------------------
 
 def _cert_disabled(cert, store):
@@ -1565,18 +1928,13 @@ def eval_trust_rule(rule, host, stores):
                 key = ("vulnerable", present) if present else ("fixed", ())
             groups.setdefault(key, []).append(st)
         for (status, present), members in sorted(groups.items()):
-            hosts = [st for st in members if not st.container_id]
-            conts = [st for st in members if st.container_id]
-            subject = "trust store: " + " + ".join(
-                (["host"] if hosts else []) + (["%d container%s" % (len(conts), "s" if len(conts) != 1 else "")] if conts else []))
-            where = []
-            for st in hosts:
+            def describe(st, status=status):
+                if st.container_id:
+                    return st.label()
                 how = "disabled in /etc/ca-certificates.conf" if status == "fixed" and any(_cert_disabled(c, st) for c in certs) else None
                 det = ", ".join(x for x in (how, "ca-certificates %s" % st.package if st.package else None) if x)
-                where.append("host (%s)" % det if det else "host")
-            where += [st.label() for st in conts[:10]]
-            if len(conts) > 10:
-                where.append("+%d more" % (len(conts) - 10))
+                return "host (%s)" % det if det else "host"
+            subject, where = _multi_root_subject("trust store", members, describe)
             extra = {"present": list(present), "stores": [st.as_dict() for st in members]}
             if status == "vulnerable":
                 remedy = cdef.get("remedy", rule.get("remedy", "remove the certificates from the trust store"))
@@ -1643,6 +2001,11 @@ def main():
     stores = []
     if "trust_store" in kinds and not args.kernel_only and not args.php_only:
         stores = discover_trust_stores()
+    runtimes, libs = [], {}
+    if "runtime" in kinds and not args.kernel_only and not args.php_only:
+        rt_rules = [r for r in rules if r.get("kind") == "runtime"]
+        runtimes = discover_runtimes(rt_rules)
+        libs = dict((r["family"], discover_libraries(r)) for r in rt_rules)
 
     findings = []
     for rule in rules:
@@ -1652,6 +2015,8 @@ def main():
             findings.extend(eval_php_rule(rule, host, instances))
         elif rule.get("kind") == "trust_store" and stores:
             findings.extend(eval_trust_rule(rule, host, stores))
+        elif rule.get("kind") == "runtime" and rule["family"] in libs:
+            findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]]))
 
     sev = worst(findings)
     report = {
@@ -1664,7 +2029,9 @@ def main():
     if args.facts:
         report["facts"] = {"kernel": kf.as_dict() if kf else None,
                            "php": [i.as_dict() for i in instances],
-                           "trust_stores": [s.as_dict() for s in stores]}
+                           "trust_stores": [s.as_dict() for s in stores],
+                           "runtimes": [i.as_dict() for i in runtimes],
+                           "libraries": dict((k, [l.as_dict() for l in v]) for k, v in libs.items())}
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -1683,6 +2050,12 @@ def main():
                 print("    error: %s" % e)
         if stores:
             print("trust stores: host%s" % (" + %d containers" % (len(stores) - 1) if len(stores) > 1 else ""))
+        for inst in runtimes:
+            print("runtime %s listening=%s pkg=%s procs=%d%s" % (
+                inst.label(), ",".join(inst.listening) or "-",
+                "%s %s" % inst.package if inst.package else "-", len(inst.pids), " STALE" if inst.stale() else ""))
+            for e in inst.errors:
+                print("    error: %s" % e)
         print("")
         hidden = 0
         for f in sorted(findings, key=lambda f: (-SEVERITY_RANK[f.severity], f.family, f.cve)):

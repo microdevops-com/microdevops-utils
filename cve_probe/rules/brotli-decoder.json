@@ -1,0 +1,48 @@
+{
+  "family": "brotli-decoder",
+  "title": "Node2Shell: Google Brotli decoder out-of-bounds write, remote code execution via crafted Brotli streams",
+  "kind": "runtime",
+  "references": [
+    "https://ubuntu.com/security/CVE-2026-111497",
+    "https://security-tracker.debian.org/tracker/CVE-2026-111497",
+    "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+    "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-111497.json"
+  ],
+  "public": "2026-10-21",
+  "runtimes": {
+    "node": {
+      "exe": "^(node|nodejs)$",
+      "version_arg": "--version",
+      "version_re": "v?(\\d+\\.\\d+\\.\\d+)",
+      "not_affected_before": "10.16.0",
+      "fixed": {"22": "22.23.4", "24": "24.22.1", "26": "26.12.1"},
+      "eol_lines": ["10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "23", "25"],
+      "packages": {"deb": "nodejs", "apk": "nodejs", "rpm": "nodejs"}
+    },
+    "bun": {
+      "exe": "^bun$",
+      "version_arg": "--version",
+      "version_re": "(\\d+\\.\\d+\\.\\d+)",
+      "fixed": {"1": "1.4.4"}
+    }
+  },
+  "library": {
+    "packages": {"deb": ["libbrotli1"], "apk": ["brotli-libs"], "rpm": ["brotli", "libbrotli"]},
+    "soname": "libbrotlidec.so",
+    "remedy": "upgrade the system brotli package (libbrotli1 / brotli-libs / brotli) and rebuild container images from updated bases",
+    "fixed_upstream": {"1.0": "1.0.10", "1.1": "1.1.1", "1.2": "1.2.1"},
+    "fixed_packages": {
+      "ubuntu": {"26.10": "1.2.0-4ubuntu0.1", "26.04": "1.2.0-3ubuntu0.1", "24.04": "1.1.0-2ubuntu0.1",
+                 "22.04": "1.0.9-2ubuntu0.1", "20.04": "1.0.7-6ubuntu0.1+esm1", "18.04": "1.0.3-1ubuntu1.3+esm1",
+                 "16.04": "1.0.3-1ubuntu1~16.04.2+esm1"},
+      "debian": {"12": "1.0.9-2+deb12u1", "13": "1.1.0-2+deb13u1"},
+      "rpm": {"8": "1.0.6-5.el8_10", "9": "1.0.9-10.el9_8.1", "10": "1.1.0-8.el10_2.1"}
+    }
+  },
+  "remedy": "upgrade Node.js to 22.23.4 / 24.22.1 / 26.12.1 (rebuild images; 18 and 20 get no fix) or Bun to 1.4.4, and upgrade the system brotli package; if the app does not need compressed request bodies set body-parser inflate: false",
+  "cves": {
+    "CVE-2026-111497": {
+      "summary": "streaming Brotli decoder treats an invalid block switch as 'need more input' and keeps appending to an 8-byte buffer; reachable through Content-Encoding: br request bodies (Express 5 / body-parser 2 inflate by default), fetch() responses and zlib.brotliDecompress on untrusted data; CISA KEV 2026-10-27; vendored copies in Node.js, Bun, .NET and Python wheels need their own update, the system libbrotli1 covers curl and distro-built nodejs"
+    }
+  }
+}

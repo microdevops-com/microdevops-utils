@@ -26,6 +26,7 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `tcp-ireq-opt-uaf` | CVE-2026-98432 | IPv4 TCP request socket IP-options use-after-free, remote and unauthenticated on any listening port; firewall drop of TCP with IP options counts as mitigated | kernel |
 | `php2shell` | CVE-2026-109618, CVE-2026-109619 | PHP2Shell: unauthenticated remote code execution in PHP HTTP SAPIs, on the host and inside containers | php |
 | `emudhra-ca` | EMUDHRA-CA-2026 (USN-8944-1/2, DSA-6572) | eMudhra CA key compromise: `emSign ECC Root CA - G3` or Sectigo `AAA Certificate Services` still in a trust store, host and containers | trust_store |
+| `brotli-decoder` | CVE-2026-111497 | Node2Shell: Brotli decoder overflow, remote code execution; running Node.js/Bun binaries (vendored copy) on host and in containers, plus the system libbrotli in every root | runtime |
 
 `--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
 
@@ -111,13 +112,33 @@ Trust store (`kind: trust_store` rules), for CA compromises such as eMudhra 2026
    without any version table. Any listed root present means `vulnerable`.
 3. Not covered: trust stores bundled by runtimes (Java cacerts, Node, Python certifi).
 
+Runtime (`kind: runtime` rules), for libraries vendored into runtime binaries such as Brotli in
+Node.js:
+
+1. Walk `/proc` for the executables named by the rule (`node`, `nodejs`, `bun`), on the host and
+   in containers, grouped per container and binary. The version comes from the binary's own
+   `--version`, executed inside its namespaces with `nsenter`, and is compared per release line;
+   end-of-life lines are `vulnerable` with no fix. A process that has the system library mapped
+   (`/proc/PID/maps` contains the rule's `soname`, as distro builds do) takes the library's verdict
+   instead of the vendored one. A fixed binary under processes started before it was installed is
+   `stale_workers`.
+2. A vulnerable runtime holding a listening TCP or Unix socket is `vulnerable`; one without is
+   `unknown`, because exposure then depends on what the code decodes (fetch responses, zlib on
+   untrusted data).
+3. The system library package (`libbrotli1`, `brotli-libs`, `brotli`) is read in the host root and
+   every container root via dpkg status, apk db or host `rpm -q`, compared with the per-distro
+   table or, without one, with the upstream fix of its branch. One finding per status across host
+   and containers, like the trust store. Roots where the library file exists but no package
+   database can be read (rpm-based images on a dpkg host, images without a package manager) are
+   reported in `--facts` and `--verbose` only.
+
 ## Rule files
 
 One JSON file per CVE family in `rules/`. Entries under `cves` are keyed by CVE id, or by an
 advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 
 ```
-family, title, kind (kernel|php|trust_store), references[], public (YYYY-MM-DD), remedy
+family, title, kind (kernel|php|trust_store|runtime), references[], public (YYYY-MM-DD), remedy
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
                      firewall_mitigations[], not_affected_distros{}, fixed{}, mitigations[] } }
 ```
@@ -147,6 +168,12 @@ version from `/proc/version`, or the RHEL version-release without arch.
 
 Trust store rules: `certs` per entry (`name`, `sha256` fingerprint, optional `files` as named
 in `/etc/ca-certificates.conf`) and a `remedy` sentence printed with the finding.
+
+Runtime rules: `runtimes` keyed by name (`exe` regex over the basename, `version_arg`,
+`version_re`, `fixed` per major line, `eol_lines`, `not_affected_before`, `packages` per family)
+and `library` (`packages`
+per family, a name or list of names, `soname`, `fixed_upstream` per branch, `fixed_packages` per distro release, `rpm`
+keyed by major release, its own `remedy`). Distroless images are read via `dpkg/status.d`.
 
 PHP rules: `fixed_upstream` per branch, `eol_branches`, `fixed_packages` per origin
 (`sury` per branch, distro id per release per source package), and per-CVE `mitigations`
