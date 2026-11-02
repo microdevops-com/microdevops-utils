@@ -13,6 +13,21 @@ compromised CA roots still present in a trust store.
 Constraints: Python 3.5 syntax, standard library only, runs as root, changes nothing.
 Kernel modules are never loaded (`modprobe` is used with `-n` only).
 
+## What it detects
+
+The complete current scope is the rule set in `rules/`. Nothing outside this table is checked.
+
+| family | ids | what | kind |
+|--------|-----|------|------|
+| `copy-fail` | CVE-2026-31431, CVE-2025-39964 | Copy Fail: AF_ALG `algif_aead` (plus `algif_skcipher`/`algif_hash` for the 2025 bug) local privilege escalation | kernel |
+| `dirty-frag` | CVE-2026-43284, CVE-2026-43500, CVE-2026-46300 | Dirty Frag / Fragnesia: XFRM ESP (`esp4`/`esp6`) and RxRPC page-cache write, local privilege escalation | kernel |
+| `ipv6-frag-escape` | CVE-2026-53362 | IPv6 UDP send path heap overflow, local privilege escalation / container escape, in CISA KEV | kernel |
+| `ebt-snat` | CVE-2026-53266 | ebtables SNAT ARP rewrite into spliced file pages, local privilege escalation | kernel |
+| `php2shell` | CVE-2026-109618, CVE-2026-109619 | PHP2Shell: unauthenticated remote code execution in PHP HTTP SAPIs, on the host and inside containers | php |
+| `emudhra-ca` | EMUDHRA-CA-2026 (USN-8944-1/2, DSA-6572) | eMudhra CA key compromise: `emSign ECC Root CA - G3` or Sectigo `AAA Certificate Services` still in a trust store, host and containers | trust_store |
+
+`--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
+
 ## Usage
 
 ```
