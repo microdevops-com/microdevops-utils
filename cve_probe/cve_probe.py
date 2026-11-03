@@ -25,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.3"
+VERSION = "1.4"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -824,6 +824,10 @@ SAPI_FOR_EXE = [
     (re.compile(r"^(apache2|httpd)"), "apache2handler"),
 ]
 CGROUP_ID_RE = re.compile(r"([0-9a-f]{64})")
+# LXC/Incus guests seen from the host: /lxc.payload.<name>/... (Incus, LXD), /lxc.monitor.<name>,
+# classic /lxc/<name>/...; the guest runs its own probe, so its processes are skipped on the host
+LXC_GUEST_RE = re.compile(r"^[^:\n]*:[^:\n]*:/lxc(?:\.payload|\.monitor)?[./]([^/\n]*)", re.M)
+_LXC_GUESTS = None       # names of guests skipped this run; None inside a container (nothing skipped)
 _CONTAINER_META = {}     # full container id -> (runtime, name, image) as the CLI reports it
 _DEAD_CLI = set()        # (cli, endpoint) that timed out once: never called again this run
 _PREFILLED = []          # non-empty once _prefill_container_meta ran
@@ -950,6 +954,18 @@ def is_stale(deleted, start_time, exe_mtime):
     return False
 
 
+def lxc_guest(cgroup):
+    """Name of the LXC/Incus guest owning a /proc/PID/cgroup text, or None. Only on the host:
+    inside a guest without a cgroup namespace its own paths carry the same prefix."""
+    if _LXC_GUESTS is None:
+        return None
+    m = LXC_GUEST_RE.search(cgroup)
+    if not m:
+        return None
+    _LXC_GUESTS.add(m.group(1))
+    return m.group(1)
+
+
 def group_processes(classify):
     """One /proc walk. classify(exe basename) returns a tag or None; processes with a tag are
     grouped by (container id, exe) -> (tag, sorted pids). The container id is the 64-hex id in
@@ -968,7 +984,10 @@ def group_processes(classify):
         tag = classify(os.path.basename(exe.replace(" (deleted)", "")))
         if tag is None:
             continue
-        m = CGROUP_ID_RE.search(read_file("/proc/%d/cgroup" % pid, "") or "")
+        cg = read_file("/proc/%d/cgroup" % pid, "") or ""
+        if lxc_guest(cg):
+            continue
+        m = CGROUP_ID_RE.search(cg)
         key = (m.group(1) if m else None, exe)
         groups.setdefault(key, (tag, []))[1].append(pid)
     for tag, pids in groups.values():
@@ -1261,7 +1280,10 @@ def discover_containers():
         if not d.isdigit():
             continue
         pid = int(d)
-        m = CGROUP_ID_RE.search(read_file("/proc/%d/cgroup" % pid, "") or "")
+        cg = read_file("/proc/%d/cgroup" % pid, "") or ""
+        if lxc_guest(cg):
+            continue
+        m = CGROUP_ID_RE.search(cg)
         if not m:
             continue
         try:
@@ -1990,6 +2012,9 @@ def main():
 
     host = Host()
     log("host: %s" % host.as_dict())
+    global _LXC_GUESTS
+    if not host.is_container:
+        _LXC_GUESTS = set()
     kinds = set(r.get("kind") for r in rules)
     kf = None
     instances = []
@@ -2028,6 +2053,7 @@ def main():
     }
     if args.facts:
         report["facts"] = {"kernel": kf.as_dict() if kf else None,
+                           "lxc_guests_skipped": sorted(_LXC_GUESTS or []),
                            "php": [i.as_dict() for i in instances],
                            "trust_stores": [s.as_dict() for s in stores],
                            "runtimes": [i.as_dict() for i in runtimes],
@@ -2050,6 +2076,8 @@ def main():
                 print("    error: %s" % e)
         if stores:
             print("trust stores: host%s" % (" + %d containers" % (len(stores) - 1) if len(stores) > 1 else ""))
+        if _LXC_GUESTS:
+            print("lxc guests skipped (own minions): %s" % ", ".join(sorted(_LXC_GUESTS)))
         for inst in runtimes:
             print("runtime %s listening=%s pkg=%s procs=%d%s" % (
                 inst.label(), ",".join(inst.listening) or "-",

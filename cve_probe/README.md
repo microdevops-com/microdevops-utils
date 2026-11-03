@@ -94,6 +94,9 @@ PHP (`kind: php` rules), discovered from running processes, not from installed p
    `libphp` mapped. CLI processes are ignored (PHP2Shell needs an HTTP SAPI).
 2. Container id from `/proc/PID/cgroup`; works for Docker, podman, containerd/k8s, k0s.
    Names are decorated via `docker`/`podman`/`crictl` when present, never required.
+   Processes of LXC/Incus guests (cgroup `/lxc.payload.<name>`, `/lxc/<name>`) are skipped on
+   the host, together with anything nested inside them: the guest runs its own probe. The
+   skipped guest names are printed in the header and in `--facts`.
 3. Version and ini from `php-fpm -v` / `php-fpm -i`, executed inside the container with
    `nsenter -t PID -m -u -p`, so what is reported is what actually serves requests.
 4. Package evidence read from `/proc/PID/root`: dpkg status and changelog (distro or
@@ -106,7 +109,8 @@ Trust store (`kind: trust_store` rules), for CA compromises such as eMudhra 2026
 1. The host bundle (`/etc/ssl/certs/ca-certificates.crt`, RHEL
    `/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem`, `/etc/ssl/cert.pem`) and the bundle of
    every container found via `/proc/PID/cgroup`, read through `/proc/PID/root`. Containers
-   without a bundle (pause, distroless) are skipped.
+   without a bundle (pause, distroless) are skipped, as are LXC/Incus guests and containers
+   nested in them.
 2. Every certificate in the bundle is SHA-256 fingerprinted and compared with the rule's list,
    so a manual removal (`!` in `/etc/ca-certificates.conf`, RHEL blocklist) counts as fixed
    without any version table. Any listed root present means `vulnerable`.
@@ -116,7 +120,7 @@ Runtime (`kind: runtime` rules), for libraries vendored into runtime binaries su
 Node.js:
 
 1. Walk `/proc` for the executables named by the rule (`node`, `nodejs`, `bun`), on the host and
-   in containers, grouped per container and binary. The version comes from the binary's own
+   in containers (not in LXC/Incus guests), grouped per container and binary. The version comes from the binary's own
    `--version`, executed inside its namespaces with `nsenter`, and is compared per release line;
    end-of-life lines are `vulnerable` with no fix. A process that has the system library mapped
    (`/proc/PID/maps` contains the rule's `soname`, as distro builds do) takes the library's verdict
