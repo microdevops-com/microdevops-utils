@@ -25,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.4"
+VERSION = "1.5"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -394,6 +394,7 @@ class KernelFacts(object):
         self.kconfig = self._kconfig()
         self.modprobe_conf = self._modprobe_conf()
         self.sysctl = {}
+        self._exposure = {}
         self._module_cache = {}
         self._fw_rules = None       # collected on first use, only rules with firewall_mitigations need it
         self._foreign_netns = None
@@ -476,6 +477,44 @@ class KernelFacts(object):
         if key not in self.sysctl:
             self.sysctl[key] = (read_file("/proc/sys/" + key.replace(".", "/"), "") or "").strip() or None
         return self.sysctl[key]
+
+    def exposure(self, name):
+        """Evidence that sharpens a non-fixed verdict without changing it. "mptcp": the sysctl
+        and the MPTCP listening sockets (`ss -Mln`), since the public exploit chain for
+        CVE-2026-98432 needs an MPTCP listener and Go >= 1.24 opens one by default."""
+        if name in self._exposure:
+            return self._exposure[name]
+        info = None
+        if name == "mptcp":
+            enabled = self.sysctl_value("net.mptcp.enabled")
+            if enabled is not None:
+                info = {"sysctl": enabled, "listeners": None}
+                if which("ss"):
+                    rc, out, _ = run(["ss", "-Mlnp"], timeout=CMD_TIMEOUT)
+                    if rc == 0:
+                        seen = []
+                        for line in out.splitlines():
+                            parts = line.split()
+                            if len(parts) < 4 or parts[0] != "LISTEN":
+                                continue
+                            m = re.search(r'\(\("([^"]+)"', line)
+                            item = (m.group(1) if m else "?", parts[3])
+                            if item not in seen:
+                                seen.append(item)
+                        info["listeners"] = seen
+                text = "net.mptcp.enabled=%s" % enabled
+                if info["listeners"] is None:
+                    text += ", MPTCP listeners unknown (ss lacks -M)"
+                elif info["listeners"]:
+                    names = ["%s %s" % it for it in info["listeners"][:6]]
+                    if len(info["listeners"]) > 6:
+                        names.append("...")
+                    text += ", %d MPTCP listener(s): %s" % (len(info["listeners"]), ", ".join(names))
+                else:
+                    text += ", no MPTCP listener"
+                info["text"] = text
+        self._exposure[name] = info
+        return info
 
     def module_state(self, mod):
         """How a module could reach the kernel: loaded / builtin / blocked / absent / loadable."""
@@ -616,6 +655,8 @@ class KernelFacts(object):
              "kconfig_available": bool(self.kconfig)}
         if self._fw_rules is not None:
             d["firewall_rules_on_hooks"] = len(self._fw_rules)
+        if self._exposure:
+            d["exposure"] = self._exposure
         return d
 
 
@@ -1652,6 +1693,13 @@ def eval_kernel_rule(rule, host, kf):
                                     "%s %s marked not affected by vendor" % (host.distro, host.release), extra))
             continue
         status, ev = _kernel_status_for_image(rule, cve, run_img, host)
+        # Exposure hints: evidence only, never a status change.
+        if status != "fixed":
+            hints = [kf.exposure(n) for n in cdef.get("exposure") or rule.get("exposure") or []]
+            hints = [h for h in hints if h]
+            if hints:
+                ev += "; exposure: " + "; ".join(h["text"] for h in hints)
+                extra["exposure"] = hints
         # Mitigations: modules and sysctl.
         mods = cdef.get("modules") or rule.get("modules") or []
         mod_states = [kf.module_state(m) for m in mods]

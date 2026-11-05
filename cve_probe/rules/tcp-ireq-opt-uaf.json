@@ -18,7 +18,8 @@
      "match": "(-m u32 --u32 \"?(0x0|0)>>(0x18|24)&0x0?[fF]=(0x6|6):(0xf|0xF|15)\"?|-m ipv4options --any-opt).*-j (DROP|REJECT)",
      "unless": "--[sd]ports?\\b|\\s-[isd]\\s|--(in-interface|source|destination|src-range|dst-range|mark)\\b|-m set\\b"}
   ],
-  "remedy": "upgrade to the fixed kernel where one exists; while none is running, drop inbound TCP carrying IP options before conntrack and DNAT so host and container ports are both covered: iptables -t raw -I PREROUTING 1 -p tcp -m u32 --u32 '0>>24&0x0f=6:15' -j DROP  (nft: chain type filter hook prerouting priority -310, rule: ip protocol tcp ip hdrlength > 5 counter drop)",
+  "remedy": "upgrade to the fixed kernel where one exists; while none is running, drop inbound TCP carrying IP options before conntrack and DNAT so host and container ports are both covered: iptables -t raw -I PREROUTING 1 -p tcp -m u32 --u32 '0>>24&0x0f=6:15' -j DROP  (nft: chain type filter hook prerouting priority -310, rule: ip protocol tcp ip hdrlength > 5 counter drop); also set sysctl net.mptcp.enabled=0: it breaks the public exploit chain (needs an MPTCP listener, which Go >= 1.24 daemons open by default) but not the bug",
+  "exposure": ["mptcp"],
   "cves": {
     "CVE-2026-98432": {
       "public": "2026-10-15",

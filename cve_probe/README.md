@@ -87,6 +87,10 @@ Kernel (`kind: kernel` rules):
    traffic is routed past INPUT); a `prerouting` rule covers both. Inside an LXC/Incus container
    the container's own ruleset is checked and turns `host_managed` into `mitigated`.
 7. Newest installed kernel, for `reboot_pending`.
+8. Exposure hints (`exposure` in the rule, currently only `mptcp`): `net.mptcp.enabled` and the
+   MPTCP listening sockets from `ss -Mln`, appended to every non-fixed finding as evidence.
+   They never change the status; the public CVE-2026-98432 exploit needs an MPTCP listener and
+   Go 1.24+ daemons open one by default, so this tells the operator how exposed the host is.
 
 PHP (`kind: php` rules), discovered from running processes, not from installed packages:
 
@@ -144,11 +148,11 @@ advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 ```
 family, title, kind (kernel|php|trust_store|runtime), references[], public (YYYY-MM-DD), remedy
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
-                     firewall_mitigations[], not_affected_distros{}, fixed{}, mitigations[] } }
+                     firewall_mitigations[], exposure[], not_affected_distros{}, fixed{}, mitigations[] } }
 ```
 
-Family-level `modules`, `sysctl_mitigations`, `firewall_mitigations`, `affected_from`, `fixed`
-and `remedy` apply to every CVE unless the CVE overrides them. `remedy` is appended to
+Family-level `modules`, `sysctl_mitigations`, `firewall_mitigations`, `exposure`, `affected_from`,
+`fixed` and `remedy` apply to every CVE unless the CVE overrides them. `remedy` is appended to
 vulnerable findings.
 
 `firewall_mitigations` entries are `{"tool": "nft"|"iptables", "match": regex, "unless": regex}`
