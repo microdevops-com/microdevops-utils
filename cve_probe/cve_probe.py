@@ -829,9 +829,11 @@ def _iptables_ruleset(nft_ok, legacy_ok):
         if (backend == "legacy" and not legacy_ok) or (backend == "nft" and not nft_ok):
             continue
         rc, out, _ = run([cli])
-        if rc != 0 or out in seen:
+        # iptables-save and iptables-nft-save print the same ruleset under different headers
+        body = "\n".join(l for l in out.splitlines() if not l.startswith("#"))
+        if rc != 0 or body in seen:
             continue
-        seen.append(out)
+        seen.append(body)
         table = None
         for line in out.splitlines():
             if line.startswith("*"):
