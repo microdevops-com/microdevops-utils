@@ -68,7 +68,9 @@ Statuses:
 
 Kernel (`kind: kernel` rules):
 
-1. Upstream range: kernels before the regression are `not_applicable`.
+1. Upstream range: kernels before the regression (`affected_from`) are `not_applicable`, kernels
+   from an upstream release that already contains the fix (`affected_before`) are `fixed`, e.g. a
+   7.0 HWE kernel for a bug fixed upstream in 6.19. Everything in between goes through 2 to 4.
 2. Running kernel package changelog containing the CVE id. On Ubuntu that changelog lives in
    `linux-modules-*`, on Debian in `linux-image-*`, on RHEL family in `rpm -q --changelog`.
 3. Per-distro fixed-version table from the rule, compared with a dpkg-compatible comparator.

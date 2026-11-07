@@ -25,7 +25,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.5"
+VERSION = "1.6"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -1687,6 +1687,13 @@ def eval_kernel_rule(rule, host, kf):
             findings.append(Finding(rule["family"], cve, subject, "not_applicable",
                                     "upstream %s predates the regression (affected from %s)" %
                                     (".".join(map(str, run_img.upstream)), cdef.get("affected_from") or rule.get("affected_from")), extra))
+            continue
+        # Kernels from an upstream release that already contains the fix (newer HWE lines).
+        before = version_tuple(cdef.get("affected_before") or rule.get("affected_before") or "")
+        if before and run_img.upstream and run_img.upstream >= before:
+            findings.append(Finding(rule["family"], cve, subject, "fixed",
+                                    "upstream %s already contains the fix (affected before %s)" %
+                                    (".".join(map(str, run_img.upstream)), cdef.get("affected_before") or rule.get("affected_before")), extra))
             continue
         distros_na = cdef.get("not_affected_distros") or rule.get("not_affected_distros") or {}
         na_list = distros_na.get(host.distro) or ([] if host.family not in distros_na else distros_na[host.family])
