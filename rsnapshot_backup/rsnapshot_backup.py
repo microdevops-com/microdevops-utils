@@ -114,6 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--item-number", dest="item_number", help="run only for config item NUMBER", nargs=1, metavar=("NUMBER"))
     parser.add_argument("--host", dest="host", help="run only for items with HOST", nargs=1, metavar=("HOST"))
     parser.add_argument("--ignore-lock", dest="ignore_lock", help="ignore locking to allow many instances of rsnapshot_backup.py in the same time (use only for testing)", action="store_true")
+    parser.add_argument("--check-max-age-seconds", dest="check_max_age_seconds", help="maximum allowed backup age for --check, default: 86400", type=int, default=86400, metavar=("SECONDS"))
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--sync", dest="sync", help="prepare rsnapshot configs and run sync, we use sync_first rsnapshot option", action="store_true")
@@ -128,6 +129,11 @@ if __name__ == "__main__":
     else:
         parser.print_help()
         sys.exit(1)
+
+    if args.check_max_age_seconds <= 0:
+        parser.error("--check-max-age-seconds must be a positive integer")
+
+    check_max_age_seconds = args.check_max_age_seconds
 
     # Enable debug
     if args.debug:
@@ -2052,12 +2058,12 @@ if __name__ == "__main__":
                                     # Check xtrabackup end_time
                                     if xtrabackup_end_time is not None:
                                         seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
-                                        # Dump files shouldn't be older than 1 day
-                                        if seconds_between_end_time_and_now < 60*60*24:
-                                            log_and_print("NOTICE", "Dump xtrabackup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                        # Dump files shouldn't be older than the configured maximum age
+                                        if seconds_between_end_time_and_now < check_max_age_seconds:
+                                            log_and_print("NOTICE", "Dump xtrabackup end_time signature age {seconds} secs is less than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                             oks += 1
                                         else:
-                                            log_and_print("ERROR", "Dump xtrabackup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Dump xtrabackup end_time signature age {seconds} secs is more than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                             errors += 1
                                     else:
                                         log_and_print("ERROR", "There is no xtrabackup end_time signature in file {xtrabackup_info_file} on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
@@ -2152,12 +2158,12 @@ if __name__ == "__main__":
                                     # Check xtrabackup end_time
                                     if xtrabackup_end_time is not None:
                                         seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(xtrabackup_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
-                                        # Dump files shouldn't be older than 1 day
-                                        if seconds_between_end_time_and_now < 60*60*24:
-                                            log_and_print("NOTICE", "Dump mariadb-backup end_time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                        # Dump files shouldn't be older than the configured maximum age
+                                        if seconds_between_end_time_and_now < check_max_age_seconds:
+                                            log_and_print("NOTICE", "Dump mariadb-backup end_time signature age {seconds} secs is less than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                             oks += 1
                                         else:
-                                            log_and_print("ERROR", "Dump mariadb-backup end_time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            log_and_print("ERROR", "Dump mariadb-backup end_time signature age {seconds} secs is more than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                             errors += 1
                                     else:
                                         log_and_print("ERROR", "There is no mariadb-backup end_time signature in file {xtrabackup_info_file} on item number {number}".format(xtrabackup_info_file=xtrabackup_info_file, number=item["number"]), logger)
@@ -2214,12 +2220,12 @@ if __name__ == "__main__":
                                         # Check mysqlsh end time
                                         if mysqlsh_end_time is not None:
                                             seconds_between_end_time_and_now = (datetime.now() - datetime.strptime(mysqlsh_end_time, "%Y-%m-%d %H:%M:%S")).total_seconds()
-                                            # Dump files shouldn't be older than 1 day
-                                            if seconds_between_end_time_and_now < 60*60*24:
-                                                log_and_print("NOTICE", "Dump @.done.json end time signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                            # Dump files shouldn't be older than the configured maximum age
+                                            if seconds_between_end_time_and_now < check_max_age_seconds:
+                                                log_and_print("NOTICE", "Dump @.done.json end time signature age {seconds} secs is less than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                                 oks += 1
                                             else:
-                                                log_and_print("ERROR", "Dump @.done.json end time signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                log_and_print("ERROR", "Dump @.done.json end time signature age {seconds} secs is more than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_end_time_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                                 errors += 1
                                         else:
                                             log_and_print("ERROR", "There is no @.done.json end time signature in file {mysqlsh_info_file} on item number {number}".format(mysqlsh_info_file=mysqlsh_info_file, number=item["number"]), logger)
@@ -2324,12 +2330,12 @@ if __name__ == "__main__":
                                             # Check toc_archive_created time, example: '2024-02-17 13:53:50 EET'
                                             if toc_archive_created is not None:
                                                 seconds_between_archive_created_and_now = (datetime.now() - datetime.strptime(toc_archive_created, "%Y-%m-%d %H:%M:%S %Z")).total_seconds()
-                                                # Dump files shouldn't be older than 1 day
-                                                if seconds_between_archive_created_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", "Dump Archive created at signature age {seconds} secs is less than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                # Dump files shouldn't be older than the configured maximum age
+                                                if seconds_between_archive_created_and_now < check_max_age_seconds:
+                                                    log_and_print("NOTICE", "Dump Archive created at signature age {seconds} secs is less than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Dump Archive created at signature age {seconds} secs is more than 1d for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), dump_dir=dump_dir, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Dump Archive created at signature age {seconds} secs is more than configured {max_age} secs for the dump dir {dump_dir} on item number {number}".format(seconds=int(seconds_between_archive_created_and_now), max_age=check_max_age_seconds, dump_dir=dump_dir, number=item["number"]), logger)
                                                     errors += 1
 
                                             # Check toc_dbname matches with item["source"]
@@ -2465,12 +2471,12 @@ if __name__ == "__main__":
                                                     seconds_between_dump_completed_date_and_now = (datetime.now() - datetime.strptime(dump_completed_date, "%Y-%m-%d %H:%M:%S")).total_seconds()
                                                 elif check["type"] == "POSTGRESQL":
                                                     seconds_between_dump_completed_date_and_now = (datetime.now() - datetime.strptime(dump_completed_date, "%Y-%m-%d %H:%M:%S %Z")).total_seconds()
-                                                # Dump files shouldn't be older than 1 day
-                                                if seconds_between_dump_completed_date_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", "Dump completion signature age {seconds} secs is less than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
+                                                # Dump files shouldn't be older than the configured maximum age
+                                                if seconds_between_dump_completed_date_and_now < check_max_age_seconds:
+                                                    log_and_print("NOTICE", "Dump completion signature age {seconds} secs is less than configured {max_age} secs for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), max_age=check_max_age_seconds, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Dump completion signature age {seconds} secs is more than configured {max_age} secs for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_dump_completed_date_and_now), max_age=check_max_age_seconds, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     errors += 1
                                             else:
                                                 log_and_print("ERROR", "There is no dump completion signature in dump dir or file {dump_dir_or_file} on item number {number}".format(dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
@@ -2513,12 +2519,12 @@ if __name__ == "__main__":
                                             # Check dump completed date
                                             if tarfile_or_dumpdir_non_zero_sized_bson_date is not None:
                                                 seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now = (datetime.now() - tarfile_or_dumpdir_non_zero_sized_bson_date).total_seconds()
-                                                # Dump files shouldn't be older than 1 day
-                                                if seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", "Dump bsons age {seconds} secs is less than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
+                                                # Dump files shouldn't be older than the configured maximum age
+                                                if seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now < check_max_age_seconds:
+                                                    log_and_print("NOTICE", "Dump bsons age {seconds} secs is less than configured {max_age} secs for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), max_age=check_max_age_seconds, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", "Dump bsons age {seconds} secs is more than 1d for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
+                                                    log_and_print("ERROR", "Dump bsons age {seconds} secs is more than configured {max_age} secs for the dump dir or file {dump_dir_or_file} on item number {number}".format(seconds=int(seconds_between_tarfile_or_dumpdir_non_zero_sized_bson_date_and_now), max_age=check_max_age_seconds, dump_dir_or_file=dump_dir_or_file, number=item["number"]), logger)
                                                     errors += 1
 
                                     else:
@@ -2724,12 +2730,12 @@ if __name__ == "__main__":
                                             # Check file UTC 
                                             if "UTC" in check_file_dict:
                                                 seconds_between_check_file_utc_and_now = (datetime.now() - datetime.strptime(check_file_dict["UTC"], "%Y-%m-%d %H:%M:%S")).total_seconds()
-                                                # .backups files shouldn't be older than 1 day
-                                                if seconds_between_check_file_utc_and_now < 60*60*24:
-                                                    log_and_print("NOTICE", ".backup file date age {seconds} secs is less than 1d on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), number=item["number"], check_file=check_file), logger)
+                                                # .backup files shouldn't be older than the configured maximum age
+                                                if seconds_between_check_file_utc_and_now < check_max_age_seconds:
+                                                    log_and_print("NOTICE", ".backup file date age {seconds} secs is less than configured {max_age} secs on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), max_age=check_max_age_seconds, number=item["number"], check_file=check_file), logger)
                                                     oks += 1
                                                 else:
-                                                    log_and_print("ERROR", ".backup file date age {seconds} secs is more than 1d on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), number=item["number"], check_file=check_file), logger)
+                                                    log_and_print("ERROR", ".backup file date age {seconds} secs is more than configured {max_age} secs on item number {number}: {check_file}".format(seconds=int(seconds_between_check_file_utc_and_now), max_age=check_max_age_seconds, number=item["number"], check_file=check_file), logger)
                                                     errors += 1
                                             else:
                                                 log_and_print("ERROR", ".backup file doesn't contain UTC on item number {number}: {check_file}".format(number=item["number"], check_file=check_file), logger)
