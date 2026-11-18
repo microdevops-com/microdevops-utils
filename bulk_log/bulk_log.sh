@@ -63,6 +63,18 @@ if ! is_positive_int "$BULK_LOG_GW_PING_COUNT"; then
     BULK_LOG_GW_PING_COUNT=4
 fi
 
+# Timestamps without spawning date(1): the bash printf builtin (bash >= 4.2) does it in-process.
+# run_section is called ~35 times per run (every 2 min from cron) and used 4 date calls each,
+# which floods hosts with execve audit logging (auditd) with thousands of useless events.
+# TZ=UTC as a prefix applies to the builtin only: same output as "date -u", even on non-UTC hosts.
+if (( BASH_VERSINFO[0] > 4 || ( BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 2 ) )); then
+    utc_now() { TZ=UTC printf -v "$1" '%(%Y-%m-%dT%H:%M:%SZ)T' -1; }
+    epoch_now() { printf -v "$1" '%(%s)T' -1; }
+else
+    utc_now() { printf -v "$1" '%s' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; }
+    epoch_now() { printf -v "$1" '%s' "$(date +%s)"; }
+fi
+
 run_with_timeout() {
     if has_cmd timeout; then
         timeout --foreground --kill-after=5 "${BULK_LOG_TIMEOUT_SECONDS}" "$@"
@@ -89,14 +101,14 @@ run_section() {
         return 0
     fi
 
-    started_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    utc_now started_at
     echo "### start ${started_at}"
-    start_epoch=$(date +%s)
+    epoch_now start_epoch
     run_with_timeout "$@" 2>&1
     rc=$?
-    end_epoch=$(date +%s)
+    epoch_now end_epoch
     duration=$((end_epoch - start_epoch))
-    ended_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    utc_now ended_at
 
     if [[ "$rc" -eq 124 || "$rc" -eq 137 ]]; then
         echo "WARN: command timed out after ${BULK_LOG_TIMEOUT_SECONDS}s (rc=${rc})"
@@ -322,7 +334,8 @@ GW_IP_ADDRESS="$(get_default_gateway)"
 DEFAULT_IFACE="$(get_default_iface)"
 
 echo "===== bulk_log snapshot ====="
-echo "ts: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+utc_now bulk_log_ts
+echo "ts: ${bulk_log_ts}"
 echo "host: $(hostname -f 2>/dev/null || hostname)"
 echo "iface: ${DEFAULT_IFACE:-unknown}"
 echo "gateway: ${GW_IP_ADDRESS:-unknown}"
