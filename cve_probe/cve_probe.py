@@ -2371,7 +2371,11 @@ def _runtime_status(rule, inst, libs, cdef=None):
         # third-party builds and unlisted releases by the upstream fix of their branch
         third = spec.get("third_party_re")
         osid, osrel = inst.os.get("ID", "").lower(), inst.os.get("VERSION_ID", "")
-        tbl = spec.get("fixed_packages", {}).get(osid, {})
+        tbl = spec.get("fixed_packages", {}).get(osid)
+        if tbl is None and Host._family(osid, inst.os.get("ID_LIKE", "")) == "rpm":
+            # RHEL family (rhel, centos, almalinux, rocky, ol): one table keyed by major release
+            tbl, osrel = spec.get("fixed_packages", {}).get("rpm", {}), osrel.split(".")[0]
+        tbl = tbl or {}
         foreign = ""
         pkg = inst.package
         if pkg and _upstream_part(pkg[1]) != inst.version:
@@ -2382,6 +2386,12 @@ def _runtime_status(rule, inst, libs, cdef=None):
         if osrel not in tbl and ".".join(osrel.split(".")[:2]) in tbl:
             osrel = ".".join(osrel.split(".")[:2])          # alpine: VERSION_ID 3.22.1, table key 3.22
         branch_of = lambda v: ".".join(_upstream_part(v).split(".")[:2])
+        ups = spec.get("fixed_upstream", {})
+        if vercmp(inst.version, ups.get(branch_of(inst.version), "999999")) >= 0:
+            # an upstream release that contains the fix is fixed whoever packaged it; the
+            # distro table is only needed for backports, which keep an older upstream version
+            return "fixed", "%s %s%s >= upstream fix %s%s" % (inst.name, inst.version, " (%s %s)" % pkg if pkg else "",
+                                                            ups[branch_of(inst.version)], foreign)
         if pkg and tbl.get(osrel) and branch_of(pkg[1]) != branch_of(tbl[osrel]):
             # a package from another branch than the distro's own (mainline image, PPA): its
             # version sorting above the distro backport proves nothing
@@ -2394,7 +2404,6 @@ def _runtime_status(rule, inst, libs, cdef=None):
                 return "vulnerable", "%s %s: %s %s has released no fixed package yet" % (inst.package[0], inst.package[1], osid, osrel)
             r = vercmp(inst.package[1], fixed)
             return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (inst.package[0], inst.package[1], ">=" if r >= 0 else "<", fixed)
-        ups = spec.get("fixed_upstream", {})
         branch = ".".join(inst.version.split(".")[:2])
         what = "%s %s" % (inst.name, inst.version) + (" (%s %s)" % pkg if pkg else "")
         if branch in ups:

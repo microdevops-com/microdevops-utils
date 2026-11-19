@@ -22,7 +22,7 @@
       "config_files": ["/etc/nginx/nginx.conf", "/usr/local/openresty/nginx/conf/nginx.conf", "/usr/local/nginx/conf/nginx.conf", "/etc/openresty/nginx.conf"],
       "packages": {"deb": ["nginx-core", "nginx-full", "nginx-light", "nginx-extras", "nginx"],
                    "apk": ["nginx"], "rpm": ["nginx-core", "nginx"]},
-      "third_party_re": "deb\\.sury\\.org|~[a-z]+\\d*$",
+      "third_party_re": "deb\\.sury\\.org|~[a-z]+\\d*$|\\.ngx$",
       "variants": [
         {"file": "/nginx-ingress-controller", "label": "ingress-nginx controller",
          "remedy": "ingress-nginx is retired, no fixed image will be released: restrict the listening ports to known sources or disable HTTP/2 (use-http2: \"false\" in the controller ConfigMap), block sctp on the node (modprobe.d: install sctp /bin/false), and plan a move to another ingress controller"}
@@ -32,7 +32,8 @@
         "ubuntu": {"16.04": "1.10.3-0ubuntu0.16.04.5+esm11", "18.04": "1.14.0-0ubuntu1.11+esm6", "20.04": "1.18.0-0ubuntu1.7+esm5",
                    "22.04": "1.18.0-6ubuntu14.23", "24.04": "1.24.0-2ubuntu7.20", "26.04": "1.28.3-2ubuntu1.13", "26.10": "1.30.4-7ubuntu1.2"},
         "debian": {"12": null, "13": "1.26.3-3+deb13u11"},
-        "alpine": {"3.22": "1.28.3-r8", "3.23": "1.28.3-r8", "3.24": "1.30.7-r0"}
+        "alpine": {"3.22": "1.28.3-r8", "3.23": "1.28.3-r8", "3.24": "1.30.7-r0"},
+        "rpm": {"8": null, "9": null, "10": null}
       }
     }
   },
