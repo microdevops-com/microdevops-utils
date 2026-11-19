@@ -2366,6 +2366,15 @@ def _runtime_status(rule, inst, libs, cdef=None):
             # package database says nothing about it
             foreign = "; binary %s does not match package %s %s, package ignored" % (inst.version, pkg[0], pkg[1])
             pkg = None
+        if osrel not in tbl and ".".join(osrel.split(".")[:2]) in tbl:
+            osrel = ".".join(osrel.split(".")[:2])          # alpine: VERSION_ID 3.22.1, table key 3.22
+        branch_of = lambda v: ".".join(_upstream_part(v).split(".")[:2])
+        if pkg and tbl.get(osrel) and branch_of(pkg[1]) != branch_of(tbl[osrel]):
+            # a package from another branch than the distro's own (mainline image, PPA): its
+            # version sorting above the distro backport proves nothing
+            foreign = "; package %s %s is not the %s %s branch %s, distro table not applied" % (
+                pkg[0], pkg[1], osid, osrel, branch_of(tbl[osrel]))
+            tbl = {}
         if pkg and osrel in tbl and not (third and re.search(third, pkg[1])):
             fixed = tbl[osrel]
             if fixed is None:

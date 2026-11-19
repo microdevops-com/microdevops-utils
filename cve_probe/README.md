@@ -151,7 +151,9 @@ Node.js:
    on the runtime judge the package of the running binary by the distro table (`null` means the
    vendor has released no fix), and third-party builds (`third_party_re`: sury, nginx.org) or
    unlisted releases by the upstream fix of their branch. A package whose upstream version differs
-   from what the running binary reports is ignored: the binary was replaced by hand.
+   from what the running binary reports is ignored: the binary was replaced by hand. A package
+   from another upstream branch than the distro's fixed version (a PPA, a mainline image on an
+   Alpine base) is not compared with the distro table either.
 5. Configuration conditions (`requires_config` per CVE): the runtime's main configuration file
    (the path after `config_arg` on the process command line, else the first existing of
    `config_files`) is read from the instance's root with its `include` directives followed;
