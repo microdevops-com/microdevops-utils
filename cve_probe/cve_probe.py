@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.8"
+VERSION = "1.9"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -1796,7 +1796,7 @@ def instance_reachability(inst, kf, ports=None):
             if any(rx.search(t) for t in texts):
                 return "open", "container address %s is published (DNAT/proxy rule on the host), sources not evaluated" % ip
         if inst.runtime in ("docker", "podman"):
-            return "restricted", "container publishes no port, reachable only through a proxy on the host"
+            return "restricted", "container publishes no port, reachable only from the host and its container networks"
         return "open", "container reachability cannot be proven for runtime %s" % (inst.runtime or "unknown")
     v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
                     for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
@@ -1816,9 +1816,10 @@ def instance_reachability(inst, kf, ports=None):
         ",".join(sorted(set(checked), key=int)), "; ".join(limited) or "no accept rule at all")
 
 
-def read_config_tree(root, path, limit=500):
-    """Text of a configuration file inside a root with `include pattern;` directives followed
-    (globs, paths relative to the main file's directory), comments stripped. None if unreadable."""
+def read_config_tree(root, path, include_re=None, limit=500):
+    """Text of a configuration file inside a root with include directives followed (globs, paths
+    relative to the main file's directory), comments stripped. include_re captures the pattern
+    list in group 1; the default is nginx's `include pattern;`. None if unreadable."""
     seen, out = set(), []
     base = os.path.dirname(path)
 
@@ -1832,13 +1833,14 @@ def read_config_tree(root, path, limit=500):
             return
         text = re.sub(r"(?m)(^|\s)#[^\n]*", r"\1", text)
         out.append(text)
-        for m in re.finditer(r"(?:^|[;{}])\s*include\s+([^;]+);", text, re.M):
-            pat = m.group(1).strip().strip("\"'")
-            if not pat.startswith("/"):
-                pat = os.path.join(base, pat)
-            g = os.path.join(root, pat.lstrip("/"))
-            for hit in (sorted(glob.glob(g)) if re.search(r"[*?\[]", pat) else [g]):
-                rd("/" + os.path.relpath(hit, root), depth + 1)
+        for m in re.finditer(include_re or r"(?:^|[;{}])\s*include\s+([^;]+);", text, re.M):
+            for pat in m.group(1).split():
+                pat = pat.strip("\"'")
+                if not pat.startswith("/"):
+                    pat = os.path.join(base, pat)
+                g = os.path.join(root, pat.lstrip("/"))
+                for hit in (sorted(glob.glob(g)) if re.search(r"[*?\[]", pat) else [g]):
+                    rd("/" + os.path.relpath(hit, root), depth + 1)
     rd(path, 0)
     return "\n".join(out) if out else None
 
@@ -1898,6 +1900,7 @@ class RuntimeInstance(object):
         self.endpoints = []               # (family, kind, port) of TCP listeners
         self._config = False              # config dump: False = not read yet, None = unreadable
         self._variant = False
+        self._maps = None
         self.start_time = None
         self.exe_mtime = None
         self.errors = []
@@ -1918,7 +1921,7 @@ class RuntimeInstance(object):
                         path = m.group(1).rstrip(";")
                         break
             for cand in ([path] if path else []) + list(self.spec.get("config_files", [])):
-                text = read_config_tree(self.root, cand)
+                text = read_config_tree(self.root, cand, self.spec.get("config_include_re"))
                 if text:
                     self._config = text
                     break
@@ -1954,6 +1957,12 @@ class RuntimeInstance(object):
             self.package = _package_in_root(self.root, fam, self.spec.get("packages", {}).get(fam), self.container_id)
         self.listening = listening_sockets(self.pids)
         self.endpoints = listening_endpoints(self.pids)
+
+    def maps(self):
+        """/proc/PID/maps of the first process: which shared objects it really runs with."""
+        if self._maps is None:
+            self._maps = read_file("/proc/%d/maps" % self.pid, "") or ""
+        return self._maps
 
     def links_system_lib(self, soname):
         """True when the running process has the shared library mapped (distro builds, as opposed
@@ -2401,7 +2410,7 @@ def _runtime_status(rule, inst, libs, cdef=None, cve=None):
         tbl = tbl or {}
         foreign = ""
         pkg = inst.package
-        if pkg and _upstream_part(pkg[1]) != inst.version:
+        if pkg and _upstream_part(pkg[1]) != _upstream_part(inst.version):
             # the running binary is not the one the package ships (replaced by hand): the
             # package database says nothing about it
             foreign = "; binary %s does not match package %s %s, package ignored" % (inst.version, pkg[0], pkg[1])
@@ -2498,22 +2507,39 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
                 continue
             subject = inst.label()
             extra = {"runtime": inst.as_dict()}
+            # the bug exists only in builds running with particular libraries (requires_mapped,
+            # e.g. musl), and not where another one is in use (exempt_if: mapped, plus a config
+            # directive when the library alone does not settle it)
+            unmapped = [rx for rx in cdef.get("requires_mapped", []) if not re.search(rx, inst.maps())]
+            ex = cdef.get("exempt_if") or {}
+            exempt = bool(ex) and re.search(ex.get("mapped", "$^"), inst.maps()) is not None and (
+                not ex.get("config") or re.search(ex["config"], inst.config() or "", re.M) is not None)
+            if unmapped or exempt:
+                results.append((inst, subject, "not_applicable", "%s %s: %s" % (
+                    inst.name, inst.version or "?", cdef.get("exempt_text" if exempt and not unmapped else "unmapped_text",
+                                                             "this build is not the affected one")), extra))
+                continue
             status, ev = _runtime_status(rule, inst, libs, cdef, cve)
             if status == "fixed" and inst.stale():
                 status = "stale_workers"
                 ev += "; running processes predate the binary on disk, restart needed"
-            elif status == "vulnerable" and cdef.get("requires_config"):
+            elif status == "vulnerable" and (cdef.get("requires_config") or cdef.get("mitigated_if_config") or cdef.get("reachability")):
                 # the bug needs particular directives; without them the path is closed. With
                 # them, severity follows who can reach the listening ports.
                 conf = inst.config()
-                missing = [] if conf is None else [rx for rx in cdef["requires_config"] if not re.search(rx, conf, re.M)]
-                if missing:
+                missing = [] if conf is None else [rx for rx in cdef.get("requires_config", []) if not re.search(rx, conf, re.M)]
+                off = cdef.get("mitigated_if_config")
+                if not missing and conf and off and re.search(off, conf, re.M) and not (
+                        cdef.get("unless_config") and re.search(cdef["unless_config"], conf, re.M)):
+                    status = "mitigated"
+                    ev += "; %s (configuration on disk)" % cdef.get("config_off_text", "the feature is switched off")
+                elif missing:
                     # "mitigated" where switching the feature off is a deliberate act, the
                     # rule's config_absent_status (not_applicable) where it was never in use
                     status = cdef.get("config_absent_status", "mitigated")
                     ev += "; %s (configuration on disk, %d of %d required directive patterns absent)" % (
                         cdef.get("config_absent_text", "the required configuration is not present"),
-                        len(missing), len(cdef["requires_config"]))
+                        len(missing), len(cdef.get("requires_config", [])))
                 else:
                     if conf is None:
                         ev += "; configuration could not be read, assumed affected"
@@ -2707,7 +2733,8 @@ def main():
         elif rule.get("kind") == "trust_store" and stores:
             findings.extend(eval_trust_rule(rule, host, stores))
         elif rule.get("kind") == "runtime" and rule["family"] in libs:
-            if kf is None and any(c.get("requires_config") for c in rule["cves"].values()):
+            if kf is None and any(c.get("requires_config") or c.get("mitigated_if_config") or c.get("reachability")
+                                  for c in rule["cves"].values()):
                 kf = KernelFacts(host)        # reachability and module evidence need it
             findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]], kf))
 

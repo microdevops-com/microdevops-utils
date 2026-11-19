@@ -1,0 +1,71 @@
+{
+  "family": "sshhole",
+  "title": "OpenSSH sshd password authentication bypass on musl libc without PAM (Alpine): any long password is accepted for some accounts",
+  "kind": "runtime",
+  "references": [
+    "https://www.openssh.org/releasenotes.html#10.6p2",
+    "https://security.alpinelinux.org/vuln/CVE-2026-123158",
+    "https://ubuntu.com/security/CVE-2026-123158",
+    "https://security-tracker.debian.org/tracker/CVE-2026-123158",
+    "https://access.redhat.com/hydra/rest/securitydata/cve/CVE-2026-123158.json",
+    "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+  ],
+  "public": "2026-11-05",
+  "runtimes": {
+    "sshd": {
+      "exe": "^sshd(\\.pam|\\.krb5)?$",
+      "version_arg": "-V",
+      "version_re": "OpenSSH_(\\d+\\.\\d+(?:p\\d+)?)",
+      "config_files": [
+        "/etc/ssh/sshd_config"
+      ],
+      "config_arg": "-f",
+      "config_include_re": "(?im)^\\s*Include\\s+(.+)$",
+      "packages": {
+        "apk": [
+          "openssh-server",
+          "openssh-server-pam",
+          "openssh"
+        ],
+        "deb": [
+          "openssh-server"
+        ],
+        "rpm": [
+          "openssh-server"
+        ]
+      },
+      "fixed_upstream": {
+        "10.6": "10.6p2"
+      },
+      "fixed_packages": {
+        "alpine": {
+          "3.19": "9.6_p1-r3",
+          "3.20": "9.7_p1-r6",
+          "3.21": "9.9_p2-r1",
+          "3.22": "10.0_p1-r11",
+          "3.23": "10.2_p1-r1",
+          "3.24": "10.3_p1-r2"
+        }
+      }
+    }
+  },
+  "remedy": "upgrade OpenSSH in the image to 10.6p2 or the patched Alpine package (apk upgrade openssh) and rebuild; until then set PasswordAuthentication no or do not publish the port",
+  "cves": {
+    "CVE-2026-123158": {
+      "summary": "sshd on musl without PAM misreads some stored password fields, so any password of 256 to 1024 characters succeeds; in CISA KEV since 2026-11-09",
+      "requires_mapped": [
+        "ld-musl|libc\\.musl"
+      ],
+      "unmapped_text": "not linked against musl libc, only musl builds without PAM are affected",
+      "exempt_if": {
+        "mapped": "libpam\\.so",
+        "config": "(?im)^\\s*UsePAM\\s+yes\\b"
+      },
+      "exempt_text": "musl build, but PAM is in use (UsePAM yes)",
+      "mitigated_if_config": "(?im)^\\s*PasswordAuthentication\\s+no\\b",
+      "unless_config": "(?im)^\\s*PasswordAuthentication\\s+yes\\b",
+      "config_off_text": "PasswordAuthentication no",
+      "config_present_text": "musl without PAM, password authentication not disabled"
+    }
+  }
+}

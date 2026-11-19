@@ -28,6 +28,7 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `emudhra-ca` | EMUDHRA-CA-2026 (USN-8944-1/2, DSA-6572) | eMudhra CA key compromise: `emSign ECC Root CA - G3` or Sectigo `AAA Certificate Services` still in a trust store, host and containers | trust_store |
 | `brotli-decoder` | CVE-2026-111497 | Node2Shell: Brotli decoder overflow, remote code execution; running Node.js/Bun binaries (vendored copy) on host and in containers, plus the system libbrotli in every root | runtime |
 | `nginx2root` | CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-121810, CVE-2026-113425 | NGINX2Root: nginx HTTP/2, HTTP/3, resolver and mail proxy memory corruption, remote code execution as the worker user; running nginx on host and in containers, judged by package, configuration and who can reach the ports | runtime |
+| `sshhole` | CVE-2026-123158 | OpenSSH sshd password authentication bypass on musl libc without PAM (Alpine), in CISA KEV; running sshd on host and in containers, judged by the libraries it has mapped, package, `PasswordAuthentication` and who can reach the port. glibc builds report `not_applicable` | runtime |
 
 `--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
 
@@ -165,6 +166,12 @@ Node.js:
    `mitigated`, or the CVE's `config_absent_status` (`not_applicable` for features that were
    simply never configured, such as the mail proxy). This is the configuration on disk: an edited but not reloaded file is reported
    by its content, not by what the running master loaded.
+   A directive that switches the feature off (`mitigated_if_config`, unless `unless_config` also
+   matches, e.g. `PasswordAuthentication no` with no `yes` anywhere) gives `mitigated`. Include
+   syntax other than nginx's is set per runtime with `config_include_re`.
+   Build conditions (`requires_mapped`, `exempt_if`): regexes over `/proc/PID/maps` of the running
+   process decide whether this build is the affected one at all, e.g. musl libc mapped and PAM
+   not in use; otherwise the finding is `not_applicable` before anything else is checked.
 6. Reachability: with the configuration present, each non-loopback TCP listener (only the ports
    whose `listen` carries `listen_param`, e.g. `http2`, when that can be told) is walked through
    the input hook of every table (iptables-save, ip6tables-save, nft) as a new connection from
@@ -214,9 +221,10 @@ in `/etc/ca-certificates.conf`) and a `remedy` sentence printed with the finding
 
 Runtime rules: `runtimes` keyed by name (`exe` regex over the basename, `version_arg`,
 `version_re`, `fixed` per major line, `eol_lines`, `not_affected_before`, `packages` per family,
-`config_arg`, `config_files`, `variants[]` (`file` marker in the instance's root, `label`, own
+`config_arg`, `config_files`, `config_include_re`, `variants[]` (`file` marker in the instance's root, `label`, own
 `remedy`: the runtime shipped inside a product with its own lifecycle, e.g. ingress-nginx), `fixed_packages` per distro release, `fixed_upstream` per branch, `third_party_re`;
-per CVE `affected_from`, `requires_config[]`, `config_absent_status`, `listen_param`, `listen_all_if`, `exposure[]`)
+per CVE `affected_from`, `requires_config[]`, `config_absent_status`, `mitigated_if_config`, `unless_config`,
+`requires_mapped[]`, `exempt_if{mapped, config}`, `listen_param`, `listen_all_if`, `exposure[]`)
 and `library` (`packages`
 per family, a name or list of names, `soname`, `fixed_upstream` per branch, `fixed_packages` per distro release, `rpm`
 keyed by major release, its own `remedy`). Distroless images are read via `dpkg/status.d`.
