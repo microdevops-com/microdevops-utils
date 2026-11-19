@@ -147,7 +147,11 @@ Node.js:
    database can be read (rpm-based images on a dpkg host, images without a package manager) are
    reported in `--facts` and `--verbose` only.
 
-4. Runtimes shipped as distro packages (nginx): rules with `fixed_packages` or `fixed_upstream`
+4. Package changelog first: when the changelog of the installed package (deb
+   `changelog.Debian.gz` in the instance's root, `rpm -q --changelog` on an rpm host) names the
+   CVE id, the runtime or library is `fixed` for that CVE, whatever the tables say. No entry or
+   no changelog (Alpine, images with stripped docs) proves nothing and the tables decide.
+   Runtimes shipped as distro packages (nginx): rules with `fixed_packages` or `fixed_upstream`
    on the runtime judge the package of the running binary by the distro table (keyed by distro id, or `rpm`
    with the major release for the RHEL family; `null` means the vendor has released no fix), and third-party builds (`third_party_re`: sury, nginx.org) or
    unlisted releases by the upstream fix of their branch. A package whose upstream version differs

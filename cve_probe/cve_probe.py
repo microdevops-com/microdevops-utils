@@ -2330,16 +2330,39 @@ def eval_php_rule(rule, host, instances):
 
 # --- runtime rules -----------------------------------------------------------
 
+_CHANGELOGS = {}
+
+
+def changelog_lists(root, fam, name, container_id, cve):
+    """True when the changelog of an installed package names the CVE id: the vendor's own
+    statement that this package carries the fix. deb: usr/share/doc/<name>/changelog.Debian.gz
+    (or changelog.gz) inside the root; rpm: `rpm -q --changelog` on the host. False when there
+    is no changelog (Alpine, images with stripped docs) or no entry, which proves nothing."""
+    key = (root, name)
+    if key not in _CHANGELOGS:
+        text = None
+        if fam == "deb":
+            d = in_root(root, "/usr/share/doc/%s" % name)        # may be a symlink to another package's dir
+            text = read_gz(os.path.join(d, "changelog.Debian.gz")) or read_gz(os.path.join(d, "changelog.gz"))
+        elif fam == "rpm" and container_id is None:
+            rc, out, _ = run(["rpm", "-q", "--changelog", name], timeout=30)
+            text = out if rc == 0 else None
+        _CHANGELOGS[key] = text or ""
+    return bool(cve) and re.search(r"%s(?!\d)" % re.escape(cve), _CHANGELOGS[key]) is not None
+
+
 def _upstream_part(ver):
     m = re.match(r"(\d+(?:\.\d+)*)", ver.split(":")[-1])
     return m.group(1) if m else ver
 
 
-def _library_status(rule, lib):
+def _library_status(rule, lib, cve=None):
     """(status, evidence) for one root's copy of the library."""
     L = rule.get("library", {})
     if lib.version is None:
         return "unknown", "%s present, version not readable" % (lib.name or L.get("soname"))
+    if changelog_lists(lib.root, lib.family, lib.name, lib.container_id, cve):
+        return "fixed", "%s listed in %s %s changelog" % (cve, lib.name, lib.version)
     osid, osrel = lib.os.get("ID", "").lower(), lib.os.get("VERSION_ID", "")
     tbl = L.get("fixed_packages", {})
     fixed = tbl.get(osid, {}).get(osrel)
@@ -2359,7 +2382,7 @@ def _library_status(rule, lib):
     return "unknown", "%s %s: no fixed version known for branch %s" % (lib.name, lib.version, branch)
 
 
-def _runtime_status(rule, inst, libs, cdef=None):
+def _runtime_status(rule, inst, libs, cdef=None, cve=None):
     spec = rule["runtimes"][inst.name]
     if inst.version is None:
         return "unknown", "could not determine %s version: %s" % (inst.name, "; ".join(inst.errors) or "no output")
@@ -2392,6 +2415,9 @@ def _runtime_status(rule, inst, libs, cdef=None):
             # distro table is only needed for backports, which keep an older upstream version
             return "fixed", "%s %s%s >= upstream fix %s%s" % (inst.name, inst.version, " (%s %s)" % pkg if pkg else "",
                                                             ups[branch_of(inst.version)], foreign)
+        if pkg and changelog_lists(inst.root, Host._family(osid, inst.os.get("ID_LIKE", "")), pkg[0], inst.container_id, cve):
+            # the vendor's own statement, per CVE; needs no table and survives a stale one
+            return "fixed", "%s listed in %s %s changelog" % (cve, pkg[0], pkg[1])
         if pkg and tbl.get(osrel) and branch_of(pkg[1]) != branch_of(tbl[osrel]):
             # a package from another branch than the distro's own (mainline image, PPA): its
             # version sorting above the distro backport proves nothing
@@ -2423,7 +2449,7 @@ def _runtime_status(rule, inst, libs, cdef=None):
         same = [l for l in libs if l.container_id == inst.container_id]
         pkg = "%s %s" % inst.package if inst.package else "%s %s" % (inst.name, inst.version)
         if same and same[0].version:
-            st, ev = _library_status(rule, same[0])
+            st, ev = _library_status(rule, same[0], cve)
             return st, "%s has the system %s mapped: %s" % (pkg, soname, ev)
         return "unknown", "%s has the system %s mapped but its package version is not readable" % (pkg, soname)
     major = inst.version.split(".")[0]
@@ -2472,7 +2498,7 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
                 continue
             subject = inst.label()
             extra = {"runtime": inst.as_dict()}
-            status, ev = _runtime_status(rule, inst, libs, cdef)
+            status, ev = _runtime_status(rule, inst, libs, cdef, cve)
             if status == "fixed" and inst.stale():
                 status = "stale_workers"
                 ev += "; running processes predate the binary on disk, restart needed"
@@ -2549,7 +2575,7 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
         for lib in libs:
             if lib.version is None:
                 continue
-            st, ev = _library_status(rule, lib)
+            st, ev = _library_status(rule, lib, cve)
             groups.setdefault(st, []).append((lib, ev))
         for status, members in sorted(groups.items()):
             evs = dict((id(lib), ev) for lib, ev in members)
