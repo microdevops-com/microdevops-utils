@@ -2359,7 +2359,14 @@ def _runtime_status(rule, inst, libs, cdef=None):
         third = spec.get("third_party_re")
         osid, osrel = inst.os.get("ID", "").lower(), inst.os.get("VERSION_ID", "")
         tbl = spec.get("fixed_packages", {}).get(osid, {})
-        if inst.package and osrel in tbl and not (third and re.search(third, inst.package[1])):
+        foreign = ""
+        pkg = inst.package
+        if pkg and _upstream_part(pkg[1]) != inst.version:
+            # the running binary is not the one the package ships (replaced by hand): the
+            # package database says nothing about it
+            foreign = "; binary %s does not match package %s %s, package ignored" % (inst.version, pkg[0], pkg[1])
+            pkg = None
+        if pkg and osrel in tbl and not (third and re.search(third, pkg[1])):
             fixed = tbl[osrel]
             if fixed is None:
                 return "vulnerable", "%s %s: %s %s has released no fixed package yet" % (inst.package[0], inst.package[1], osid, osrel)
@@ -2367,16 +2374,16 @@ def _runtime_status(rule, inst, libs, cdef=None):
             return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (inst.package[0], inst.package[1], ">=" if r >= 0 else "<", fixed)
         ups = spec.get("fixed_upstream", {})
         branch = ".".join(inst.version.split(".")[:2])
-        what = "%s %s" % (inst.name, inst.version) + (" (%s %s)" % inst.package if inst.package else "")
+        what = "%s %s" % (inst.name, inst.version) + (" (%s %s)" % pkg if pkg else "")
         if branch in ups:
             r = vercmp(inst.version, ups[branch])
-            return ("fixed" if r >= 0 else "vulnerable"), "%s %s upstream fix %s" % (what, ">=" if r >= 0 else "<", ups[branch])
+            return ("fixed" if r >= 0 else "vulnerable"), "%s %s upstream fix %s%s" % (what, ">=" if r >= 0 else "<", ups[branch], foreign)
         newest = sorted(ups.values(), key=version_tuple)[-1] if ups else None
         if newest and vercmp(inst.version, newest) >= 0:
-            return "fixed", "%s is newer than the fixed release %s" % (what, newest)
+            return "fixed", "%s is newer than the fixed release %s%s" % (what, newest, foreign)
         return "vulnerable", "%s: branch %s has no upstream fix (fixed in %s)%s" % (
             what, branch, " / ".join(sorted(ups.values(), key=version_tuple)),
-            "" if not inst.package else ", no distro fix table entry for %s %s" % (osid, osrel))
+            foreign or ("" if not pkg else ", no distro fix table entry for %s %s" % (osid, osrel)))
     na = spec.get("not_affected_before")
     if na and vercmp(inst.version, na) < 0:
         return "not_applicable", "%s %s predates the vendored library (affected from %s)" % (inst.name, inst.version, na)

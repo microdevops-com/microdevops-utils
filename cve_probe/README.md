@@ -150,7 +150,8 @@ Node.js:
 4. Runtimes shipped as distro packages (nginx): rules with `fixed_packages` or `fixed_upstream`
    on the runtime judge the package of the running binary by the distro table (`null` means the
    vendor has released no fix), and third-party builds (`third_party_re`: sury, nginx.org) or
-   unlisted releases by the upstream fix of their branch.
+   unlisted releases by the upstream fix of their branch. A package whose upstream version differs
+   from what the running binary reports is ignored: the binary was replaced by hand.
 5. Configuration conditions (`requires_config` per CVE): the runtime's main configuration file
    (the path after `config_arg` on the process command line, else the first existing of
    `config_files`) is read from the instance's root with its `include` directives followed;
