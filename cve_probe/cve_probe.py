@@ -19,13 +19,14 @@ import gzip
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.6"
+VERSION = "1.7"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -36,6 +37,7 @@ STATUS_SEVERITY = {
     "stale_workers": "major",
     "host_managed": "major",
     "unknown": "major",
+    "restricted": "major",
     "mitigated": "minor",
     "fixed": "ok",
     "not_applicable": "ok",
@@ -397,6 +399,8 @@ class KernelFacts(object):
         self._exposure = {}
         self._module_cache = {}
         self._fw_rules = None       # collected on first use, only rules with firewall_mitigations need it
+        self._fw_chains = None
+        self._reach = {}
         self._foreign_netns = None
 
     def _installed(self):
@@ -513,6 +517,16 @@ class KernelFacts(object):
                 else:
                     text += ", no MPTCP listener"
                 info["text"] = text
+        elif name == "sctp":
+            # the published nginx chain reaches root through a kernel SCTP flaw (no CVE id yet)
+            st = self.module_state("sctp")
+            if self.host.is_container and st["state"] not in ("loaded", "builtin"):
+                st = {"state": "state not visible from this container, the kernel belongs to the host"}
+            info = {"module": st["state"],
+                    "text": "sctp module %s%s" % (st["state"], {
+                        "loadable": " (autoloads on demand: worker-to-root chain possible; block with modprobe.d install sctp /bin/false)",
+                        "loaded": " (worker-to-root chain possible)",
+                        "builtin": " (worker-to-root chain possible)"}.get(st["state"], ""))}
         self._exposure[name] = info
         return info
 
@@ -566,12 +580,61 @@ class KernelFacts(object):
         iptables-nft need nf_tables, legacy iptables needs ip_tables; running them otherwise
         would autoload the module, which this probe promises not to do."""
         if self._fw_rules is None:
-            nft_ok = "nf_tables" in self.loaded or "nf_tables" in self.builtin
-            legacy_ok = "ip_tables" in self.loaded or "ip_tables" in self.builtin
-            self._fw_rules = _nft_ruleset(nft_ok) + _iptables_ruleset(nft_ok, legacy_ok)
-            log("firewall: %d rules on input/forward/prerouting hooks (nft backend %s, legacy %s)" %
-                (len(self._fw_rules), nft_ok, legacy_ok))
+            ch = self.fw_chains()
+            self._fw_rules = _nft_ruleset(dict((k, v) for k, v in ch["nft"].items() if k[0] in ("ip", "inet"))) + \
+                _iptables_ruleset(ch["ip"])
+            log("firewall: %d rules on input/forward/prerouting hooks" % len(self._fw_rules))
         return self._fw_rules
+
+    def fw_chains(self):
+        """Parsed chains with their policies: nft (all families), iptables-save, ip6tables-save.
+        Same backend rule as firewall_rules(): a tool only runs when its module is present."""
+        if self._fw_chains is None:
+            has = lambda m: m in self.loaded or m in self.builtin
+            nft_ok = has("nf_tables")
+            self._fw_chains = {"nft": _nft_chains(nft_ok),
+                               "ip": _iptables_chains(nft_ok, has("ip_tables"), ""),
+                               "ip6": _iptables_chains(nft_ok, has("ip6_tables"), "6")}
+        return self._fw_chains
+
+    def port_reachability(self, fam, port):
+        """Who can open a new TCP connection to a local port, judged from the input hook of
+        every table: ("open", rule) when some accept needs no particular source, ("restricted",
+        n) when only n source- or interface-limited accepts exist, ("closed", 0) when nothing
+        accepts it. fam is "ip" or "ip6". Every base chain must accept a packet, so the most
+        restrictive chain wins; anything not understood counts as open."""
+        key = (fam, port)
+        if key in self._reach:
+            return self._reach[key]
+        ch = self.fw_chains()
+        pub = _default_ifaces(fam)
+        results = []
+        ipt = ch[fam]
+        for k, c in ipt.items():
+            if c.get("hook") == "input" and k[1] in ("filter", "mangle", "security"):
+                results.append(_walk_base(ipt, k, lambda t: _ipt_cond(t, port, pub), "iptables"))
+        nft = ch["nft"]
+        xt_seen = bool(ipt)
+        for k, c in nft.items():
+            if c.get("hook") != "input" or c.get("type") != "filter":
+                continue
+            if k[0] not in (fam, "inet"):
+                continue
+            if xt_seen and k[0] in ("ip", "ip6") and k[2] in ("INPUT",):
+                continue          # iptables-nft table, already judged from iptables-save
+            results.append(_walk_base(nft, k, lambda t: _nft_cond(t, port, fam, pub), "nft"))
+        if not results:
+            out = ("open", "no firewall rules on the input hook")
+        elif any(r[0] == "closed" for r in results):
+            out = ("closed", 0)
+        elif any(r[0] == "restricted" for r in results):
+            out = ("restricted", min(r[1] for r in results if r[0] == "restricted"))
+        else:
+            details = [r[1] for r in results]
+            out = ("open", ([d for d in details if not d.endswith("policy accept")] or details)[0])
+        log("reachability %s port %s: %s" % (fam, port, out))
+        self._reach[key] = out
+        return out
 
     def foreign_netns(self):
         """Number of other network namespaces with processes and a non-loopback interface:
@@ -751,14 +814,14 @@ def _hooked_rules(tool, chains, jump_of, is_accept):
     return rules
 
 
-def _nft_ruleset(nft_ok):
-    """Rules from `nft list ruleset`, ip and inet families only (hdrlength etc. are IPv4).
-    Rules wrapped over several lines (long sets) are joined until braces balance."""
+def _nft_chains(nft_ok):
+    """Chains from `nft list ruleset`, every family, keyed (family, table, chain), with hook,
+    type and policy. Rules wrapped over several lines (long sets) are joined until braces balance."""
     if not nft_ok or not which("nft"):
-        return []
+        return {}
     rc, out, _ = run(["nft", "list", "ruleset"])
     if rc != 0:
-        return []
+        return {}
     chains = {}
     cur = None
     fam = tab = None
@@ -779,8 +842,8 @@ def _nft_ruleset(nft_ok):
         m = NFT_CHAIN_RE.match(line)
         if m:
             cur = None
-            if fam in ("ip", "inet"):
-                cur = chains.setdefault((fam, tab, m.group(1)), {"hook": None, "type": None, "rules": []})
+            if fam in ("ip", "ip6", "inet"):
+                cur = chains.setdefault((fam, tab, m.group(1)), {"hook": None, "type": None, "policy": None, "rules": []})
             continue
         st = line.strip()
         if st == "}":
@@ -791,6 +854,8 @@ def _nft_ruleset(nft_ok):
         m = NFT_HOOK_RE.match(line)
         if m:
             cur["type"], cur["hook"] = m.group(1), m.group(2)
+            pm = re.search(r"policy\s+(\w+)", line)
+            cur["policy"] = pm.group(1) if pm else "accept"
             continue
         if st.startswith(("policy ", "comment ", "flags ", "devices ")):
             continue
@@ -798,7 +863,11 @@ def _nft_ruleset(nft_ok):
             pending = st
             continue
         cur["rules"].append(st)
+    return chains
 
+
+def _nft_ruleset(chains):
+    """Hooked rules of the ip and inet families (hdrlength etc. are IPv4)."""
     def jump_of(t):
         m = NFT_JUMP_RE.match(NFT_COMMENT_RE.sub("", t))
         return m.group(1) if m else None
@@ -817,15 +886,16 @@ def _iptables_backend(cli):
     return "nft" if "nf_tables" in out else "legacy"
 
 
-def _iptables_ruleset(nft_ok, legacy_ok):
-    """Rules from iptables-save (and the legacy/nft variants when they show something else).
+def _iptables_chains(nft_ok, legacy_ok, v):
+    """Chains from iptables-save (v "") or ip6tables-save (v "6"), plus the legacy/nft variants
+    when they show something else, keyed (cli, table, chain), with the built-in policy.
     nat table chains are not hooks here: they only see the first packet of a flow."""
     chains = {}
     seen = []
-    for cli in ("iptables-save", "iptables-legacy-save", "iptables-nft-save"):
+    for cli in ("ip%stables-save" % v, "ip%stables-legacy-save" % v, "ip%stables-nft-save" % v):
         if not which(cli):
             continue
-        backend = _iptables_backend(cli)
+        backend = _iptables_backend(cli.replace("ip6", "ip"))
         if (backend == "legacy" and not legacy_ok) or (backend == "nft" and not nft_ok):
             continue
         rc, out, _ = run([cli])
@@ -841,17 +911,245 @@ def _iptables_ruleset(nft_ok, legacy_ok):
             elif line.startswith(":") and table:
                 name = line[1:].split()[0]
                 chains.setdefault((cli, table, name), {"hook": None if table == "nat" else IPT_BUILTIN_HOOK.get(name),
-                                                       "type": "filter", "rules": []})
+                                                       "type": "filter", "rules": []})["policy"] = line.split()[1].lower()
             elif line.startswith("-A ") and table:
                 name = line.split()[1]
                 chains.setdefault((cli, table, name), {"hook": None if table == "nat" else IPT_BUILTIN_HOOK.get(name),
                                                        "type": "filter", "rules": []})["rules"].append(line)
+    return chains
 
+
+def _iptables_ruleset(chains):
     def jump_of(t):
         m = IPT_JUMP_RE.match(IPT_COMMENT_RE.sub("", t))
         return m.group(1) if m else None
     return _hooked_rules("iptables", chains, jump_of,
                          lambda t: re.search(r"\s-j\s+ACCEPT\b", t) is not None)
+
+
+# ----------------------------------------------------------------------------
+# Reachability: can any source open a new TCP connection to a local port
+# ----------------------------------------------------------------------------
+
+def _default_ifaces(fam):
+    """Interfaces carrying a default route: an accept limited to one of these is not a limit."""
+    out = set()
+    if fam == "ip":
+        for line in (read_file("/proc/net/route", "") or "").splitlines()[1:]:
+            parts = line.split()
+            if len(parts) > 7 and parts[1] == "00000000" and parts[7] == "00000000":
+                out.add(parts[0])
+    else:
+        for line in (read_file("/proc/net/ipv6_route", "") or "").splitlines():
+            parts = line.split()
+            if len(parts) > 9 and parts[0] == "0" * 32 and parts[1] == "00" and parts[9] != "lo":
+                out.add(parts[9])
+    return out
+
+
+def _port_in(spec, port):
+    """True when a port list like "80,443,8000:8100" or "80-90" contains port."""
+    names = {"http": 80, "https": 443, "ssh": 22}
+    for item in re.split(r"[,\s]+", spec.strip("{} ")):
+        if not item:
+            continue
+        m = re.match(r"^(\d+)[:-](\d+)$", item)
+        if m:
+            if int(m.group(1)) <= port <= int(m.group(2)):
+                return True
+        elif item.isdigit():
+            if int(item) == port:
+                return True
+        elif names.get(item) == port:
+            return True
+        elif item not in names:
+            return True          # named set or something else: cannot rule the port out
+    return False
+
+
+def _ipt_cond(text, port, pub):
+    """One iptables rule seen by a new inbound TCP packet to port from a non-loopback
+    interface: None when it cannot match, else {"src", "extra", "verdict", "target"}. src: the
+    rule is limited to particular sources (or to an interface without a default route); extra:
+    other conditions the probe does not evaluate."""
+    try:
+        tok = shlex.split(text)
+    except ValueError:
+        return {"src": False, "extra": True, "verdict": "accept", "target": None}
+    r = {"src": False, "extra": False, "verdict": None, "target": None}
+    i, neg = 2, False
+    while i < len(tok):
+        t = tok[i]
+        val = tok[i + 1] if i + 1 < len(tok) else ""
+        if t == "!":
+            neg = True
+            i += 1
+            continue
+        if t in ("-p", "--protocol"):
+            is_tcp = val.lower() in ("tcp", "6", "all")
+            if is_tcp == neg and val.lower() != "all":
+                return None
+            i += 1
+        elif t in ("-m", "--match"):
+            i += 1
+        elif t == "--comment":
+            i += 1
+        elif t in ("-s", "--source"):
+            if val not in ("0.0.0.0/0", "::/0"):
+                if neg:
+                    r["extra"] = True
+                else:
+                    r["src"] = True
+            i += 1
+        elif t == "--src-range":
+            r["extra" if neg else "src"] = True
+            i += 1
+        elif t == "--match-set":
+            flags = tok[i + 2] if i + 2 < len(tok) else ""
+            r["src" if ("src" in flags.split(",") and not neg) else "extra"] = True
+            i += 2
+        elif t in ("-i", "--in-interface"):
+            is_lo = val == "lo"
+            if is_lo != neg and is_lo:
+                return None
+            if not is_lo and not neg:
+                base = val.rstrip("+")
+                if not any(p == val or (val.endswith("+") and p.startswith(base)) for p in pub):
+                    r["src"] = True
+            i += 1
+        elif t in ("-o", "--out-interface"):
+            return None
+        elif t in ("--dport", "--dports", "--destination-port", "--destination-ports", "--ports"):
+            if _port_in(val.replace(":", "-") if "," not in val else val, port) == neg:
+                return None
+            i += 1
+        elif t in ("--sport", "--sports", "--source-port", "--source-ports"):
+            i += 1
+        elif t in ("--ctstate", "--state"):
+            if ("NEW" in val.split(",")) == neg:
+                return None
+            i += 1
+        elif t == "--dst-type":
+            if ("LOCAL" in val.split(",")) == neg:
+                return None
+            i += 1
+        elif t == "--tcp-flags":
+            i += 2
+        elif t in ("--syn",):
+            pass
+        elif t in ("--icmp-type", "--icmpv6-type", "-f"):
+            return None
+        elif t in ("-j", "--jump", "-g", "--goto"):
+            tgt = val
+            r["target"] = tgt
+            r["verdict"] = {"ACCEPT": "accept", "DROP": "drop", "REJECT": "drop", "RETURN": "return"}.get(
+                tgt, "goto" if t in ("-g", "--goto") else "jump")
+            break
+        elif t.startswith("-"):
+            r["extra"] = True
+        neg = False
+        i += 1
+    return r if r["verdict"] else None
+
+
+NFT_VERDICT_RE = re.compile(r"\b(?:(jump|goto)\s+(\S+)|(accept|drop|return)|(reject)(?:\s+with\s+.*)?)\s*$")
+
+
+def _nft_cond(text, port, fam, pub):
+    """Same as _ipt_cond for one nft rule of an ip, ip6 or inet table."""
+    t = NFT_COMMENT_RE.sub("", text)
+    if "vmap" in t:
+        if re.search(r"ct state vmap", t) and not re.search(r"\bnew\s*:", t):
+            return None
+        return {"src": False, "extra": True, "verdict": "accept", "target": None}
+    m = NFT_VERDICT_RE.search(t)
+    if not m:
+        return None
+    if m.group(1):
+        verdict, target = m.group(1), m.group(2)
+    else:
+        verdict, target = ("drop" if m.group(4) else m.group(3)), None
+    body = t[:m.start()]
+    if re.search(r"\biif(?:name)?\s+\"?lo\"?(\s|$)", body):
+        return None
+    proto_rx = r"\b(meta l4proto|ip protocol|ip6 nexthdr)\s+(\{[^}]*\}|\S+)"
+    if re.search(r"\b(udp|udplite|icmp|icmpv6|sctp|dccp|igmp)\s", re.sub(proto_rx, " ", body)) or \
+            re.search(r"\b(meta l4proto|ip protocol|ip6 nexthdr)\s+(?!tcp\b|\{[^}]*\btcp\b)", body) or \
+            re.search(r"\bpkttype\s+(broadcast|multicast)", body) or \
+            re.search(r"\bfib daddr type\s+(?!local\b)", body):
+        return None
+    if fam == "ip6" and re.search(r"\bip (saddr|daddr|protocol)\b|meta nfproto ipv4", body):
+        return None
+    if fam == "ip" and re.search(r"\bip6 (saddr|daddr|nexthdr)\b|meta nfproto ipv6", body):
+        return None
+    cs = re.search(r"\bct state\s+(!=\s+)?(\{[^}]*\}|[a-z,]+)", body)
+    if cs and (("new" in re.split(r"[,{}\s]+", cs.group(2))) == bool(cs.group(1))):
+        return None
+    dp = re.search(r"\b(?:tcp|th) dport\s+(!=\s+)?(\{[^}]*\}|\S+)", body)
+    if dp and _port_in(dp.group(2), port) == bool(dp.group(1)):
+        return None
+    r = {"src": False, "extra": False, "verdict": verdict, "target": target}
+    if re.search(r"\bip6? saddr\s+(?!!=)", body):
+        r["src"] = True
+    ifm = re.search(r"\biif(?:name)?\s+(!=\s+)?\"?([^\"\s]+)\"?", body)
+    if ifm and not ifm.group(1) and ifm.group(2) not in pub:
+        r["src"] = True
+    rest = body
+    for rx in (r"\bcounter(\s+packets\s+\d+\s+bytes\s+\d+)?", r"\b(?:tcp|th) dport\s+(!=\s+)?(\{[^}]*\}|\S+)",
+               r"\bmeta l4proto\s+(\{[^}]*\}|\S+)", r"\bip protocol\s+\S+", r"\bip6 nexthdr\s+\S+",
+               r"\bct state\s+(!=\s+)?(\{[^}]*\}|[a-z,]+)", r"\bip6? saddr\s+(\{[^}]*\}|\S+)",
+               r"\biif(?:name)?\s+(!=\s+)?\"?[^\"\s]+\"?", r"\bfib daddr type\s+local", r"\bmeta nfproto\s+\S+",
+               r"\btcp flags[^a-z]*(syn|ack|fin|rst)[a-z,/& |()]*", r"\blog(\s+prefix\s+\"[^\"]*\")?(\s+level\s+\S+)?"):
+        rest = re.sub(rx, " ", rest)
+    if rest.strip():
+        r["extra"] = True
+    return r
+
+
+def _walk_base(chains, key, cond, tool):
+    """Verdict of one base chain for the packet: ("open", rule text), ("restricted", count of
+    limited accepts) or ("closed", 0)."""
+    acc = {"open": None, "restricted": 0}
+
+    def walk(k, src, extra, depth):
+        """True when the packet's fate is settled for every source that entered this chain."""
+        ch = chains.get(k)
+        if ch is None or depth > 30:
+            return False
+        for text in ch["rules"]:
+            c = cond(text)
+            if not c:
+                continue
+            uncond = not c["src"] and not c["extra"]
+            s2 = src or c["src"]
+            if c["verdict"] == "accept":
+                if s2:
+                    acc["restricted"] += 1
+                elif acc["open"] is None:
+                    acc["open"] = "%s %s: %s" % (tool, "/".join(k[-2:]), text)
+                if uncond:
+                    return True
+            elif c["verdict"] == "drop":
+                if uncond:
+                    return True
+            elif c["verdict"] == "return":
+                if uncond:
+                    return False
+            else:
+                done = walk(k[:-1] + (c["target"],), s2, extra or c["extra"], depth + 1)
+                if done and uncond:
+                    return True
+                if c["verdict"] == "goto" and uncond:
+                    return False
+        return False
+    settled = walk(key, False, False, 0)
+    if not settled and (chains[key].get("policy") or "accept") == "accept" and acc["open"] is None:
+        acc["open"] = "%s %s: policy accept" % (tool, "/".join(key[-2:]))
+    if acc["open"]:
+        return ("open", acc["open"])
+    if acc["restricted"]:
+        return ("restricted", acc["restricted"])
+    return ("closed", 0)
 
 
 # ----------------------------------------------------------------------------
@@ -1417,6 +1715,134 @@ def listening_sockets(pids):
     return sorted(out, key=lambda x: (x.startswith("unix:"), x))
 
 
+def listening_endpoints(pids):
+    """TCP listening sockets of these processes as (family, kind, port): family "ip"/"ip6",
+    kind "any", "loopback" or "addr". An IPv6 wildcard socket also counts for IPv4."""
+    inodes = set()
+    ns_pid = {}
+    for pid in pids:
+        try:
+            for fd in os.listdir("/proc/%d/fd" % pid):
+                try:
+                    l = os.readlink("/proc/%d/fd/%s" % (pid, fd))
+                except OSError:
+                    continue
+                if l.startswith("socket:["):
+                    inodes.add(l[8:-1])
+            ns_pid.setdefault(os.readlink("/proc/%d/ns/net" % pid), pid)
+        except OSError:
+            continue
+    out = set()
+    for pid in ns_pid.values():
+        for f in ("tcp", "tcp6"):
+            for line in (read_file("/proc/%d/net/%s" % (pid, f), "") or "").splitlines()[1:]:
+                parts = line.split()
+                if len(parts) <= 9 or parts[3] != "0A" or parts[9] not in inodes:
+                    continue
+                addr, port = parts[1].rsplit(":", 1)
+                port = int(port, 16)
+                b = []
+                for w in range(0, len(addr), 8):
+                    b.extend(int(addr[w + j:w + j + 2], 16) for j in (6, 4, 2, 0))
+                if len(b) == 16 and b[:10] == [0] * 10 and b[10:12] == [255, 255]:
+                    b = b[12:]
+                fam = "ip" if len(b) == 4 else "ip6"
+                if not any(b):
+                    out.add((fam, "any", port))
+                    if fam == "ip6":
+                        out.add(("ip", "any", port))
+                elif (fam == "ip" and b[0] == 127) or (fam == "ip6" and b == [0] * 15 + [1]):
+                    out.add((fam, "loopback", port))
+                else:
+                    out.add((fam, "addr", port))
+    return sorted(out)
+
+
+def _netns_local_ips(pid):
+    """IPv4 addresses local to the network namespace of pid, from its fib_trie."""
+    ips, prev = set(), None
+    for line in (read_file("/proc/%d/net/fib_trie" % pid, "") or "").splitlines():
+        m = re.search(r"\|--\s+(\d+\.\d+\.\d+\.\d+)", line)
+        if m:
+            prev = m.group(1)
+        elif "/32 host LOCAL" in line and prev and not prev.startswith("127."):
+            ips.add(prev)
+    return ips
+
+
+def instance_reachability(inst, kf, ports=None):
+    """("open"|"restricted", text) for a runtime instance's TCP listeners. Host network
+    namespace: judged from the input hook rules per port. Other namespaces: open when a DNAT
+    rule or a docker-proxy forwards to the container, or when the runtime is not Docker/podman
+    (cannot be proven); restricted when a Docker/podman container publishes nothing."""
+    eps = [e for e in inst.endpoints if not ports or e[2] in ports] or inst.endpoints
+    if not eps:
+        return "open", "listening sockets not readable"
+    if all(e[1] == "loopback" for e in eps):
+        return "restricted", "listens on loopback only"
+    try:
+        own_ns = os.readlink("/proc/self/ns/net") == os.readlink("/proc/%d/ns/net" % inst.pid)
+    except OSError:
+        own_ns = not inst.container_id
+    if not own_ns:
+        ips = _netns_local_ips(inst.pid)
+        ch = kf.fw_chains()
+        texts = [t for c in list(ch["ip"].values()) + list(ch["nft"].values()) for t in c["rules"]]
+        for d in os.listdir("/proc"):
+            if d.isdigit() and (read_file("/proc/%s/comm" % d, "") or "").strip() == "docker-proxy":
+                texts.append((read_file("/proc/%s/cmdline" % d, "") or "").replace("\0", " "))
+        for ip in sorted(ips):
+            rx = re.compile(r"(--to-destination|dnat (ip )?to|-container-ip)\s+%s(:|\s|$)" % re.escape(ip))
+            if any(rx.search(t) for t in texts):
+                return "open", "container address %s is published (DNAT/proxy rule on the host), sources not evaluated" % ip
+        if inst.runtime in ("docker", "podman"):
+            return "restricted", "container publishes no port, reachable only through a proxy on the host"
+        return "open", "container reachability cannot be proven for runtime %s" % (inst.runtime or "unknown")
+    v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
+                    for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
+    checked, limited = [], []
+    for fam, port in sorted(set((e[0], e[2]) for e in eps if e[1] != "loopback")):
+        if fam == "ip6" and not v6_global:
+            continue
+        state, detail = kf.port_reachability(fam, port)
+        if state == "open":
+            return "open", "port %d%s open to any source (%s)" % (port, "/ipv6" if fam == "ip6" else "", detail)
+        checked.append(str(port))
+        if state == "restricted":
+            limited.append("%d: %d limited accept rule(s)" % (port, detail))
+    if not checked:
+        return "restricted", "no non-loopback listener on a routable address family"
+    return "restricted", "firewall accepts port(s) %s only from particular sources or interfaces (%s)" % (
+        ",".join(sorted(set(checked), key=int)), "; ".join(limited) or "no accept rule at all")
+
+
+def read_config_tree(root, path, limit=500):
+    """Text of a configuration file inside a root with `include pattern;` directives followed
+    (globs, paths relative to the main file's directory), comments stripped. None if unreadable."""
+    seen, out = set(), []
+    base = os.path.dirname(path)
+
+    def rd(p, depth):
+        full = in_root(root, p)
+        if depth > 8 or len(seen) >= limit or full in seen:
+            return
+        seen.add(full)
+        text = read_file(full)
+        if text is None:
+            return
+        text = re.sub(r"(?m)(^|\s)#[^\n]*", r"\1", text)
+        out.append(text)
+        for m in re.finditer(r"(?:^|[;{}])\s*include\s+([^;]+);", text, re.M):
+            pat = m.group(1).strip().strip("\"'")
+            if not pat.startswith("/"):
+                pat = os.path.join(base, pat)
+            g = os.path.join(root, pat.lstrip("/"))
+            for hit in (sorted(glob.glob(g)) if re.search(r"[*?\[]", pat) else [g]):
+                rd("/" + os.path.relpath(hit, root), depth + 1)
+    rd(path, 0)
+    return "\n".join(out) if out else None
+
+
 def _package_in_root(root, fam, names, container_id):
     """(name, version) of the first installed package among names inside a root: dpkg status
     (or distroless status.d), apk db, or rpm on the host. None when none is installed or the
@@ -1469,9 +1895,35 @@ class RuntimeInstance(object):
         self.version = None               # of the binary on disk (what a restart would run)
         self.package = None               # (name, version) when the binary is a distro package
         self.listening = []
+        self.endpoints = []               # (family, kind, port) of TCP listeners
+        self._config = False              # config dump: False = not read yet, None = unreadable
         self.start_time = None
         self.exe_mtime = None
         self.errors = []
+
+    def config(self):
+        """The runtime's configuration as text: the main file (the path after spec config_arg on
+        a process command line, else the first existing of spec config_files) with its include
+        directives followed, read from the instance's root, comments removed. Nothing is
+        executed. It is the configuration on disk. None when no file can be read."""
+        if self._config is False:
+            self._config = None
+            path = None
+            arg = self.spec.get("config_arg")
+            if arg:
+                for pid in self.pids:
+                    m = re.search(r"\s%s\s*(/\S+)" % re.escape(arg), (read_file("/proc/%d/cmdline" % pid, "") or "").replace("\0", " "))
+                    if m:
+                        path = m.group(1).rstrip(";")
+                        break
+            for cand in ([path] if path else []) + list(self.spec.get("config_files", [])):
+                text = read_config_tree(self.root, cand)
+                if text:
+                    self._config = text
+                    break
+            else:
+                self.errors.append("no readable configuration file (%s)" % ", ".join(([path] if path else []) + list(self.spec.get("config_files", []))))
+        return self._config
 
     def collect(self):
         if self.container_id:
@@ -1485,9 +1937,10 @@ class RuntimeInstance(object):
         else:
             self.errors.append("%s %s: rc=%s %s" % (self.exe_path, arg, rc, (err or out or "").strip()[:120]))
         fam = Host._family(self.os.get("ID", ""), self.os.get("ID_LIKE", ""))
-        if self.exe_path.startswith(("/usr/bin/", "/usr/lib/", "/usr/libexec/", "/bin/")):
+        if self.exe_path.startswith(("/usr/bin/", "/usr/sbin/", "/usr/lib/", "/usr/libexec/", "/bin/", "/sbin/")):
             self.package = _package_in_root(self.root, fam, self.spec.get("packages", {}).get(fam), self.container_id)
         self.listening = listening_sockets(self.pids)
+        self.endpoints = listening_endpoints(self.pids)
 
     def links_system_lib(self, soname):
         """True when the running process has the shared library mapped (distro builds, as opposed
@@ -1893,10 +2346,37 @@ def _library_status(rule, lib):
     return "unknown", "%s %s: no fixed version known for branch %s" % (lib.name, lib.version, branch)
 
 
-def _runtime_status(rule, inst, libs):
+def _runtime_status(rule, inst, libs, cdef=None):
     spec = rule["runtimes"][inst.name]
     if inst.version is None:
         return "unknown", "could not determine %s version: %s" % (inst.name, "; ".join(inst.errors) or "no output")
+    frm = (cdef or {}).get("affected_from")
+    if frm and vercmp(inst.version, frm) < 0:
+        return "not_applicable", "%s %s predates the vulnerable code (affected from %s)" % (inst.name, inst.version, frm)
+    if "fixed_packages" in spec or "fixed_upstream" in spec:
+        # the runtime's own package: distro table first (backports keep the upstream version),
+        # third-party builds and unlisted releases by the upstream fix of their branch
+        third = spec.get("third_party_re")
+        osid, osrel = inst.os.get("ID", "").lower(), inst.os.get("VERSION_ID", "")
+        tbl = spec.get("fixed_packages", {}).get(osid, {})
+        if inst.package and osrel in tbl and not (third and re.search(third, inst.package[1])):
+            fixed = tbl[osrel]
+            if fixed is None:
+                return "vulnerable", "%s %s: %s %s has released no fixed package yet" % (inst.package[0], inst.package[1], osid, osrel)
+            r = vercmp(inst.package[1], fixed)
+            return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (inst.package[0], inst.package[1], ">=" if r >= 0 else "<", fixed)
+        ups = spec.get("fixed_upstream", {})
+        branch = ".".join(inst.version.split(".")[:2])
+        what = "%s %s" % (inst.name, inst.version) + (" (%s %s)" % inst.package if inst.package else "")
+        if branch in ups:
+            r = vercmp(inst.version, ups[branch])
+            return ("fixed" if r >= 0 else "vulnerable"), "%s %s upstream fix %s" % (what, ">=" if r >= 0 else "<", ups[branch])
+        newest = sorted(ups.values(), key=version_tuple)[-1] if ups else None
+        if newest and vercmp(inst.version, newest) >= 0:
+            return "fixed", "%s is newer than the fixed release %s" % (what, newest)
+        return "vulnerable", "%s: branch %s has no upstream fix (fixed in %s)%s" % (
+            what, branch, " / ".join(sorted(ups.values(), key=version_tuple)),
+            "" if not inst.package else ", no distro fix table entry for %s %s" % (osid, osrel))
     na = spec.get("not_affected_before")
     if na and vercmp(inst.version, na) < 0:
         return "not_applicable", "%s %s predates the vendored library (affected from %s)" % (inst.name, inst.version, na)
@@ -1933,20 +2413,60 @@ def _multi_root_subject(prefix, members, describe, limit=10):
     return subject, where
 
 
-def eval_runtime_rule(rule, host, instances, libs):
+def _listen_ports(conf, param):
+    """Ports of the listen directives carrying a parameter (e.g. http2) in a config dump."""
+    ports = set()
+    for m in re.finditer(r"(?:^|[;{}])\s*listen\s+([^;]*)\b%s\b[^;]*(?=;)" % re.escape(param), conf, re.M):
+        first = m.group(1).split()[0] if m.group(1).split() else ""
+        pm = re.search(r"(?:^|:)(\d+)$", first)
+        ports.add(int(pm.group(1)) if pm else 80)
+    return ports
+
+
+def eval_runtime_rule(rule, host, instances, libs, kf=None):
     findings = []
     remedy = rule.get("remedy")
     for cve, cdef in sorted(rule["cves"].items()):
         rem = cdef.get("remedy", remedy)
+        results = []
         for inst in instances:
             if inst.name not in rule.get("runtimes", {}):
                 continue
             subject = inst.label()
             extra = {"runtime": inst.as_dict()}
-            status, ev = _runtime_status(rule, inst, libs)
+            status, ev = _runtime_status(rule, inst, libs, cdef)
             if status == "fixed" and inst.stale():
                 status = "stale_workers"
                 ev += "; running processes predate the binary on disk, restart needed"
+            elif status == "vulnerable" and cdef.get("requires_config"):
+                # the bug needs particular directives; without them the path is closed. With
+                # them, severity follows who can reach the listening ports.
+                conf = inst.config()
+                missing = [] if conf is None else [rx for rx in cdef["requires_config"] if not re.search(rx, conf, re.M)]
+                if missing:
+                    # "mitigated" where switching the feature off is a deliberate act, the
+                    # rule's config_absent_status (not_applicable) where it was never in use
+                    status = cdef.get("config_absent_status", "mitigated")
+                    ev += "; %s (configuration on disk, %d of %d required directive patterns absent)" % (
+                        cdef.get("config_absent_text", "the required configuration is not present"),
+                        len(missing), len(cdef["requires_config"]))
+                else:
+                    if conf is None:
+                        ev += "; configuration could not be read, assumed affected"
+                    ports = None
+                    if conf and cdef.get("listen_param") and not (cdef.get("listen_all_if") and re.search(cdef["listen_all_if"], conf, re.M)):
+                        ports = _listen_ports(conf, cdef["listen_param"])
+                    state, why = instance_reachability(inst, kf, ports) if kf is not None else ("open", "firewall not evaluated")
+                    extra["reachability"] = {"state": state, "detail": why}
+                    if state != "open":
+                        status = "restricted"
+                    ev += "; %s: %s" % (cdef.get("config_present_text", "required configuration present"), why)
+                    hints = [kf.exposure(n) for n in cdef.get("exposure") or rule.get("exposure") or []] if kf is not None else []
+                    hints = [h for h in hints if h]
+                    if hints:
+                        ev += "; exposure: " + "; ".join(h["text"] for h in hints)
+                    if rem:
+                        ev += "; remedy: " + rem
             elif status == "vulnerable":
                 if inst.listening:
                     ev += "; listening on %s" % ",".join(inst.listening[:6])
@@ -1955,6 +2475,27 @@ def eval_runtime_rule(rule, host, instances, libs):
                     ev += "; no listening socket, exposure depends on fetch()/zlib use on untrusted data"
                 if rem:
                     ev += "; remedy: " + rem
+            results.append((inst, subject, status, ev, extra))
+        # containers with the same runtime version, status and evidence (pod replicas) share a finding
+        grouped, order = {}, []
+        for inst, subject, status, ev, extra in results:
+            key = (inst.name, inst.version, status, ev) if inst.container_id else id(inst)
+            if key not in grouped:
+                order.append(key)
+            grouped.setdefault(key, []).append((inst, subject, extra))
+        for key in order:
+            members = grouped[key]
+            inst, subject, extra = members[0]
+            status, ev = [r for r in results if r[0] is inst][0][2:4]
+            if len(members) > 1:
+                names = [where_label(m[0].container_id, m[0].runtime, m[0].container_name) for m in members]
+                subject = "%s %s: %d containers" % (inst.name, inst.version or "?", len(members))
+                ev = "%s%s: %s" % (", ".join(names[:6]), " +%d more" % (len(names) - 6) if len(names) > 6 else "", ev)
+                extra = {"runtimes": [m[2]["runtime"] for m in members]}
+                for m in members:
+                    if "reachability" in m[2]:
+                        extra["reachability"] = m[2]["reachability"]
+                        break
             findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
         # system library: one finding per status across host and containers
         groups = {}
@@ -2098,7 +2639,9 @@ def main():
         elif rule.get("kind") == "trust_store" and stores:
             findings.extend(eval_trust_rule(rule, host, stores))
         elif rule.get("kind") == "runtime" and rule["family"] in libs:
-            findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]]))
+            if kf is None and any(c.get("requires_config") for c in rule["cves"].values()):
+                kf = KernelFacts(host)        # reachability and module evidence need it
+            findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]], kf))
 
     sev = worst(findings)
     report = {

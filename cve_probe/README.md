@@ -27,6 +27,7 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `php2shell` | CVE-2026-109618, CVE-2026-109619 | PHP2Shell: unauthenticated remote code execution in PHP HTTP SAPIs, on the host and inside containers | php |
 | `emudhra-ca` | EMUDHRA-CA-2026 (USN-8944-1/2, DSA-6572) | eMudhra CA key compromise: `emSign ECC Root CA - G3` or Sectigo `AAA Certificate Services` still in a trust store, host and containers | trust_store |
 | `brotli-decoder` | CVE-2026-111497 | Node2Shell: Brotli decoder overflow, remote code execution; running Node.js/Bun binaries (vendored copy) on host and in containers, plus the system libbrotli in every root | runtime |
+| `nginx2root` | CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-121810, CVE-2026-113425 | NGINX2Root: nginx HTTP/2, HTTP/3, resolver and mail proxy memory corruption, remote code execution as the worker user; running nginx on host and in containers, judged by package, configuration and who can reach the ports | runtime |
 
 `--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
 
@@ -48,7 +49,7 @@ Exit codes, meant for cmd_check_alert `severity_per_retcode`:
 | 0 | ok | fixed, not_applicable |
 | 1 | probe error | could not run (not root, bad rules) |
 | 2 | minor | mitigated |
-| 3 | major | reboot_pending, stale_workers, host_managed, unknown |
+| 3 | major | reboot_pending, stale_workers, host_managed, unknown, restricted |
 | 4 | critical | vulnerable |
 
 Statuses:
@@ -61,6 +62,10 @@ Statuses:
 - `stale_workers` - fixed PHP binary on disk, running processes started before it.
 - `host_managed` - running inside an LXC/Incus container: the kernel is vulnerable by version
   but belongs to the host, and host-side mitigations are not visible from here.
+- `restricted` - vulnerable and configured for the bug, but the firewall accepts the listening
+  ports only from particular sources or interfaces (a CDN, an office range), or the service
+  listens on loopback or in a container that publishes no port. Not proven safe: the allowed
+  sources can still attack, and the list has to stay correct.
 - `unknown` - no evidence either way (no changelog, no table entry, built after disclosure).
 - `fixed`, `not_applicable`.
 
@@ -142,6 +147,27 @@ Node.js:
    database can be read (rpm-based images on a dpkg host, images without a package manager) are
    reported in `--facts` and `--verbose` only.
 
+4. Runtimes shipped as distro packages (nginx): rules with `fixed_packages` or `fixed_upstream`
+   on the runtime judge the package of the running binary by the distro table (`null` means the
+   vendor has released no fix), and third-party builds (`third_party_re`: sury, nginx.org) or
+   unlisted releases by the upstream fix of their branch.
+5. Configuration conditions (`requires_config` per CVE): the runtime's main configuration file
+   (the path after `config_arg` on the process command line, else the first existing of
+   `config_files`) is read from the instance's root with its `include` directives followed;
+   nothing is executed. Every regex must match for the CVE to apply, otherwise the finding is
+   `mitigated`, or the CVE's `config_absent_status` (`not_applicable` for features that were
+   simply never configured, such as the mail proxy). This is the configuration on disk: an edited but not reloaded file is reported
+   by its content, not by what the running master loaded.
+6. Reachability: with the configuration present, each non-loopback TCP listener (only the ports
+   whose `listen` carries `listen_param`, e.g. `http2`, when that can be told) is walked through
+   the input hook of every table (iptables-save, ip6tables-save, nft) as a new connection from
+   an outside interface. An accept with no source condition, an accept policy, or anything the
+   probe cannot evaluate means open to any source: `vulnerable`. Only source-limited accepts
+   (`-s`, ipset, `ip saddr`, or an interface without a default route) or none at all:
+   `restricted`. IPv6 is checked when the host has a global IPv6 address. Containers: a DNAT or
+   docker-proxy rule to the container address, or a runtime other than Docker/podman, counts as
+   open; a Docker/podman container that publishes nothing is `restricted`.
+
 ## Rule files
 
 One JSON file per CVE family in `rules/`. Entries under `cves` are keyed by CVE id, or by an
@@ -180,7 +206,9 @@ Trust store rules: `certs` per entry (`name`, `sha256` fingerprint, optional `fi
 in `/etc/ca-certificates.conf`) and a `remedy` sentence printed with the finding.
 
 Runtime rules: `runtimes` keyed by name (`exe` regex over the basename, `version_arg`,
-`version_re`, `fixed` per major line, `eol_lines`, `not_affected_before`, `packages` per family)
+`version_re`, `fixed` per major line, `eol_lines`, `not_affected_before`, `packages` per family,
+`config_arg`, `config_files`, `fixed_packages` per distro release, `fixed_upstream` per branch, `third_party_re`;
+per CVE `affected_from`, `requires_config[]`, `config_absent_status`, `listen_param`, `listen_all_if`, `exposure[]`)
 and `library` (`packages`
 per family, a name or list of names, `soname`, `fixed_upstream` per branch, `fixed_packages` per distro release, `rpm`
 keyed by major release, its own `remedy`). Distroless images are read via `dpkg/status.d`.

@@ -1,0 +1,77 @@
+{
+  "family": "nginx2root",
+  "title": "NGINX2Root: nginx HTTP/2, HTTP/3, resolver and mail proxy memory corruption, unauthenticated remote code execution as the worker user",
+  "kind": "runtime",
+  "references": [
+    "https://nginx.org/en/security_advisories.html",
+    "https://xint.io/blog/nginx2root-remote-code-execution",
+    "https://ubuntu.com/security/CVE-2026-123007",
+    "https://security-tracker.debian.org/tracker/CVE-2026-123007",
+    "https://security.alpinelinux.org/vuln/CVE-2026-123007"
+  ],
+  "public": "2026-11-18",
+  "runtimes": {
+    "nginx": {
+      "exe": "^nginx$",
+      "version_arg": "-v",
+      "version_re": "(?:nginx|openresty)/(\\d+\\.\\d+\\.\\d+)",
+      "config_arg": "-c",
+      "config_files": ["/etc/nginx/nginx.conf", "/usr/local/openresty/nginx/conf/nginx.conf", "/usr/local/nginx/conf/nginx.conf", "/etc/openresty/nginx.conf"],
+      "packages": {"deb": ["nginx-core", "nginx-full", "nginx-light", "nginx-extras", "nginx"],
+                   "apk": ["nginx"], "rpm": ["nginx-core", "nginx"]},
+      "third_party_re": "deb\\.sury\\.org|~[a-z]+\\d*$",
+      "fixed_upstream": {"1.30": "1.30.7", "1.31": "1.31.9"},
+      "fixed_packages": {
+        "ubuntu": {"16.04": null, "18.04": null, "20.04": null, "22.04": null, "24.04": null, "26.04": null, "26.10": null},
+        "debian": {"12": null, "13": null},
+        "alpine": {"3.24": "1.30.7-r0"}
+      }
+    }
+  },
+  "exposure": ["sctp"],
+  "remedy": "upgrade nginx to a fixed package (upstream 1.30.7 / 1.31.9) and restart it, a reload keeps the old binary; until a package exists turn HTTP/2 off (remove http2 from listen, or http2 off;) and restart, or restrict the ports to known sources; block the root half with modprobe.d: install sctp /bin/false",
+  "cves": {
+    "CVE-2026-123007": {
+      "summary": "integer overflow in HTTP/2 flow control, out-of-bounds write",
+      "affected_from": "1.9.5",
+      "requires_config": ["(?:^|[;{}])\\s*(listen\\s[^;]*\\shttp2\\b|http2\\s+on\\s*;)"],
+      "listen_param": "http2",
+      "listen_all_if": "(?:^|[;{}])\\s*http2\\s+on\\s*;",
+      "config_absent_text": "HTTP/2 is not enabled",
+      "config_present_text": "HTTP/2 enabled"
+    },
+    "CVE-2026-123633": {
+      "summary": "use-after-free in HTTP/2",
+      "affected_from": "1.19.7",
+      "requires_config": ["(?:^|[;{}])\\s*(listen\\s[^;]*\\shttp2\\b|http2\\s+on\\s*;)"],
+      "listen_param": "http2",
+      "listen_all_if": "(?:^|[;{}])\\s*http2\\s+on\\s*;",
+      "config_absent_text": "HTTP/2 is not enabled",
+      "config_present_text": "HTTP/2 enabled"
+    },
+    "CVE-2026-123634": {
+      "summary": "resolver memory corruption with request-derived proxy_pass in subrequests",
+      "affected_from": "0.6.18",
+      "requires_config": ["(?:^|[;{}])\\s*proxy_pass\\s+[^;]*\\$", "(?:^|[;{}])\\s*resolver\\s", "(?:^|[;{}])\\s*mirror\\s+(?!off\\b)"],
+      "config_absent_status": "not_applicable",
+      "config_absent_text": "no variable proxy_pass with resolver and mirror",
+      "config_present_text": "variable proxy_pass, resolver and mirror configured"
+    },
+    "CVE-2026-121810": {
+      "summary": "use-after-free in HTTP/3",
+      "affected_from": "1.25.0",
+      "requires_config": ["(?:^|[;{}])\\s*listen\\s[^;]*\\squic\\b"],
+      "config_absent_status": "not_applicable",
+      "config_absent_text": "no QUIC listener",
+      "config_present_text": "QUIC listener configured"
+    },
+    "CVE-2026-113425": {
+      "summary": "mail proxy memory corruption with proxy on and auth_http",
+      "affected_from": "0.5.33",
+      "requires_config": ["(?:^|[;{}])\\s*mail\\s*\\{", "(?:^|[;{}])\\s*auth_http\\s", "(?:^|[;{}])\\s*proxy\\s+on\\s*;"],
+      "config_absent_status": "not_applicable",
+      "config_absent_text": "no mail proxy with auth_http",
+      "config_present_text": "mail proxy with auth_http configured"
+    }
+  }
+}
