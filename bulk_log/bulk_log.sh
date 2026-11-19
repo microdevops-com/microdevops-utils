@@ -334,6 +334,8 @@ GW_IP_ADDRESS="$(get_default_gateway)"
 DEFAULT_IFACE="$(get_default_iface)"
 
 echo "===== bulk_log snapshot ====="
+# declared first: utc_now assigns through printf -v "$1", which shellcheck cannot follow (SC2154)
+bulk_log_ts=""
 utc_now bulk_log_ts
 echo "ts: ${bulk_log_ts}"
 echo "host: $(hostname -f 2>/dev/null || hostname)"
