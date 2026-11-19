@@ -1897,6 +1897,7 @@ class RuntimeInstance(object):
         self.listening = []
         self.endpoints = []               # (family, kind, port) of TCP listeners
         self._config = False              # config dump: False = not read yet, None = unreadable
+        self._variant = False
         self.start_time = None
         self.exe_mtime = None
         self.errors = []
@@ -1924,6 +1925,18 @@ class RuntimeInstance(object):
             else:
                 self.errors.append("no readable configuration file (%s)" % ", ".join(([path] if path else []) + list(self.spec.get("config_files", []))))
         return self._config
+
+    def variant(self):
+        """The first of the spec's variants whose marker file exists in this root, else None. A
+        variant is the runtime shipped inside a product with its own lifecycle (ingress-nginx):
+        it carries a label and a remedy of its own."""
+        if self._variant is False:
+            self._variant = None
+            for v in self.spec.get("variants", []):
+                if v.get("file") and os.path.exists(in_root(self.root, v["file"])):
+                    self._variant = v
+                    break
+        return self._variant
 
     def collect(self):
         if self.container_id:
@@ -2481,7 +2494,11 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
                     hints = [h for h in hints if h]
                     if hints:
                         ev += "; exposure: " + "; ".join(h["text"] for h in hints)
-                    if rem:
+                    var = inst.variant()
+                    if var:
+                        ev += "; %s; remedy: %s" % (var.get("label", "variant"), var.get("remedy", rem))
+                        extra["variant"] = var.get("label")
+                    elif rem:
                         ev += "; remedy: " + rem
             elif status == "vulnerable":
                 if inst.listening:

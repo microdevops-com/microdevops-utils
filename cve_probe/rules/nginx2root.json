@@ -23,6 +23,10 @@
       "packages": {"deb": ["nginx-core", "nginx-full", "nginx-light", "nginx-extras", "nginx"],
                    "apk": ["nginx"], "rpm": ["nginx-core", "nginx"]},
       "third_party_re": "deb\\.sury\\.org|~[a-z]+\\d*$",
+      "variants": [
+        {"file": "/nginx-ingress-controller", "label": "ingress-nginx controller",
+         "remedy": "ingress-nginx is retired, no fixed image will be released: restrict the listening ports to known sources or disable HTTP/2 (use-http2: \"false\" in the controller ConfigMap), block sctp on the node (modprobe.d: install sctp /bin/false), and plan a move to another ingress controller"}
+      ],
       "fixed_upstream": {"1.30": "1.30.7", "1.31": "1.31.9"},
       "fixed_packages": {
         "ubuntu": {"16.04": "1.10.3-0ubuntu0.16.04.5+esm11", "18.04": "1.14.0-0ubuntu1.11+esm6", "20.04": "1.18.0-0ubuntu1.7+esm5",

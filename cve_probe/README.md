@@ -210,7 +210,8 @@ in `/etc/ca-certificates.conf`) and a `remedy` sentence printed with the finding
 
 Runtime rules: `runtimes` keyed by name (`exe` regex over the basename, `version_arg`,
 `version_re`, `fixed` per major line, `eol_lines`, `not_affected_before`, `packages` per family,
-`config_arg`, `config_files`, `fixed_packages` per distro release, `fixed_upstream` per branch, `third_party_re`;
+`config_arg`, `config_files`, `variants[]` (`file` marker in the instance's root, `label`, own
+`remedy`: the runtime shipped inside a product with its own lifecycle, e.g. ingress-nginx), `fixed_packages` per distro release, `fixed_upstream` per branch, `third_party_re`;
 per CVE `affected_from`, `requires_config[]`, `config_absent_status`, `listen_param`, `listen_all_if`, `exposure[]`)
 and `library` (`packages`
 per family, a name or list of names, `soname`, `fixed_upstream` per branch, `fixed_packages` per distro release, `rpm`
