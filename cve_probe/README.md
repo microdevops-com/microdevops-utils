@@ -31,6 +31,8 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `sshhole` | CVE-2026-123158 | OpenSSH sshd password authentication bypass on musl libc without PAM (Alpine), in CISA KEV; running sshd on host and in containers, judged by the libraries it has mapped, package, `PasswordAuthentication` and who can reach the port. glibc builds report `not_applicable` | runtime |
 
 `--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
+CVEs that were assessed and deliberately left out, with the reason, are listed in `NOT_COVERED.md` in
+the source repository.
 
 ## Usage
 
