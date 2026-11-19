@@ -133,10 +133,12 @@
     },
     "CVE-2026-46300": {
       "public": "2026-05-13",
-      "affected_from": "5.6",
       "modules": ["esp4", "esp6"],
       "fixed": {
         "ubuntu": [
+          {"match": "^5\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": "5.4.0-233"},
+          {"match": "^4\\.15\\.0-\\d+-(generic|lowlatency)", "fixed": "4.15.0-253"},
+          {"match": "^4\\.4\\.0-\\d+-(generic|lowlatency)", "fixed": "4.4.0-283"},
           {"match": "^7\\.0\\.0-\\d+-(generic|lowlatency)", "fixed": "7.0.0-22"},
           {"match": "^6\\.17\\.0-\\d+-(generic|lowlatency)", "fixed": "6.17.0-35"},
           {"match": "^6\\.8\\.0-\\d+-(generic|lowlatency)", "fixed": "6.8.0-124"},
