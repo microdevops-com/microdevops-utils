@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.10"
+VERSION = "1.11"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -1900,6 +1900,8 @@ class RuntimeInstance(object):
         self.endpoints = []               # (family, kind, port) of TCP listeners
         self._config = False              # config dump: False = not read yet, None = unreadable
         self._variant = False
+        self.variant_version = None
+        self.banner = ""                  # raw output of the version command
         self._maps = None
         self.start_time = None
         self.exe_mtime = None
@@ -1930,16 +1932,28 @@ class RuntimeInstance(object):
         return self._config
 
     def variant(self):
-        """The first of the spec's variants whose marker file exists in this root, else None. A
-        variant is the runtime shipped inside a product with its own lifecycle (ingress-nginx):
-        it carries a label and a remedy of its own."""
+        """The first of the spec's variants this instance is, else None: recognised by a marker
+        file in the root or by a regex over the binary's version banner. A variant is the
+        runtime shipped inside a product with its own lifecycle (ingress-nginx, OpenResty): it
+        carries a label and a remedy, and optionally its own name, version_re (the product's
+        full version, kept in variant_version) and fixed table."""
         if self._variant is False:
             self._variant = None
             for v in self.spec.get("variants", []):
-                if v.get("file") and os.path.exists(in_root(self.root, v["file"])):
+                if (v.get("file") and os.path.exists(in_root(self.root, v["file"]))) or \
+                        (v.get("banner") and re.search(v["banner"], self.banner)):
                     self._variant = v
+                    m = re.search(v["version_re"], self.banner) if v.get("version_re") else None
+                    self.variant_version = m.group(1) if m else None
                     break
         return self._variant
+
+    def display(self):
+        """(name, version) as shown to people: the variant's own where it has them."""
+        v = self.variant()
+        if v and v.get("name") and self.variant_version:
+            return v["name"], self.variant_version
+        return self.name, self.version or "?"
 
     def collect(self):
         if self.container_id:
@@ -1947,7 +1961,8 @@ class RuntimeInstance(object):
         self.start_time, self.exe_mtime = process_times(self.pid, self.root, self.exe_path)
         arg = self.spec.get("version_arg", "--version")
         rc, out, err = exec_in_root(self.pid, self.container_id, [self.exe_path, arg], self.errors)
-        m = re.search(self.spec.get("version_re", r"(\d+\.\d+\.\d+)"), (out or "") + "\n" + (err or ""))
+        self.banner = ((out or "") + "\n" + (err or ""))[:600]
+        m = re.search(self.spec.get("version_re", r"(\d+\.\d+\.\d+)"), self.banner)
         if m:
             self.version = m.group(1)
         else:
@@ -1974,7 +1989,7 @@ class RuntimeInstance(object):
         return is_stale(self.deleted, self.start_time, self.exe_mtime)
 
     def label(self):
-        return "%s %s (%s)" % (self.name, self.version or "?", where_label(self.container_id, self.runtime, self.container_name))
+        return "%s %s (%s)" % (self.display() + (where_label(self.container_id, self.runtime, self.container_name),))
 
     def as_dict(self):
         return {"runtime": self.name, "exe": self.exe, "version": self.version, "pids": sorted(self.pids),
@@ -2398,7 +2413,17 @@ def _runtime_status(rule, inst, libs, cdef=None, cve=None):
     frm = (cdef or {}).get("affected_from")
     if frm and vercmp(inst.version, frm) < 0:
         return "not_applicable", "%s %s predates the vulnerable code (affected from %s)" % (inst.name, inst.version, frm)
+    var = inst.variant() or {}
+    core = ".".join(inst.version.split(".")[:2])
+    if var.get("fixed", {}).get(core) and inst.variant_version:
+        # the product backports fixes without changing the core version: its own release decides
+        r = vercmp(inst.variant_version, var["fixed"][core])
+        return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s release %s" % (
+            var.get("name", inst.name), inst.variant_version, ">=" if r >= 0 else "<", var.get("name", inst.name), var["fixed"][core])
     if "fixed_packages" in spec or "fixed_upstream" in spec:
+        shown = "%s %s" % (inst.name, inst.version)
+        if var.get("name") and inst.variant_version:
+            shown = "%s %s (%s core %s)" % (var["name"], inst.variant_version, inst.name, inst.version)
         # the runtime's own package: distro table first (backports keep the upstream version),
         # third-party builds and unlisted releases by the upstream fix of their branch
         third = spec.get("third_party_re")
@@ -2422,7 +2447,7 @@ def _runtime_status(rule, inst, libs, cdef=None, cve=None):
         if vercmp(inst.version, ups.get(branch_of(inst.version), "999999")) >= 0:
             # an upstream release that contains the fix is fixed whoever packaged it; the
             # distro table is only needed for backports, which keep an older upstream version
-            return "fixed", "%s %s%s >= upstream fix %s%s" % (inst.name, inst.version, " (%s %s)" % pkg if pkg else "",
+            return "fixed", "%s%s >= upstream fix %s%s" % (shown, " (%s %s)" % pkg if pkg else "",
                                                             ups[branch_of(inst.version)], foreign)
         if pkg and changelog_lists(inst.root, Host._family(osid, inst.os.get("ID_LIKE", "")), pkg[0], inst.container_id, cve):
             # the vendor's own statement, per CVE; needs no table and survives a stale one
@@ -2440,7 +2465,7 @@ def _runtime_status(rule, inst, libs, cdef=None, cve=None):
             r = vercmp(inst.package[1], fixed)
             return ("fixed" if r >= 0 else "vulnerable"), "%s %s %s fixed %s" % (inst.package[0], inst.package[1], ">=" if r >= 0 else "<", fixed)
         branch = ".".join(inst.version.split(".")[:2])
-        what = "%s %s" % (inst.name, inst.version) + (" (%s %s)" % pkg if pkg else "")
+        what = shown + (" (%s %s)" % pkg if pkg else "")
         if branch in ups:
             r = vercmp(inst.version, ups[branch])
             return ("fixed" if r >= 0 else "vulnerable"), "%s %s upstream fix %s%s" % (what, ">=" if r >= 0 else "<", ups[branch], foreign)
@@ -2583,7 +2608,7 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
             status, ev = [r for r in results if r[0] is inst][0][2:4]
             if len(members) > 1:
                 names = [where_label(m[0].container_id, m[0].runtime, m[0].container_name) for m in members]
-                subject = "%s %s: %d containers" % (inst.name, inst.version or "?", len(members))
+                subject = "%s %s: %d containers" % (inst.display() + (len(members),))
                 ev = "%s%s: %s" % (", ".join(names[:6]), " +%d more" % (len(names) - 6) if len(names) > 6 else "", ev)
                 extra = {"runtimes": [m[2]["runtime"] for m in members]}
                 for m in members:

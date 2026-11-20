@@ -24,6 +24,9 @@
                    "apk": ["nginx"], "rpm": ["nginx-core", "nginx"]},
       "third_party_re": "deb\\.sury\\.org|~[a-z]+\\d*$|\\.ngx$",
       "variants": [
+        {"banner": "openresty/", "name": "openresty", "label": "OpenResty", "version_re": "openresty/(\\d+\\.\\d+\\.\\d+\\.\\d+)",
+         "fixed": {},
+         "remedy": "no OpenResty release contains the fix yet (latest 1.31.8.1 is built on nginx 1.31.8): disable HTTP/2 (remove http2 from listen, or http2 off;) or restrict the ports to known sources, and restart; upgrade when OpenResty publishes a release built on nginx 1.31.9 or later, or a patched legacy release; block sctp (modprobe.d: install sctp /bin/false)"},
         {"file": "/nginx-ingress-controller", "label": "ingress-nginx controller",
          "remedy": "ingress-nginx is retired, no fixed image will be released: restrict the listening ports to known sources or disable HTTP/2 (use-http2: \"false\" in the controller ConfigMap), block sctp on the node (modprobe.d: install sctp /bin/false), and plan a move to another ingress controller"}
       ],
