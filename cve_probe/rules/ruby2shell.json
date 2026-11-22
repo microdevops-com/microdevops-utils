@@ -1,0 +1,73 @@
+{
+  "family": "ruby2shell",
+  "title": "Ruby2Shell: heap overflow in Ruby String case conversion for single-byte encodings, remote code execution reported for Rails and Sinatra in default configuration",
+  "kind": "runtime",
+  "references": [
+    "https://www.ruby-lang.org/en/news/2026/11/18/multiple-vulnerabilities-in-regexp-and-string/",
+    "https://github.com/ruby/ruby/security/advisories/GHSA-34m4-m9fh-gqp5",
+    "https://verialabs.com/ruby2shell/",
+    "https://ubuntu.com/security/CVE-2026-132825",
+    "https://security-tracker.debian.org/tracker/CVE-2026-132825",
+    "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-6-1-released/"
+  ],
+  "public": "2026-11-18",
+  "runtimes": {
+    "ruby": {
+      "exe": "^ruby(\\d[\\d.]*)?$",
+      "version_arg": "-v",
+      "version_re": "ruby (\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "deb": [
+          "ruby3.4",
+          "ruby3.3",
+          "ruby3.2",
+          "ruby3.1",
+          "ruby3.0",
+          "ruby2.7",
+          "ruby2.5",
+          "ruby2.3"
+        ],
+        "apk": [
+          "ruby"
+        ],
+        "rpm": [
+          "ruby"
+        ]
+      },
+      "fixed_upstream": {
+        "3.3": "3.3.14",
+        "3.4": "3.4.13",
+        "4.0": "4.0.10"
+      },
+      "fixed_packages": {
+        "debian": {
+          "12": "3.1.7-1~deb12u2",
+          "13": "3.3.14-0+deb13u1"
+        },
+        "ubuntu": {
+          "16.04": null,
+          "18.04": null,
+          "20.04": null,
+          "22.04": null,
+          "24.04": null,
+          "26.04": null,
+          "26.10": null
+        }
+      },
+      "variants": [
+        {
+          "file": "/opt/gitlab/embedded/service/gitlab-rails/VERSION",
+          "label": "GitLab bundled Ruby",
+          "remedy": "upgrade GitLab to 19.6.1, 19.5.8 or 19.4.10 or later, which bundle Ruby 3.3.14; the package upgrade restarts the services"
+        }
+      ]
+    }
+  },
+  "no_listener_text": "exposure depends on whether this process handles untrusted text in a legacy encoding (job workers, scripts)",
+  "remedy": "upgrade the Ruby interpreter to 3.3.14 / 3.4.13 / 4.0.10 (rbenv, RVM, image rebuild or the distro package; 3.2 and older get no upstream fix) and restart the application servers and job workers; updating Rails or other gems does not fix it",
+  "cves": {
+    "CVE-2026-132825": {
+      "summary": "one-byte heap overflow in upcase/swapcase/downcase(:fold)/casecmp? on ISO-8859-x and Windows-125x strings; UTF-8 not affected; reported reachable without authentication in Rails and classic Sinatra"
+    }
+  }
+}

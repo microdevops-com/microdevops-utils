@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.11"
+VERSION = "1.12"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -2591,8 +2591,13 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
                     ev += "; listening on %s" % ",".join(inst.listening[:6])
                 else:
                     status = "unknown"
-                    ev += "; no listening socket, exposure depends on fetch()/zlib use on untrusted data"
-                if rem:
+                    ev += "; no listening socket, %s" % cdef.get(
+                        "no_listener_text", rule.get("no_listener_text", "exposure depends on fetch()/zlib use on untrusted data"))
+                var = inst.variant()
+                if var:
+                    ev += "; %s; remedy: %s" % (var.get("label", "variant"), var.get("remedy", rem))
+                    extra["variant"] = var.get("label")
+                elif rem:
                     ev += "; remedy: " + rem
             results.append((inst, subject, status, ev, extra))
         # containers with the same runtime version, status and evidence (pod replicas) share a finding

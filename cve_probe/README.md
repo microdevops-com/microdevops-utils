@@ -29,6 +29,7 @@ The complete current scope is the rule set in `rules/`. Nothing outside this tab
 | `brotli-decoder` | CVE-2026-111497 | Node2Shell: Brotli decoder overflow, remote code execution; running Node.js/Bun binaries (vendored copy) on host and in containers, plus the system libbrotli in every root | runtime |
 | `nginx2root` | CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-121810, CVE-2026-113425 | NGINX2Root: nginx HTTP/2, HTTP/3, resolver and mail proxy memory corruption, remote code execution as the worker user; running nginx on host and in containers, judged by package, configuration and who can reach the ports | runtime |
 | `sshhole` | CVE-2026-123158 | OpenSSH sshd password authentication bypass on musl libc without PAM (Alpine), in CISA KEV; running sshd on host and in containers, judged by the libraries it has mapped, package, `PasswordAuthentication` and who can reach the port. glibc builds report `not_applicable` | runtime |
+| `ruby2shell` | CVE-2026-132825 | Ruby2Shell: heap overflow in Ruby string case conversion, remote code execution reported for Rails and Sinatra; running Ruby interpreters on host and in containers (rbenv, RVM, images, distro packages, GitLab's bundled Ruby), critical when the process holds a listening TCP or Unix socket | runtime |
 
 `--only <family>` or `--only <id>` restricts a run to one row. When a rule file is added, add its row here.
 CVEs that were assessed and deliberately left out, with the reason, are listed in `NOT_COVERED.md` in
@@ -227,6 +228,7 @@ Runtime rules: `runtimes` keyed by name (`exe` regex over the basename, `version
 version output; `label`, own `remedy`, optional `name` and `version_re` for the product's own version,
 optional `fixed` per core branch for products that backport without changing the core version: the
 runtime shipped inside a product with its own lifecycle, e.g. ingress-nginx, OpenResty), `fixed_packages` per distro release, `fixed_upstream` per branch, `third_party_re`;
+`no_listener_text` for the `unknown` finding of a vulnerable runtime without a listening socket;
 per CVE `affected_from`, `requires_config[]`, `config_absent_status`, `mitigated_if_config`, `unless_config`,
 `requires_mapped[]`, `exempt_if{mapped, config}`, `listen_param`, `listen_all_if`, `exposure[]`)
 and `library` (`packages`
