@@ -111,8 +111,8 @@ firewall rules as described under Reachability below.
 Entry points for foreign code, any one of which keeps a local bug critical:
 
 1. a service other than the host's sshd open to any source;
-2. a service accepted from particular sources whose class is web or application, runs commands
-   by design, or unknown (see the classes below);
+2. a service accepted from particular sources whose class is an entry class: web, application,
+   transfer, exec or unknown (see the classes below);
 3. a published Docker/podman container whose published ports carry such a service, judged by
    what listens inside the container; any container of a runtime that cannot be judged
    (Kubernetes pods); LXC/Incus guests running on this kernel;
@@ -124,14 +124,16 @@ Entry points for foreign code, any one of which keeps a local bug critical:
 Service classes, by executable name; where the name is ambiguous the command line or path
 decides. `host_exposure.listeners` carries the class and the evidence per port.
 
-| class | entry point | members |
-|-------|-------------|---------|
-| admin | no | `sshd` |
-| data | no | databases, caches and their sentinels, storage and queue daemons: `mysqld`, `mariadbd`, `postgres`, `redis-*`, `valkey-*`, `keydb-server`, `memcached`, `mongod`, `mongos`, `clickhouse`, `etcd`, `consul`, `minio`, `proxysql`, `pgbouncer`, `slapd`, `gluster*`, `nsq*`; RabbitMQ (`beam.smp` with rabbit on its command line); Kafka, ZooKeeper, Elasticsearch, OpenSearch, Cassandra (`java` by main class) |
-| system | no | mail, name, time and RPC daemons, proxies that only relay, virtual machine consoles, monitoring and log agents: Postfix `master`, `exim4`, `dovecot`, `rpcbind`, `systemd-resolved`, `named`, `unbound`, `chronyd`, `ntpd`, `danted`, `xinetd`, `qemu-system-*`, `epmd`, salt master and minion, `zabbix_*`, `netdata`, `vmagent`, `promtail`, `telegraf`, `vector`, `fluent-bit`, `filebeat`, `alloy`, `*_exporter` |
-| web | yes | `nginx`, `apache2`, `httpd`, `caddy`, `traefik`, `envoy`, `varnishd`, `php-fpm`, `node`, `bun`, `deno`, `ruby`, `python`, `uwsgi`, `gunicorn`, `dotnet`, other `java` and `beam.smp`, `asterisk` (telephony), Kannel `bearerbox`/`smsbox` (messaging gateway) |
-| exec | yes | services that run commands by design: `olivetin` |
-| unknown | yes | everything else |
+| class | open to any | limited sources | members |
+|-------|-------------|-----------------|---------|
+| admin | no | no | `sshd` |
+| data | entry point | no | databases, caches and their sentinels, search, storage, queue and secrets daemons: `mysqld`, `mariadbd`, `postgres`, `redis-*`, `valkey-*` (also `redis-check-rdb`, the same binary), `keydb-server`, `memcached`, `mongod`, `mongos`, `clickhouse`, `etcd`, `consul`, `minio`, `proxysql`, `pgbouncer`, `slapd`, `gluster*`, `nsq*`, `searchd`, `typesense-server`, `gearmand`, `bao`; RabbitMQ (`beam.smp` with rabbit on its command line); Kafka, ZooKeeper, Elasticsearch, OpenSearch, Cassandra (`java` by main class) |
+| system | entry point | no | mail, name, time, print and RPC daemons, VPN and proxies that only relay, hypervisor APIs and consoles, monitoring servers and agents: Postfix `master`, `exim4`, `dovecot`, `cyrus-master`, `pop3d`, `imapd`, `rpcbind`, `systemd-resolved`, `named`, `unbound`, `dnsmasq`, `aardvark-dns`, `chronyd`, `ntpd`, `cupsd`, `hfaxd`, `openvpn`, `pptpd`, `danted`, `squid`, `tinyproxy`, `3proxy`, `xinetd`, `qemu-system-*`, `lxd`, `incusd`, `epmd`, salt master and minion, `zabbix_*`, `netdata`, `vmagent`, VictoriaMetrics servers, `victoria-logs`, `loki`, `alertmanager`, `promtail`, `telegraf`, `vector`, `fluent-bit`, `filebeat`, `alloy`, `*_exporter` |
+| web | entry point | entry point | `nginx`, `apache2`, `httpd`, `caddy`, `traefik`, `envoy`, `varnishd`, `php-fpm` and other `php`, `node`, `bun`, `deno`, `ruby`, `python`, `perl` (also versioned names such as `php7.1`), `uwsgi`, `gunicorn`, `dotnet`, `grafana`, `centrifugo`, `binom-observer`, `jsvc`, other `java` and `beam.smp`, `asterisk` (telephony), Kannel `bearerbox`/`smsbox` (messaging gateway), `evostreamms` (media server) |
+| application | entry point | entry point | a name not listed whose executable is under `/srv`, `/opt`, `/home`, `/var/www`, `/usr/local`, `/app`, `/data`, or runs in a container: a deployed application |
+| transfer | entry point | entry point | services whose purpose is that others write files onto the host: `proftpd` (FTP and SFTP ports alike), `vsftpd`, `pure-ftpd`, `syncthing` |
+| exec | entry point | entry point | services that run commands by design: `olivetin`, `dockerd` on TCP, `webhook`, `pinokio` |
+| unknown | entry point | entry point | everything else: a name not listed, run from a system path. The list worth a human look |
 
 Forwarders count by what they carry. `haproxy` is judged per bound port from its configuration
 (the `-f` files of the master process; the worker is chrooted): mode http with servers is web;
@@ -139,7 +141,7 @@ a section serving only haproxy's own stats or metrics is system; mode tcp is dat
 positive evidence, a database health check (`option mysql-check`, `pgsql-check`, `redis-check`,
 `tcp-check` with Redis or SQL commands) or every backend server on a well-known data port,
 because tcp mode also passes TLS through to web servers. An unreadable configuration or a port
-not found in it counts as web. `docker-proxy` and DNAT-published container ports take the class
+not found in it counts as web. `docker-proxy`, podman's `conmon` and DNAT-published container ports take the class
 of the process listening inside the container.
 
 What the probe sees is an upper bound: a provider firewall or NAT in front of the host may

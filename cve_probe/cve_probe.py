@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.14"
+VERSION = "1.15"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -2721,26 +2721,38 @@ def eval_trust_rule(rule, host, stores):
 # Exposure-aware severity (--severity exposure): who can reach the host, who can run code on it
 # ----------------------------------------------------------------------------
 
-# Service classes for a listener that is accepted only from particular sources. "admin",
-# "data" and "system" are not an entry point for foreign code; "web", "exec" and "unknown" are.
-# Families are matched by executable name; where the name is ambiguous (java, beam.smp, master,
-# python running salt) the command line or the path decides. Anything not listed is unknown.
+# Service classes for a listener. Open to any source, every class but "admin" is an entry point
+# for foreign code; accepted only from particular sources, "admin", "data" and "system" are not
+# and the classes in ENTRY_CLASSES are. Families are matched by executable name; where the name
+# is ambiguous (java, beam.smp, master, python running salt) the command line or the path
+# decides. A name not listed is "application" when it runs from an application directory or in
+# a container, else "unknown": both count, unknown is the list worth a human look.
 SERVICE_CLASS_RE = [
     ("admin", re.compile(r"^sshd$")),
-    ("data", re.compile(r"^(mysqld|mariadbd|mysqld_safe|postgres|postmaster|redis-server|redis-sentinel|valkey-server|"
-                        r"valkey-sentinel|keydb-server|memcached|mongod|mongos|clickhouse|clickhouse-server|etcd|consul|"
-                        r"minio|proxysql|pgbouncer|slapd|glusterfsd|glusterd|glusterfs|nsqd|nsqlookupd|nsqadmin)$")),
-    ("system", re.compile(r"^(smtpd|exim4|dovecot|rpcbind|systemd-resolved|named|unbound|chronyd|ntpd|danted|sockd|xinetd|"
-                          r"qemu-system-\w+|epmd|zabbix_server|zabbix_proxy|zabbix_agentd|zabbix_agent2|netdata|vmagent|"
-                          r"promtail|telegraf|vector|fluent-bit|filebeat|alloy|\w+[_-]exporter)$")),
-    ("exec", re.compile(r"^(olivetin)$", re.I)),
-    ("web", re.compile(r"^(nginx|apache2|httpd|caddy|traefik|envoy|varnishd|php-fpm[\d.]*|node|nodejs|bun|deno|ruby[\d.]*|"
-                       r"python[\d.]*|uwsgi|gunicorn|dotnet|asterisk|bearerbox|smsbox|java|beam\.smp)$")),
+    ("data", re.compile(r"^(mysqld|mariadbd|mysqld_safe|postgres|postmaster|redis-server|redis-sentinel|redis-check-rdb|"
+                        r"valkey-server|valkey-sentinel|valkey-check-rdb|keydb-server|memcached|mongod|mongos|clickhouse|"
+                        r"clickhouse-server|etcd|consul|minio|proxysql|pgbouncer|slapd|glusterfsd|glusterd|glusterfs|"
+                        r"nsqd|nsqlookupd|nsqadmin|searchd|typesense-server|gearmand|bao)$")),
+    ("system", re.compile(r"^(smtpd|exim4|dovecot|cyrus-master|pop3d|imapd|rpcbind|systemd-resolved|named|unbound|dnsmasq|"
+                          r"aardvark-dns|chronyd|ntpd|danted|sockd|squid|squid-\w+|tinyproxy|3proxy|openvpn|pptpd|xinetd|"
+                          r"qemu-system-\w+|lxd|incusd|cupsd|hfaxd|epmd|zabbix_server|zabbix_proxy|zabbix_agentd|"
+                          r"zabbix_agent2|netdata|vmagent|vmserver|vmstorage|vmselect|vminsert|victoria-metrics[\w-]*|"
+                          r"victoria-logs[\w-]*|loki|alertmanager|promtail|telegraf|vector|fluent-bit|filebeat|alloy|"
+                          r"\w+[_-]exporter)$")),
+    ("exec", re.compile(r"^(olivetin|dockerd|webhook|pinokio)$", re.I)),
+    ("transfer", re.compile(r"^(proftpd|vsftpd|pure-ftpd|syncthing)$")),
+    ("web", re.compile(r"^(nginx|apache2|httpd|caddy|traefik|envoy|varnishd|php-fpm[\d.]*|php[\d.]*|node|nodejs|bun|deno|"
+                       r"ruby[\d.]*|python[\d.]*|perl[\d.]*|uwsgi|gunicorn|dotnet|grafana|grafana-server|centrifugo|"
+                       r"binom-observer|jsvc|asterisk|bearerbox|smsbox|evostreamms|java|beam\.smp)$")),
 ]
 JAVA_DATA_RE = re.compile(r"kafka\.Kafka|org\.apache\.zookeeper|org\.elasticsearch|org\.opensearch|org\.apache\.cassandra")
-SERVICE_LABEL = {"asterisk": "telephony service", "bearerbox": "messaging gateway", "smsbox": "messaging gateway"}
-ENTRY_CLASSES = ("web", "exec", "unknown")
-CLASS_RANK = {"admin": 0, "system": 1, "data": 2, "unknown": 3, "web": 4, "exec": 5}
+SERVICE_LABEL = {"asterisk": "telephony service", "bearerbox": "messaging gateway", "smsbox": "messaging gateway",
+                 "evostreamms": "media server"}
+ENTRY_CLASSES = ("web", "application", "transfer", "exec", "unknown")
+PROXIED_CLASSES = ("web", "application", "unknown")      # may carry a request on to an application
+APP_PATH_RE = re.compile(r"^/(srv|opt|home|var/www|usr/local|app|data)/")
+PORT_HOLDERS = ("docker-proxy", "conmon")                # hold a host port for a container
+CLASS_RANK = {"admin": 0, "system": 1, "data": 2, "unknown": 3, "application": 4, "transfer": 5, "web": 6, "exec": 7}
 DATA_PORTS = set([3306, 5432, 6379, 26379, 27017, 11211])
 CI_RUNNER_RE = re.compile(r"^(gitlab-runner|gitlab-runner-helper|Runner\.Listener|Runner\.Worker|buildkite-agent|"
                           r"act_runner|forgejo-runner|drone-runner-[\w-]+|woodpecker-agent|circleci-runner)$")
@@ -2920,6 +2932,12 @@ class HostExposure(object):
         for cls, rx in SERVICE_CLASS_RE:
             if rx.match(exe):
                 return cls, name
+        try:
+            path = os.readlink("/proc/%d/exe" % pid).replace(" (deleted)", "") if pid else ""
+        except OSError:
+            path = ""
+        if APP_PATH_RE.match(path) or (pid and CGROUP_ID_RE.search(read_file("/proc/%d/cgroup" % pid, "") or "")):
+            return "application", name
         return "unknown", name
 
     def classify_owners(self, pids, port):
@@ -2930,6 +2948,16 @@ class HostExposure(object):
             if best is None or CLASS_RANK[c[0]] > CLASS_RANK[best[0]]:
                 best = c
         return best
+
+    def published_target(self, port):
+        """(container ip, container port) a host port is forwarded to, from the DNAT rules, or None."""
+        for t in self.kf._publish_texts or []:
+            if not re.search(r"dports? (\S*,)?%d\b" % port, t):
+                continue
+            m = re.search(r"(?:--to-destination|dnat (?:ip )?to)\s+(\d+\.\d+\.\d+\.\d+):(\d+)", t)
+            if m:
+                return m.group(1), int(m.group(2))
+        return None
 
     def inside(self, ip, cport):
         """(class, evidence, container) of whatever listens on cport inside the container that owns
@@ -3088,11 +3116,15 @@ class HostExposure(object):
                 if EXPOSURE_RANK[state] >= EXPOSURE_RANK[L["state"]]:
                     L["state"], L["detail"] = state, detail
         for port, L in self.listeners.items():
-            if set(L["owners"]) == set(["docker-proxy"]) and L["pids"].get("docker-proxy") in proxies:
-                got = self.inside(*proxies[L["pids"]["docker-proxy"]])
+            if L["owners"] and set(L["owners"]) <= set(PORT_HOLDERS):
+                # the port is held for a container: it counts by what listens inside
+                target = proxies.get(L["pids"].get("docker-proxy")) or self.published_target(port)
+                got = self.inside(*target) if target else None
                 if got:
                     L["class"], L["evidence"], L["container"] = got[0], got[1], got[2]["where"]
-                    continue
+                else:
+                    L["class"], L["evidence"] = "unknown", "published container port, listener inside not identified"
+                continue
             L["class"], L["evidence"] = self.classify_owners(L["pids"], port)
         self._accounts()
         self._entry_points()
@@ -3148,6 +3180,10 @@ class HostExposure(object):
                     ep.append("service that runs commands by design (%s)" % what)
                 elif L["class"] == "unknown":
                     ep.append("unclassified service accepted from particular sources (%s)" % what)
+                elif L["class"] == "transfer":
+                    ep.append("file transfer service accepted from particular sources (%s)" % what)
+                elif L["class"] == "application":
+                    ep.append("application service accepted from particular sources, which may be a proxy (%s)" % what)
                 elif label:
                     ep.append("%s accepted from particular sources (%s)" % (label, what))
                 else:
@@ -3175,7 +3211,7 @@ class HostExposure(object):
         container its own publication; otherwise, and for a kernel bug, every listener of the
         host. through_proxy bugs travel in an ordinary request, so a source-limited port may
         still deliver them (the sources may be a load balancer); for those, host-wide judgement
-        leaves out ports whose service class cannot carry a request to an application."""
+        keeps only ports whose service class may carry a request on to an application."""
         own_ports, hostwide = set(), not instances
         try:
             own_ns = os.readlink("/proc/self/ns/net")
@@ -3201,7 +3237,7 @@ class HostExposure(object):
         for port, L in self.listeners.items():
             if port in own_ports:
                 cand.append((port, L["state"]))
-            elif hostwide and not (through_proxy and L["class"] not in ENTRY_CLASSES):
+            elif hostwide and not (through_proxy and L["class"] not in PROXIED_CLASSES):
                 cand.append((port, L["state"]))
         if hostwide:
             for c in self.containers:
