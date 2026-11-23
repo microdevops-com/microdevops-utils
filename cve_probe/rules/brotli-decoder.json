@@ -2,6 +2,8 @@
   "family": "brotli-decoder",
   "title": "Node2Shell: Google Brotli decoder out-of-bounds write, remote code execution via crafted Brotli streams",
   "kind": "runtime",
+  "vector": "remote",
+  "through_proxy": true,
   "references": [
     "https://ubuntu.com/security/CVE-2026-111497",
     "https://security-tracker.debian.org/tracker/CVE-2026-111497",
@@ -27,6 +29,7 @@
     }
   },
   "library": {
+    "vector": "library",
     "packages": {"deb": ["libbrotli1"], "apk": ["brotli-libs"], "rpm": ["brotli", "libbrotli"]},
     "soname": "libbrotlidec.so",
     "remedy": "upgrade the system brotli package (libbrotli1 / brotli-libs / brotli) and rebuild container images from updated bases",

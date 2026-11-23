@@ -2,6 +2,7 @@
   "family": "copy-fail",
   "title": "Copy Fail: Linux kernel AF_ALG (algif_aead) local privilege escalation",
   "kind": "kernel",
+  "vector": "local",
   "references": [
     "https://ubuntu.com/security/CVE-2026-31431",
     "https://security-tracker.debian.org/tracker/CVE-2026-31431",

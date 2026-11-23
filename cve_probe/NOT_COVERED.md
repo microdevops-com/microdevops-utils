@@ -28,6 +28,17 @@ Add a row when a CVE or a batch is assessed and rejected. Move a row out when it
 | `nginx2root` | `restricted` means the firewall limits the sources, not that the sources are a proxying CDN | the probe carries no CDN address lists and cannot see the CDN's mode from the host |
 | `sshhole` | "password authentication possible" is the test; the advisory says the bypass needs "some configurations of accounts" without naming them | not published |
 
+## Limits of `--severity exposure`
+
+| limit | consequence |
+|-------|-------------|
+| the probe sees only the host: a provider firewall, security group or NAT in front is invisible | exposure is an upper bound; a host can look open and be closed, never the reverse |
+| source addresses do not say whether they are a proxy or an office | request-level bugs stay critical behind any source-limited port; a non-infrastructure service behind limited sources counts as an entry point |
+| accept rules under conditions the probe does not evaluate (packet marks set by Cilium or kube-proxy, rate limits) count as open | Kubernetes nodes show every port as open |
+| accounts from LDAP, SSSD or other directories are not in `/etc/passwd` | such non-admin users are not counted as an entry point |
+| the infrastructure daemon list is short on purpose | hosts with other internal-only services (mail relay on port 25, health checks, message brokers) keep local bugs critical |
+| which listener proxies to which process is not visible | an application on loopback is judged by all listeners of the host |
+
 ## Seen, not assessed
 
 Leads nobody has looked at. Not decisions.

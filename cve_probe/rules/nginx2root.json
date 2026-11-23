@@ -2,6 +2,8 @@
   "family": "nginx2root",
   "title": "NGINX2Root: nginx HTTP/2, HTTP/3, resolver and mail proxy memory corruption, unauthenticated remote code execution as the worker user",
   "kind": "runtime",
+  "vector": "remote",
+  "through_proxy": false,
   "references": [
     "https://nginx.org/en/security_advisories.html",
     "https://xint.io/blog/nginx2root-remote-code-execution",

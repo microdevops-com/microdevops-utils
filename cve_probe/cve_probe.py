@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.12"
+VERSION = "1.13"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -401,6 +401,7 @@ class KernelFacts(object):
         self._fw_rules = None       # collected on first use, only rules with firewall_mitigations need it
         self._fw_chains = None
         self._reach = {}
+        self._publish_texts = None
         self._foreign_netns = None
 
     def _installed(self):
@@ -900,7 +901,8 @@ def _iptables_chains(nft_ok, legacy_ok, v):
             continue
         rc, out, _ = run([cli])
         # iptables-save and iptables-nft-save print the same ruleset under different headers
-        body = "\n".join(l for l in out.splitlines() if not l.startswith("#"))
+        # ... and with packet counters that move between the two calls on a busy host
+        body = "\n".join(re.sub(r"\[\d+:\d+\]", "", l) for l in out.splitlines() if not l.startswith("#"))
         if rc != 0 or body in seen:
             continue
         seen.append(body)
@@ -1770,6 +1772,26 @@ def _netns_local_ips(pid):
     return ips
 
 
+def netns_reachability(pid, runtime, kf):
+    """("open"|"restricted", text) for a container in its own network namespace: open when a
+    DNAT rule or a docker-proxy on the host forwards to one of its addresses, or when the
+    runtime is not Docker/podman (cannot be proven); restricted when it publishes nothing."""
+    if kf._publish_texts is None:
+        ch = kf.fw_chains()
+        texts = [t for c in list(ch["ip"].values()) + list(ch["nft"].values()) for t in c["rules"]]
+        for d in os.listdir("/proc"):
+            if d.isdigit() and (read_file("/proc/%s/comm" % d, "") or "").strip() == "docker-proxy":
+                texts.append((read_file("/proc/%s/cmdline" % d, "") or "").replace("\0", " "))
+        kf._publish_texts = [t for t in texts if re.search(r"--to-destination|dnat (ip )?to|-container-ip", t)]
+    for ip in sorted(_netns_local_ips(pid)):
+        rx = re.compile(r"(--to-destination|dnat (ip )?to|-container-ip)\s+%s(:|\s|$)" % re.escape(ip))
+        if any(rx.search(t) for t in kf._publish_texts):
+            return "open", "container address %s is published (DNAT/proxy rule on the host), sources not evaluated" % ip
+    if runtime in ("docker", "podman"):
+        return "restricted", "container publishes no port, reachable only from the host and its container networks"
+    return "open", "container reachability cannot be proven for runtime %s" % (runtime or "unknown")
+
+
 def instance_reachability(inst, kf, ports=None):
     """("open"|"restricted", text) for a runtime instance's TCP listeners. Host network
     namespace: judged from the input hook rules per port. Other namespaces: open when a DNAT
@@ -1785,19 +1807,7 @@ def instance_reachability(inst, kf, ports=None):
     except OSError:
         own_ns = not inst.container_id
     if not own_ns:
-        ips = _netns_local_ips(inst.pid)
-        ch = kf.fw_chains()
-        texts = [t for c in list(ch["ip"].values()) + list(ch["nft"].values()) for t in c["rules"]]
-        for d in os.listdir("/proc"):
-            if d.isdigit() and (read_file("/proc/%s/comm" % d, "") or "").strip() == "docker-proxy":
-                texts.append((read_file("/proc/%s/cmdline" % d, "") or "").replace("\0", " "))
-        for ip in sorted(ips):
-            rx = re.compile(r"(--to-destination|dnat (ip )?to|-container-ip)\s+%s(:|\s|$)" % re.escape(ip))
-            if any(rx.search(t) for t in texts):
-                return "open", "container address %s is published (DNAT/proxy rule on the host), sources not evaluated" % ip
-        if inst.runtime in ("docker", "podman"):
-            return "restricted", "container publishes no port, reachable only from the host and its container networks"
-        return "open", "container reachability cannot be proven for runtime %s" % (inst.runtime or "unknown")
+        return netns_reachability(inst.pid, inst.runtime, kf)
     v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
                     for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
     checked, limited = [], []
@@ -2109,10 +2119,20 @@ class Finding(object):
         self.severity = STATUS_SEVERITY[status]
         self.evidence = evidence
         self.extra = extra or {}
+        self.instances = []               # runtime instances behind the finding, for reachability
+        self.severity_default = self.severity
+        self.severity_exposure = self.severity
+        self.severity_reason = None
+        self.vector = None
 
     def as_dict(self):
         d = {"family": self.family, "cve": self.cve, "subject": self.subject, "status": self.status,
-             "severity": self.severity, "evidence": self.evidence}
+             "severity": self.severity, "evidence": self.evidence,
+             "severity_default": self.severity_default, "severity_exposure": self.severity_exposure}
+        if self.vector:
+            d["vector"] = self.vector
+        if self.severity_reason:
+            d["severity_reason"] = self.severity_reason
         d.update(self.extra)
         return d
 
@@ -2620,7 +2640,9 @@ def eval_runtime_rule(rule, host, instances, libs, kf=None):
                     if "reachability" in m[2]:
                         extra["reachability"] = m[2]["reachability"]
                         break
-            findings.append(Finding(rule["family"], cve, subject, status, ev, extra))
+            fnd = Finding(rule["family"], cve, subject, status, ev, extra)
+            fnd.instances = [m[0] for m in members]
+            findings.append(fnd)
         # system library: one finding per status across host and containers
         groups = {}
         unreadable = [lib for lib in libs if lib.version is None]
@@ -2695,6 +2717,305 @@ def eval_trust_rule(rule, host, stores):
 # Main
 # ----------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------
+# Exposure-aware severity (--severity exposure): who can reach the host, who can run code on it
+# ----------------------------------------------------------------------------
+
+# Daemons that are not an entry point for foreign code when their port is limited to particular
+# sources. Everything else behind limited sources counts as one: it may sit behind a proxy.
+INFRA_DAEMON_RE = re.compile(r"^(sshd|mysqld|mariadbd|postgres|postmaster|redis-server|memcached|mongod|vmagent|"
+                             r"netdata|zabbix_agentd|zabbix_agent2|xinetd|\w+[_-]exporter)$")
+CI_RUNNER_RE = re.compile(r"^(gitlab-runner|gitlab-runner-helper|Runner\.Listener|Runner\.Worker|buildkite-agent|"
+                          r"act_runner|forgejo-runner|drone-runner-[\w-]+|woodpecker-agent|circleci-runner)$")
+CI_JAVA_RE = re.compile(r"agent\.jar|remoting\.jar|slave\.jar|jetbrains\.buildServer\.agent|hudson\.remoting")
+NOLOGIN_SHELL_RE = re.compile(r"(/nologin|/false|/sync|/halt|/shutdown|git-shell)$")
+ADMIN_GROUPS = ("root", "sudo", "wheel", "admin")
+EXPOSURE_RANK = {"closed": 0, "restricted": 1, "open": 2}
+
+
+def _listen_addr(addr_hex):
+    """(family, kind) of a hex local address from /proc/net/tcp{,6}."""
+    b = []
+    for w in range(0, len(addr_hex), 8):
+        b.extend(int(addr_hex[w + j:w + j + 2], 16) for j in (6, 4, 2, 0))
+    if len(b) == 16 and b[:10] == [0] * 10 and b[10:12] == [255, 255]:
+        b = b[12:]
+    fam = "ip" if len(b) == 4 else "ip6"
+    if not any(b):
+        return fam, "any"
+    if (fam == "ip" and b[0] == 127) or (fam == "ip6" and b == [0] * 15 + [1]):
+        return fam, "loopback"
+    return fam, "addr"
+
+
+class HostExposure(object):
+    """What the host itself shows about being reachable and about running foreign code. An
+    upper bound: a firewall or NAT in front of the host may close what looks open from here.
+    Anything that cannot be determined counts as exposed."""
+
+    def __init__(self, host, kf):
+        self.host = host
+        self.kf = kf
+        self.error = None
+        self.listeners = {}       # port -> {"owners": set, "state": open|restricted|closed, "detail": text}
+        self.containers = []      # {"id", "where", "state", "detail"} for containers with their own netns
+        self.lxc_guests = set()
+        self.runners = set()
+        self.accounts = []
+        self.entry_points = []
+        try:
+            self._collect()
+        except Exception as e:      # noqa: any failure means "could not tell"
+            self.error = "%s: %s" % (type(e).__name__, e)
+            log("host exposure failed: %s" % self.error)
+
+    def _collect(self):
+        try:
+            own_ns = os.readlink("/proc/self/ns/net")
+        except OSError:
+            own_ns = None
+        sockets = {}              # inode -> set of (family, kind, port)
+        for f in ("tcp", "tcp6"):
+            for line in (read_file("/proc/net/%s" % f, "") or "").splitlines()[1:]:
+                parts = line.split()
+                if len(parts) > 9 and parts[3] == "0A":
+                    addr, port = parts[1].rsplit(":", 1)
+                    fam, kind = _listen_addr(addr)
+                    eps = sockets.setdefault(parts[9], set())
+                    eps.add((fam, kind, int(port, 16)))
+                    if fam == "ip6" and kind == "any":
+                        eps.add(("ip", "any", int(port, 16)))
+        owners = {}               # inode -> set of exe basenames
+        for d in os.listdir("/proc"):
+            if not d.isdigit():
+                continue
+            pid = int(d)
+            cg = read_file("/proc/%d/cgroup" % pid, "") or ""
+            if not self.host.is_container:
+                m = LXC_GUEST_RE.search(cg)
+                if m:
+                    self.lxc_guests.add(m.group(1))
+                    continue
+            try:
+                exe = os.path.basename(os.readlink("/proc/%d/exe" % pid).replace(" (deleted)", ""))
+            except OSError:
+                continue
+            argv = (read_file("/proc/%d/cmdline" % pid, "") or "").split("\0")
+            arg0 = os.path.basename(argv[0]) if argv and argv[0] else ""
+            if CI_RUNNER_RE.match(exe) or CI_RUNNER_RE.match(arg0) or \
+                    (exe == "java" and CI_JAVA_RE.search(" ".join(argv))):
+                self.runners.add(exe if CI_RUNNER_RE.match(exe) else (arg0 if CI_RUNNER_RE.match(arg0) else "java build agent"))
+            try:
+                if own_ns and os.readlink("/proc/%d/ns/net" % pid) != own_ns:
+                    continue
+                fds = os.listdir("/proc/%d/fd" % pid)
+            except OSError:
+                continue
+            for fd in fds:
+                try:
+                    l = os.readlink("/proc/%d/fd/%s" % (pid, fd))
+                except OSError:
+                    continue
+                if l.startswith("socket:[") and l[8:-1] in sockets:
+                    owners.setdefault(l[8:-1], set()).add(exe)
+        # A socket-activated service is listened on by systemd: name the unit it starts instead.
+        # With other holders present (sshd next to ssh.socket) systemd is just dropped.
+        units = None
+        for inode, names in owners.items():
+            if "systemd" not in names:
+                continue
+            names.discard("systemd")
+            if names:
+                continue
+            if units is None:
+                units = {}
+                if which("systemctl"):
+                    rc, out, _ = run(["systemctl", "list-sockets", "--no-legend", "--no-pager"], timeout=10)
+                    for line in out.splitlines() if rc == 0 else []:
+                        parts = line.split()
+                        m = re.search(r":(\d+)$", parts[0]) if len(parts) >= 3 else None
+                        if m:
+                            units[int(m.group(1))] = parts[-1]
+            for fam, kind, port in sockets[inode]:
+                unit = units.get(port, "")
+                names.add("sshd" if re.match(r"sshd?(@.*)?\.service$", unit) else (unit or "systemd socket"))
+        v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
+                        for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
+        for inode, eps in sockets.items():
+            for fam, kind, port in eps:
+                if kind == "loopback" or (fam == "ip6" and not v6_global):
+                    continue
+                state, detail = self.kf.port_reachability(fam, port)
+                L = self.listeners.setdefault(port, {"owners": set(), "state": "closed", "detail": ""})
+                L["owners"].update(owners.get(inode, set()))
+                if EXPOSURE_RANK[state] >= EXPOSURE_RANK[L["state"]]:
+                    L["state"], L["detail"] = state, detail
+        for cid, pid in container_roots():
+            try:
+                if own_ns and os.readlink("/proc/%d/ns/net" % pid) == own_ns:
+                    continue          # host network: its listeners are judged above
+            except OSError:
+                continue
+            runtime, name, _ = describe_container(pid, cid)
+            state, detail = netns_reachability(pid, runtime, self.kf)
+            self.containers.append({"id": cid, "where": where_label(cid, runtime, name), "state": state, "detail": detail})
+        self._accounts()
+        self._entry_points()
+
+    def _accounts(self):
+        """Login accounts that are not administrators: a normal uid, a real login shell, able to
+        log in (usable password hash or a non-empty authorized_keys), and neither in an admin
+        group nor named in sudoers. Unreadable sudoers means not an administrator."""
+        m = re.search(r"^\s*UID_MIN\s+(\d+)", read_file("/etc/login.defs", "") or "", re.M)
+        uid_min = int(m.group(1)) if m else 1000
+        shadow = dict((l.split(":")[0], l.split(":")[1]) for l in (read_file("/etc/shadow", "") or "").splitlines() if l.count(":") >= 2)
+        groups, gid_name = {}, {}
+        for l in (read_file("/etc/group", "") or "").splitlines():
+            parts = l.split(":")
+            if len(parts) >= 4:
+                gid_name[parts[2]] = parts[0]
+                for u in parts[3].split(","):
+                    if u:
+                        groups.setdefault(u, set()).add(parts[0])
+        sudoers = read_file("/etc/sudoers", "") or ""
+        for p in sorted(glob.glob("/etc/sudoers.d/*")):
+            sudoers += "\n" + (read_file(p, "") or "")
+        sudo_names = set(l.split()[0] for l in sudoers.splitlines() if l.strip() and not l.lstrip().startswith(("#", "Defaults")))
+        for l in (read_file("/etc/passwd", "") or "").splitlines():
+            parts = l.split(":")
+            if len(parts) < 7 or not parts[2].isdigit():
+                continue
+            name, uid, gid, home, shell = parts[0], int(parts[2]), parts[3], parts[5], parts[6]
+            if uid < uid_min or uid >= 65534 or NOLOGIN_SHELL_RE.search(shell):
+                continue
+            pw = shadow.get(name, "*")
+            keys = any(os.path.getsize(k) > 0 for k in (os.path.join(home, ".ssh/authorized_keys"), os.path.join(home, ".ssh/authorized_keys2"))
+                       if os.path.isfile(k))
+            if (pw.startswith(("!", "*")) or pw == "x") and not keys:
+                continue
+            mine = groups.get(name, set()) | set([gid_name.get(gid, "")])
+            if mine & set(ADMIN_GROUPS) or name in sudo_names or any("%" + g in sudo_names for g in mine):
+                continue
+            self.accounts.append(name)
+
+    def _entry_points(self):
+        ep = []
+        for port, L in sorted(self.listeners.items()):
+            who = ",".join(sorted(L["owners"])) or "unknown process"
+            if L["state"] == "open" and (not L["owners"] or L["owners"] - set(["sshd"])):
+                ep.append("service open to any source (%s port %d)" % (who, port))
+            elif L["state"] == "restricted" and not (L["owners"] and all(INFRA_DAEMON_RE.match(o) for o in L["owners"])):
+                ep.append("service accepted from particular sources, may sit behind a proxy (%s port %d)" % (who, port))
+        opened = [c for c in self.containers if c["state"] == "open"]
+        if opened:
+            ep.append("%d container(s) published or of a runtime that cannot be judged (%s)" % (
+                len(opened), ", ".join(c["where"] for c in opened[:3]) + (", ..." if len(opened) > 3 else "")))
+        if self.lxc_guests:
+            ep.append("%d LXC/Incus guest(s) run on this kernel" % len(self.lxc_guests))
+        for r in sorted(self.runners):
+            ep.append("CI runner or build agent (%s)" % r)
+        if self.accounts:
+            ep.append("non-admin login account(s): %s" % ", ".join(self.accounts[:5]) + (", ..." if len(self.accounts) > 5 else ""))
+        self.entry_points = ep
+
+    def judge(self, instances, through_proxy):
+        """Reachability of a remote bug: ("open"|"proxy"|"limited"|"closed", text). The ports
+        judged are the instance's own non-loopback TCP listeners in the host namespace; for a
+        container its own publication; otherwise, and for a kernel bug, every listener of the
+        host. through_proxy bugs travel in an ordinary request, so a source-limited port may
+        still deliver them (the sources may be a load balancer)."""
+        own_ports, hostwide = set(), not instances
+        try:
+            own_ns = os.readlink("/proc/self/ns/net")
+        except OSError:
+            own_ns = None
+        for inst in instances:
+            try:
+                same = own_ns is not None and os.readlink("/proc/%d/ns/net" % inst.pid) == own_ns
+            except OSError:
+                same = not inst.container_id
+            if not same:
+                for c in self.containers:
+                    if c["id"] == inst.container_id and c["state"] == "open":
+                        return "open", c["detail"]
+                hostwide = True
+                continue
+            mine = set(e[2] for e in getattr(inst, "endpoints", []) if e[1] != "loopback")
+            if mine:
+                own_ports.update(mine)
+            else:
+                hostwide = True
+        cand = []                 # (port, state, owners)
+        for port, L in self.listeners.items():
+            if port in own_ports:
+                cand.append((port, L["state"], L["owners"]))
+            elif hostwide and not (through_proxy and L["owners"] and all(INFRA_DAEMON_RE.match(o) for o in L["owners"])):
+                cand.append((port, L["state"], L["owners"]))
+        if hostwide:
+            for c in self.containers:
+                if c["state"] == "open":
+                    return "open", "%s: %s" % (c["where"], c["detail"])
+        opened = sorted(p for p, st, _ in cand if st == "open")
+        if opened:
+            return "open", "port %s open to any source" % ",".join(str(p) for p in opened[:6])
+        limited = sorted(p for p, st, _ in cand if st == "restricted")
+        if limited:
+            ports = ",".join(str(p) for p in limited[:6])
+            if through_proxy:
+                return "proxy", "port %s accepted from particular sources, which may be a proxy" % ports
+            return "limited", "port %s accepted only from particular sources" % ports
+        if cand:
+            return "closed", "no accept rule for port %s" % ",".join(str(p) for p, _, _ in sorted(cand)[:6])
+        return "closed", "no TCP listener reachable from outside the host" if hostwide else "no non-loopback listener"
+
+    def as_dict(self):
+        return {"error": self.error,
+                "listeners": [{"port": p, "owners": sorted(L["owners"]), "state": L["state"]} for p, L in sorted(self.listeners.items())],
+                "open_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "open"),
+                "limited_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "restricted"),
+                "containers": [{"where": c["where"], "state": c["state"]} for c in self.containers],
+                "lxc_guests": sorted(self.lxc_guests), "ci_runners": sorted(self.runners),
+                "non_admin_accounts": self.accounts, "entry_points": self.entry_points}
+
+    def summary(self):
+        if self.error:
+            return "could not be determined (%s), assumed exposed" % self.error
+        d = self.as_dict()
+        return "open to any: %s; limited: %s; entry points: %d" % (
+            ",".join(str(p) for p in d["open_ports"]) or "-", ",".join(str(p) for p in d["limited_ports"]) or "-", len(self.entry_points))
+
+
+def exposure_severity(f, rule, hx):
+    """(severity, reason) of a finding in exposure mode; sets f.vector. Only vulnerable findings
+    are touched, and only lowered from critical to major. A rule without a vector is remote, a
+    remote rule that does not say passes a reverse proxy: the cautious defaults."""
+    cdef = rule.get("cves", {}).get(f.cve, {})
+    vector = cdef.get("vector") or rule.get("vector") or "remote"
+    if "libraries" in f.extra:
+        vector = rule.get("library", {}).get("vector") or vector
+    f.vector = vector
+    if f.status != "vulnerable":
+        return STATUS_SEVERITY[f.status], None
+    if hx.error:
+        return "critical", "host exposure could not be determined (%s): assumed exposed" % hx.error
+    if vector == "library":
+        return "major", "installed library, no exposed process found using it"
+    if vector == "trust":
+        return "major", "needs a position in the network path"
+    if vector == "local":
+        if hx.entry_points:
+            more = " (+%d more)" % (len(hx.entry_points) - 1) if len(hx.entry_points) > 1 else ""
+            return "critical", "local bug: entry point found: %s%s" % (hx.entry_points[0], more)
+        return "major", "local bug: no entry point for foreign code found on this host"
+    through = cdef.get("through_proxy", rule.get("through_proxy", True))
+    state, why = hx.judge(f.instances, through)
+    if state == "open":
+        return "critical", "remote bug: %s" % why
+    if state == "proxy":
+        return "critical", "remote bug that passes a reverse proxy: %s" % why
+    return "major", "remote bug: %s" % why
+
+
 def worst(findings):
     sev = "ok"
     for f in findings:
@@ -2713,6 +3034,9 @@ def main():
     ap.add_argument("--json", action="store_true", help="print JSON report instead of text")
     ap.add_argument("--facts", action="store_true", help="include raw facts in JSON output")
     ap.add_argument("--all", action="store_true", help="text output: list ok findings too")
+    ap.add_argument("--severity", choices=["default", "exposure"], default="default",
+                    help="severity scheme for the headline severity and exit code: default (fixed per status) or "
+                         "exposure (vulnerable findings weighed by who can reach the host or run code on it)")
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--version", action="version", version="cve_probe %s" % VERSION)
     args = ap.parse_args()
@@ -2768,10 +3092,27 @@ def main():
                 kf = KernelFacts(host)        # reachability and module evidence need it
             findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]], kf))
 
+    # Both severities are always computed; --severity only chooses the headline one.
+    sev_default = worst(findings)
+    hx = HostExposure(host, kf if kf is not None else KernelFacts(host))
+    log("host exposure: %s" % hx.as_dict())
+    by_family = dict((r["family"], r) for r in rules)
+    for f in findings:
+        f.severity_exposure, f.severity_reason = exposure_severity(f, by_family.get(f.family, {}), hx)
+        if args.severity == "exposure":
+            f.severity = f.severity_exposure
+    sev_exposure = "ok"
+    for f in findings:
+        if SEVERITY_RANK[f.severity_exposure] > SEVERITY_RANK[sev_exposure]:
+            sev_exposure = f.severity_exposure
     sev = worst(findings)
     report = {
         "probe": "cve_probe", "version": VERSION, "host": host.as_dict(),
         "severity": sev, "exit_code": SEVERITY_EXIT[sev],
+        "severity_mode": args.severity,
+        "severity_default": sev_default, "exit_code_default": SEVERITY_EXIT[sev_default],
+        "severity_exposure": sev_exposure, "exit_code_exposure": SEVERITY_EXIT[sev_exposure],
+        "host_exposure": hx.as_dict(),
         "rules": [r["_file"] for r in rules],
         "findings": [f.as_dict() for f in findings],
         "duration_s": round(time.time() - started, 1),
@@ -2809,6 +3150,8 @@ def main():
                 "%s %s" % inst.package if inst.package else "-", len(inst.pids), " STALE" if inst.stale() else ""))
             for e in inst.errors:
                 print("    error: %s" % e)
+        if args.severity == "exposure":
+            print("host exposure: %s" % hx.summary())
         print("")
         hidden = 0
         for f in sorted(findings, key=lambda f: (-SEVERITY_RANK[f.severity], f.family, f.cve)):
@@ -2816,11 +3159,16 @@ def main():
                 hidden += 1
                 continue
             print("%-9s %-15s %-17s %s" % (f.severity.upper(), f.status, f.cve, f.subject))
-            print("          %s" % f.evidence)
+            if args.severity == "exposure" and f.severity_reason:
+                print("          %s; severity: %s, %s" % (f.evidence, f.severity, f.severity_reason))
+            else:
+                print("          %s" % f.evidence)
         if hidden:
             print("%d ok findings not listed (use --all)" % hidden)
         print("")
-        print("overall: %s (exit %d), %d findings, %.1fs" % (sev, SEVERITY_EXIT[sev], len(findings), report["duration_s"]))
+        print("overall: %s (exit %d), %d findings, %.1fs%s" % (
+            sev, SEVERITY_EXIT[sev], len(findings), report["duration_s"],
+            ", severity mode exposure" if args.severity == "exposure" else ""))
     return SEVERITY_EXIT[sev]
 
 

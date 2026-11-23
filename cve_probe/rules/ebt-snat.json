@@ -2,6 +2,7 @@
   "family": "ebt-snat",
   "title": "ebtables SNAT ARP rewrite into spliced file pages, local privilege escalation",
   "kind": "kernel",
+  "vector": "local",
   "references": [
     "https://ubuntu.com/security/CVE-2026-53266",
     "https://security-tracker.debian.org/tracker/CVE-2026-53266",

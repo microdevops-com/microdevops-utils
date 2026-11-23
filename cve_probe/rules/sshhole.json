@@ -2,6 +2,8 @@
   "family": "sshhole",
   "title": "OpenSSH sshd password authentication bypass on musl libc without PAM (Alpine): any long password is accepted for some accounts",
   "kind": "runtime",
+  "vector": "remote",
+  "through_proxy": false,
   "references": [
     "https://www.openssh.org/releasenotes.html#10.6p2",
     "https://security.alpinelinux.org/vuln/CVE-2026-123158",

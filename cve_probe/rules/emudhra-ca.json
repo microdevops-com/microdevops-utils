@@ -2,6 +2,7 @@
   "family": "emudhra-ca",
   "title": "eMudhra intermediate CA key compromise: trust store still contains the affected roots",
   "kind": "trust_store",
+  "vector": "trust",
   "references": [
     "https://ubuntu.com/security/notices/USN-8944-1",
     "https://ubuntu.com/security/notices/USN-8944-2",

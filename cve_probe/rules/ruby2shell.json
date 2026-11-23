@@ -2,6 +2,8 @@
   "family": "ruby2shell",
   "title": "Ruby2Shell: heap overflow in Ruby String case conversion for single-byte encodings, remote code execution reported for Rails and Sinatra in default configuration",
   "kind": "runtime",
+  "vector": "remote",
+  "through_proxy": true,
   "references": [
     "https://www.ruby-lang.org/en/news/2026/11/18/multiple-vulnerabilities-in-regexp-and-string/",
     "https://github.com/ruby/ruby/security/advisories/GHSA-34m4-m9fh-gqp5",

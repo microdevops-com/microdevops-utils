@@ -44,6 +44,7 @@ the source repository.
 /opt/microdevops/cve_probe/cve_probe.py --only php2shell --only CVE-2026-31431
 /opt/microdevops/cve_probe/cve_probe.py --kernel-only | --php-only
 /opt/microdevops/cve_probe/cve_probe.py --json --facts   # add raw kernel/php facts
+/opt/microdevops/cve_probe/cve_probe.py --severity exposure   # weigh findings by exposure, see below
 ```
 
 Exit codes, meant for cmd_check_alert `severity_per_retcode`:
@@ -72,6 +73,58 @@ Statuses:
   sources can still attack, and the list has to stay correct.
 - `unknown` - no evidence either way (no changelog, no table entry, built after disclosure).
 - `fixed`, `not_applicable`.
+
+## Severity modes
+
+`--severity default` (also when the argument is absent) is the table above: every `vulnerable`
+finding is critical. Monitoring uses it. `--severity exposure` keeps every finding and status
+and changes only the severity of `vulnerable` findings: it can lower them from critical to
+major, never below, and never touches another status. The JSON always carries both
+(`severity_default`, `severity_exposure`, `vector`, `severity_reason` per finding; both overall
+severities and exit codes, `severity_mode` and `host_exposure` at the top), so one run serves
+both views. Text output in default mode is unchanged.
+
+Each rule states how its bug is exploited (`vector`, per family or per CVE, and on the
+`library` block): `remote` (the attacker sends something over the network), `local` (must
+already run code on the host), `library` (vulnerable code installed, no exposed consumer
+found), `trust` (needs a position in the network path). A rule that does not say is `remote`.
+
+| vector | host | exposure severity |
+|--------|------|-------------------|
+| remote | a judged port is open to any source | critical |
+| remote, `through_proxy` | a judged port is accepted from particular sources | critical: they may be a load balancer or CDN, which forwards an ordinary request |
+| remote, not `through_proxy` | all judged ports limited to particular sources | major |
+| remote | no accept rule, or no listener | major |
+| local | an entry point for foreign code exists | critical |
+| local | none found | major |
+| library, trust | any | major |
+
+`through_proxy` says whether the attack survives a reverse proxy: true for bugs carried in a
+request (PHP, Ruby, Brotli), false for protocol-level ones (TCP options, HTTP/2 framing, ssh).
+A remote rule that does not say is treated as true.
+
+Ports judged for a remote finding: the process's own non-loopback TCP listeners; if it listens
+only on loopback or a Unix socket (an application server behind nginx), or for a kernel bug,
+every non-loopback TCP listener of the host. Each port goes through the same walk of the input
+firewall rules as described under Reachability below.
+
+Entry points for foreign code, any one of which keeps a local bug critical:
+
+1. a service other than the host's sshd open to any source;
+2. a service accepted from particular sources that is not a known infrastructure daemon
+   (`sshd`, `mysqld`, `mariadbd`, `postgres`, `redis-server`, `memcached`, `mongod`, `vmagent`,
+   `netdata`, `zabbix_agentd`, `xinetd`, `*_exporter`): it may sit behind a proxy;
+3. a container with a published port or of a runtime other than Docker/podman, or LXC/Incus
+   guests running on this kernel;
+4. a CI runner or build agent (`gitlab-runner`, GitHub Actions, Buildkite, Gitea, Drone,
+   Woodpecker, Jenkins and TeamCity agents);
+5. a login account that is not an administrator: normal uid, real shell, usable password or
+   `authorized_keys`, not in `sudo`/`wheel`/`admin` and not named in sudoers.
+
+What the probe sees is an upper bound: a provider firewall or NAT in front of the host may
+close what looks open. Every doubt counts as exposed: no firewall, an accept under a
+condition the probe does not evaluate (packet marks on Kubernetes nodes, for example), an
+unknown process, an unreadable sudoers. A closed host is never ok because it is closed.
 
 ## What it looks at
 
@@ -191,7 +244,8 @@ One JSON file per CVE family in `rules/`. Entries under `cves` are keyed by CVE 
 advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 
 ```
-family, title, kind (kernel|php|trust_store|runtime), references[], public (YYYY-MM-DD), remedy
+family, title, kind (kernel|php|trust_store|runtime), references[], public (YYYY-MM-DD), remedy,
+vector (remote|local|library|trust), through_proxy (true|false, remote rules)
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
                      firewall_mitigations[], exposure[], not_affected_distros{}, fixed{}, mitigations[] } }
 ```

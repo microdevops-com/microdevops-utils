@@ -2,6 +2,8 @@
   "family": "php2shell",
   "title": "PHP2Shell: unauthenticated remote code execution in PHP request handling",
   "kind": "php",
+  "vector": "remote",
+  "through_proxy": true,
   "references": [
     "https://ubuntu.com/blog/php2shell-vulnerability-fixes-available",
     "https://security-tracker.debian.org/tracker/CVE-2026-109618",

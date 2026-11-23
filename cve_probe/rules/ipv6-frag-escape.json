@@ -2,6 +2,7 @@
   "family": "ipv6-frag-escape",
   "title": "ipv6_frag_escape: Linux kernel IPv6 UDP send path heap overflow, local privilege escalation / container escape",
   "kind": "kernel",
+  "vector": "local",
   "references": [
     "https://access.redhat.com/security/vulnerabilities/RHSB-2026-009",
     "https://ubuntu.com/security/CVE-2026-53362",

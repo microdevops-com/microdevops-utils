@@ -2,6 +2,8 @@
   "family": "tcp-ireq-opt-uaf",
   "title": "IPv4 TCP request socket IP options use-after-free, remote kernel memory corruption",
   "kind": "kernel",
+  "vector": "remote",
+  "through_proxy": false,
   "references": [
     "https://ubuntu.com/security/CVE-2026-98432",
     "https://security-tracker.debian.org/tracker/CVE-2026-98432",
