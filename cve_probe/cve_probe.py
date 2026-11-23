@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.13"
+VERSION = "1.14"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -2721,10 +2721,27 @@ def eval_trust_rule(rule, host, stores):
 # Exposure-aware severity (--severity exposure): who can reach the host, who can run code on it
 # ----------------------------------------------------------------------------
 
-# Daemons that are not an entry point for foreign code when their port is limited to particular
-# sources. Everything else behind limited sources counts as one: it may sit behind a proxy.
-INFRA_DAEMON_RE = re.compile(r"^(sshd|mysqld|mariadbd|postgres|postmaster|redis-server|memcached|mongod|vmagent|"
-                             r"netdata|zabbix_agentd|zabbix_agent2|xinetd|\w+[_-]exporter)$")
+# Service classes for a listener that is accepted only from particular sources. "admin",
+# "data" and "system" are not an entry point for foreign code; "web", "exec" and "unknown" are.
+# Families are matched by executable name; where the name is ambiguous (java, beam.smp, master,
+# python running salt) the command line or the path decides. Anything not listed is unknown.
+SERVICE_CLASS_RE = [
+    ("admin", re.compile(r"^sshd$")),
+    ("data", re.compile(r"^(mysqld|mariadbd|mysqld_safe|postgres|postmaster|redis-server|redis-sentinel|valkey-server|"
+                        r"valkey-sentinel|keydb-server|memcached|mongod|mongos|clickhouse|clickhouse-server|etcd|consul|"
+                        r"minio|proxysql|pgbouncer|slapd|glusterfsd|glusterd|glusterfs|nsqd|nsqlookupd|nsqadmin)$")),
+    ("system", re.compile(r"^(smtpd|exim4|dovecot|rpcbind|systemd-resolved|named|unbound|chronyd|ntpd|danted|sockd|xinetd|"
+                          r"qemu-system-\w+|epmd|zabbix_server|zabbix_proxy|zabbix_agentd|zabbix_agent2|netdata|vmagent|"
+                          r"promtail|telegraf|vector|fluent-bit|filebeat|alloy|\w+[_-]exporter)$")),
+    ("exec", re.compile(r"^(olivetin)$", re.I)),
+    ("web", re.compile(r"^(nginx|apache2|httpd|caddy|traefik|envoy|varnishd|php-fpm[\d.]*|node|nodejs|bun|deno|ruby[\d.]*|"
+                       r"python[\d.]*|uwsgi|gunicorn|dotnet|asterisk|bearerbox|smsbox|java|beam\.smp)$")),
+]
+JAVA_DATA_RE = re.compile(r"kafka\.Kafka|org\.apache\.zookeeper|org\.elasticsearch|org\.opensearch|org\.apache\.cassandra")
+SERVICE_LABEL = {"asterisk": "telephony service", "bearerbox": "messaging gateway", "smsbox": "messaging gateway"}
+ENTRY_CLASSES = ("web", "exec", "unknown")
+CLASS_RANK = {"admin": 0, "system": 1, "data": 2, "unknown": 3, "web": 4, "exec": 5}
+DATA_PORTS = set([3306, 5432, 6379, 26379, 27017, 11211])
 CI_RUNNER_RE = re.compile(r"^(gitlab-runner|gitlab-runner-helper|Runner\.Listener|Runner\.Worker|buildkite-agent|"
                           r"act_runner|forgejo-runner|drone-runner-[\w-]+|woodpecker-agent|circleci-runner)$")
 CI_JAVA_RE = re.compile(r"agent\.jar|remoting\.jar|slave\.jar|jetbrains\.buildServer\.agent|hudson\.remoting")
@@ -2748,6 +2765,107 @@ def _listen_addr(addr_hex):
     return fam, "addr"
 
 
+def haproxy_ports(pid):
+    """{port: (class, evidence)} for every bind of a running haproxy, from the configuration files
+    on its command line (inside its root). A port counts by what it carries: mode http with
+    servers is web; mode http or tcp serving only haproxy's own stats is system; mode tcp is
+    data only with positive evidence (a database health check, or every backend server on a
+    well-known data port), because tcp mode also passes TLS through to web servers. Returns {}
+    when nothing can be read: the caller then treats the port as web."""
+    # The worker that holds the sockets is usually chrooted (global: chroot /var/lib/haproxy),
+    # so its root does not show the configuration: read through the master process instead.
+    try:
+        ppid = int((read_file("/proc/%d/stat" % pid, "") or "").rsplit(")", 1)[1].split()[1])
+        if os.path.basename(os.readlink("/proc/%d/exe" % ppid).replace(" (deleted)", "")) == "haproxy":
+            pid = ppid
+    except (IndexError, ValueError, OSError):
+        pass
+    root = "/proc/%d/root" % pid
+    argv = (read_file("/proc/%d/cmdline" % pid, "") or "").split("\0")
+    files, i = [], 0
+    while i < len(argv):
+        if argv[i] == "-f" and i + 1 < len(argv):
+            files.append(argv[i + 1])
+            i += 1
+        elif argv[i] == "--":
+            files.extend(a for a in argv[i + 1:] if a)
+            break
+        i += 1
+    paths = []
+    for f in files or ["/etc/haproxy/haproxy.cfg"]:
+        full = in_root(root, f)
+        if os.path.isdir(full):
+            paths.extend(sorted(glob.glob(os.path.join(full, "*.cfg"))))
+        else:
+            paths.append(full)
+    sections, cur, dmode = [], None, None
+    for path in paths:
+        for raw in (read_file(path, "") or "").splitlines():
+            line = re.sub(r"(^|\s)#.*$", "", raw).strip()
+            if not line:
+                continue
+            tok = line.split()
+            kw = tok[0]
+            if kw in ("global", "defaults", "frontend", "listen", "backend", "resolvers", "userlist", "peers", "mailers",
+                      "cache", "program", "ring", "http-errors", "fcgi-app", "crt-store"):
+                cur = {"type": kw, "name": tok[1] if len(tok) > 1 else "", "mode": None, "dmode": dmode, "binds": [],
+                       "refs": [], "servers": [], "stats": False, "dbcheck": False}
+                if kw == "defaults":
+                    dmode = None
+                sections.append(cur)
+                continue
+            if cur is None:
+                continue
+            if kw == "mode" and len(tok) > 1:
+                cur["mode"] = tok[1]
+                if cur["type"] == "defaults":
+                    dmode = tok[1]
+            elif kw == "bind" and len(tok) > 1:
+                for part in tok[1].split(","):
+                    m = re.search(r":(\d+)(?:-(\d+))?$", part)
+                    if m:
+                        lo, hi = int(m.group(1)), int(m.group(2) or m.group(1))
+                        cur["binds"].extend(range(lo, min(hi, lo + 2000) + 1))
+            elif kw in ("default_backend", "use_backend") and len(tok) > 1:
+                cur["refs"].append(tok[1])
+            elif kw in ("server", "server-template") and len(tok) > 2:
+                addr = tok[3] if kw == "server-template" and len(tok) > 3 else tok[2]
+                m = re.search(r":(\d+)$", addr)
+                cur["servers"].append(int(m.group(1)) if m else None)
+            elif kw == "stats" or "prometheus-exporter" in line:
+                cur["stats"] = True
+            elif re.match(r"option\s+(mysql-check|pgsql-check|redis-check)", line) or \
+                    (kw == "tcp-check" and re.search(r"PING|PONG|info\\? replication|role:master|AUTH|SELECT", line)):
+                cur["dbcheck"] = True
+    backends = dict((x["name"], x) for x in sections if x["type"] in ("backend", "listen"))
+    out = {}
+    for sec in sections:
+        if sec["type"] not in ("frontend", "listen") or not sec["binds"]:
+            continue
+        parts = [sec] + [backends[r] for r in sec["refs"] if r in backends]
+        missing = [r for r in sec["refs"] if r not in backends]
+        mode = sec["mode"] or sec["dmode"] or "tcp"
+        servers = [p for x in parts for p in x["servers"]]
+        stats = any(x["stats"] for x in parts)
+        how = "mode %s%s" % (mode, "" if sec["mode"] else " from defaults")
+        if not servers and stats and not missing:
+            verdict = ("system", "haproxy %s %s: %s, only its own stats or metrics" % (sec["type"], sec["name"], how))
+        elif mode == "http":
+            verdict = ("web", "haproxy %s %s: %s" % (sec["type"], sec["name"], how))
+        elif any(x["dbcheck"] for x in parts):
+            verdict = ("data", "haproxy %s %s: %s, database health check" % (sec["type"], sec["name"], how))
+        elif servers and not missing and all(p in DATA_PORTS for p in servers):
+            verdict = ("data", "haproxy %s %s: %s, every backend server on data port %s" % (
+                sec["type"], sec["name"], how, ",".join(str(p) for p in sorted(set(servers)))))
+        else:
+            verdict = ("web", "haproxy %s %s: %s without evidence of a data protocol, may pass TLS to web servers" % (
+                sec["type"], sec["name"], how))
+        for port in sec["binds"]:
+            if port not in out or CLASS_RANK[verdict[0]] > CLASS_RANK[out[port][0]]:
+                out[port] = verdict
+    return out
+
+
 class HostExposure(object):
     """What the host itself shows about being reachable and about running foreign code. An
     upper bound: a firewall or NAT in front of the host may close what looks open from here.
@@ -2757,17 +2875,90 @@ class HostExposure(object):
         self.host = host
         self.kf = kf
         self.error = None
-        self.listeners = {}       # port -> {"owners": set, "state": open|restricted|closed, "detail": text}
-        self.containers = []      # {"id", "where", "state", "detail"} for containers with their own netns
+        self.listeners = {}       # port -> {"owners", "pids", "state", "detail", "class", "evidence"}
+        self.containers = []      # {"id", "pid", "ns", "where", "runtime", "state", "detail", "entry", "evidence"}
         self.lxc_guests = set()
         self.runners = set()
         self.accounts = []
         self.entry_points = []
+        self._ns_pids = {}        # netns link -> pids, for looking inside containers
+        self._haproxy = {}        # pid -> haproxy_ports()
         try:
             self._collect()
         except Exception as e:      # noqa: any failure means "could not tell"
             self.error = "%s: %s" % (type(e).__name__, e)
             log("host exposure failed: %s" % self.error)
+
+    # --- classification ---------------------------------------------------------------------
+
+    def classify(self, exe, pid, port):
+        """(class, evidence) of one process listening on a port."""
+        name = exe
+        argv = (read_file("/proc/%d/cmdline" % pid, "") or "").replace("\0", " ") if pid else ""
+        if exe == "haproxy" and pid:
+            if pid not in self._haproxy:
+                try:
+                    self._haproxy[pid] = haproxy_ports(pid)
+                except Exception as e:      # noqa
+                    log("haproxy config of pid %d not parsed: %s" % (pid, e))
+                    self._haproxy[pid] = {}
+            if port in self._haproxy[pid]:
+                return self._haproxy[pid][port]
+            return "web", "haproxy: port %d not found in a readable configuration, treated as HTTP" % port
+        if exe == "master":
+            try:
+                path = os.readlink("/proc/%d/exe" % pid)
+            except OSError:
+                path = ""
+            return ("system", "postfix") if "postfix" in path else ("unknown", name)
+        if re.match(r"^python[\d.]*$", exe) and re.search(r"\bsalt-(master|minion|api|syndic)\b", argv):
+            return ("system", "salt") if "salt-api" not in argv else ("web", "salt-api")
+        if exe == "java" and JAVA_DATA_RE.search(argv):
+            return "data", "java: %s" % JAVA_DATA_RE.search(argv).group(0)
+        if exe == "beam.smp" and re.search(r"rabbit", argv):
+            return "data", "rabbitmq"
+        for cls, rx in SERVICE_CLASS_RE:
+            if rx.match(exe):
+                return cls, name
+        return "unknown", name
+
+    def classify_owners(self, pids, port):
+        """Class of a port with these {exe: pid} holders: the most exposing one."""
+        best = ("unknown", "unknown process") if not pids else None
+        for exe, pid in sorted(pids.items()):
+            c = self.classify(exe, pid, port)
+            if best is None or CLASS_RANK[c[0]] > CLASS_RANK[best[0]]:
+                best = c
+        return best
+
+    def inside(self, ip, cport):
+        """(class, evidence, container) of whatever listens on cport inside the container that owns
+        ip, or None when that cannot be found."""
+        for c in self.containers:
+            if ip not in c["ips"]:
+                continue
+            inodes = set()
+            for f in ("tcp", "tcp6"):
+                for line in (read_file("/proc/%d/net/%s" % (c["pid"], f), "") or "").splitlines()[1:]:
+                    parts = line.split()
+                    if len(parts) > 9 and parts[3] == "0A" and int(parts[1].rsplit(":", 1)[1], 16) == cport:
+                        inodes.add(parts[9])
+            holders = {}
+            for pid in self._ns_pids.get(c["ns"], []):
+                try:
+                    for fd in os.listdir("/proc/%d/fd" % pid):
+                        l = os.readlink("/proc/%d/fd/%s" % (pid, fd))
+                        if l.startswith("socket:[") and l[8:-1] in inodes:
+                            holders.setdefault(os.path.basename(os.readlink("/proc/%d/exe" % pid).replace(" (deleted)", "")), pid)
+                except OSError:
+                    continue
+            if not holders:
+                return None
+            cls, ev = self.classify_owners(holders, cport)
+            return cls, "%s in %s" % (ev, c["where"]), c
+        return None
+
+    # --- collection -------------------------------------------------------------------------
 
     def _collect(self):
         try:
@@ -2785,7 +2976,8 @@ class HostExposure(object):
                     eps.add((fam, kind, int(port, 16)))
                     if fam == "ip6" and kind == "any":
                         eps.add(("ip", "any", int(port, 16)))
-        owners = {}               # inode -> set of exe basenames
+        owners = {}               # inode -> {exe basename: pid}
+        proxies = {}              # docker-proxy pid -> (container ip, container port)
         for d in os.listdir("/proc"):
             if not d.isdigit():
                 continue
@@ -2805,9 +2997,19 @@ class HostExposure(object):
             if CI_RUNNER_RE.match(exe) or CI_RUNNER_RE.match(arg0) or \
                     (exe == "java" and CI_JAVA_RE.search(" ".join(argv))):
                 self.runners.add(exe if CI_RUNNER_RE.match(exe) else (arg0 if CI_RUNNER_RE.match(arg0) else "java build agent"))
+            if exe == "docker-proxy" and "-container-ip" in argv and "-container-port" in argv:
+                try:
+                    proxies[pid] = (argv[argv.index("-container-ip") + 1], int(argv[argv.index("-container-port") + 1]))
+                except (IndexError, ValueError):
+                    pass
             try:
-                if own_ns and os.readlink("/proc/%d/ns/net" % pid) != own_ns:
-                    continue
+                ns = os.readlink("/proc/%d/ns/net" % pid)
+            except OSError:
+                continue
+            if own_ns and ns != own_ns:
+                self._ns_pids.setdefault(ns, []).append(pid)
+                continue
+            try:
                 fds = os.listdir("/proc/%d/fd" % pid)
             except OSError:
                 continue
@@ -2817,14 +3019,14 @@ class HostExposure(object):
                 except OSError:
                     continue
                 if l.startswith("socket:[") and l[8:-1] in sockets:
-                    owners.setdefault(l[8:-1], set()).add(exe)
+                    owners.setdefault(l[8:-1], {}).setdefault(exe, pid)
         # A socket-activated service is listened on by systemd: name the unit it starts instead.
         # With other holders present (sshd next to ssh.socket) systemd is just dropped.
         units = None
         for inode, names in owners.items():
             if "systemd" not in names:
                 continue
-            names.discard("systemd")
+            del names["systemd"]
             if names:
                 continue
             if units is None:
@@ -2838,7 +3040,39 @@ class HostExposure(object):
                             units[int(m.group(1))] = parts[-1]
             for fam, kind, port in sockets[inode]:
                 unit = units.get(port, "")
-                names.add("sshd" if re.match(r"sshd?(@.*)?\.service$", unit) else (unit or "systemd socket"))
+                names["sshd" if re.match(r"sshd?(@.*)?\.service$", unit) else (unit or "systemd socket")] = 0
+        # containers with their own network namespace
+        for cid, pid in container_roots():
+            try:
+                ns = os.readlink("/proc/%d/ns/net" % pid)
+            except OSError:
+                continue
+            if own_ns and ns == own_ns:
+                continue          # host network: its listeners are judged with the host's
+            runtime, name, _ = describe_container(pid, cid)
+            state, detail = netns_reachability(pid, runtime, self.kf)
+            self.containers.append({"id": cid, "pid": pid, "ns": ns, "ips": _netns_local_ips(pid), "runtime": runtime,
+                                    "where": where_label(cid, runtime, name), "state": state, "detail": detail,
+                                    "entry": state == "open", "evidence": detail})
+        # a published Docker/podman container counts by what listens inside on the published ports
+        texts = self.kf._publish_texts or []
+        for c in self.containers:
+            if c["state"] != "open" or c["runtime"] not in ("docker", "podman"):
+                continue
+            cports = set()
+            for ip in c["ips"]:
+                for t in texts:
+                    for m in re.finditer(r"(?:--to-destination|dnat (?:ip )?to)\s+%s:(\d+)" % re.escape(ip), t):
+                        cports.add(int(m.group(1)))
+                    m = re.search(r"-container-ip\s+%s\s.*-container-port\s+(\d+)" % re.escape(ip), t)
+                    if m:
+                        cports.add(int(m.group(1)))
+            found = [self.inside(sorted(c["ips"])[0], p) for p in sorted(cports)] if c["ips"] else []
+            if cports and all(found):
+                worst = max(found, key=lambda x: CLASS_RANK[x[0]])
+                c["entry"] = worst[0] in ENTRY_CLASSES
+                c["evidence"] = "published port(s) %s: %s" % (",".join(str(p) for p in sorted(cports)),
+                                                              "; ".join(sorted(set(x[1] for x in found))))
         v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
                         for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
         for inode, eps in sockets.items():
@@ -2846,19 +3080,20 @@ class HostExposure(object):
                 if kind == "loopback" or (fam == "ip6" and not v6_global):
                     continue
                 state, detail = self.kf.port_reachability(fam, port)
-                L = self.listeners.setdefault(port, {"owners": set(), "state": "closed", "detail": ""})
-                L["owners"].update(owners.get(inode, set()))
+                L = self.listeners.setdefault(port, {"owners": set(), "pids": {}, "state": "closed", "detail": "",
+                                                     "class": None, "evidence": "", "container": None})
+                L["owners"].update(owners.get(inode, {}).keys())
+                for exe, pid in owners.get(inode, {}).items():
+                    L["pids"].setdefault(exe, pid)
                 if EXPOSURE_RANK[state] >= EXPOSURE_RANK[L["state"]]:
                     L["state"], L["detail"] = state, detail
-        for cid, pid in container_roots():
-            try:
-                if own_ns and os.readlink("/proc/%d/ns/net" % pid) == own_ns:
-                    continue          # host network: its listeners are judged above
-            except OSError:
-                continue
-            runtime, name, _ = describe_container(pid, cid)
-            state, detail = netns_reachability(pid, runtime, self.kf)
-            self.containers.append({"id": cid, "where": where_label(cid, runtime, name), "state": state, "detail": detail})
+        for port, L in self.listeners.items():
+            if set(L["owners"]) == set(["docker-proxy"]) and L["pids"].get("docker-proxy") in proxies:
+                got = self.inside(*proxies[L["pids"]["docker-proxy"]])
+                if got:
+                    L["class"], L["evidence"], L["container"] = got[0], got[1], got[2]["where"]
+                    continue
+            L["class"], L["evidence"] = self.classify_owners(L["pids"], port)
         self._accounts()
         self._entry_points()
 
@@ -2901,15 +3136,31 @@ class HostExposure(object):
     def _entry_points(self):
         ep = []
         for port, L in sorted(self.listeners.items()):
+            if L["container"]:
+                continue          # a published container: reported with the containers below
             who = ",".join(sorted(L["owners"])) or "unknown process"
-            if L["state"] == "open" and (not L["owners"] or L["owners"] - set(["sshd"])):
-                ep.append("service open to any source (%s port %d)" % (who, port))
-            elif L["state"] == "restricted" and not (L["owners"] and all(INFRA_DAEMON_RE.match(o) for o in L["owners"])):
-                ep.append("service accepted from particular sources, may sit behind a proxy (%s port %d)" % (who, port))
-        opened = [c for c in self.containers if c["state"] == "open"]
-        if opened:
-            ep.append("%d container(s) published or of a runtime that cannot be judged (%s)" % (
-                len(opened), ", ".join(c["where"] for c in opened[:3]) + (", ..." if len(opened) > 3 else "")))
+            what = "%s port %d" % (who, port) if L["evidence"] in L["owners"] or not L["evidence"] else "%s port %d: %s" % (who, port, L["evidence"])
+            if L["state"] == "open" and L["class"] != "admin":
+                ep.append("service open to any source (%s)" % what)
+            elif L["state"] == "restricted" and L["class"] in ENTRY_CLASSES:
+                label = next((SERVICE_LABEL[o] for o in sorted(L["owners"]) if o in SERVICE_LABEL), None)
+                if L["class"] == "exec":
+                    ep.append("service that runs commands by design (%s)" % what)
+                elif L["class"] == "unknown":
+                    ep.append("unclassified service accepted from particular sources (%s)" % what)
+                elif label:
+                    ep.append("%s accepted from particular sources (%s)" % (label, what))
+                else:
+                    ep.append("web or application service accepted from particular sources, which may be a proxy (%s)" % what)
+        for c in self.containers:
+            if not c["entry"]:
+                continue
+            if c["runtime"] in ("docker", "podman"):
+                ep.append("published container (%s: %s)" % (c["where"], c["evidence"]))
+        other = [c for c in self.containers if c["entry"] and c["runtime"] not in ("docker", "podman")]
+        if other:
+            ep.append("%d container(s) of a runtime that cannot be judged (%s)" % (
+                len(other), ", ".join(c["where"] for c in other[:3]) + (", ..." if len(other) > 3 else "")))
         if self.lxc_guests:
             ep.append("%d LXC/Incus guest(s) run on this kernel" % len(self.lxc_guests))
         for r in sorted(self.runners):
@@ -2923,7 +3174,8 @@ class HostExposure(object):
         judged are the instance's own non-loopback TCP listeners in the host namespace; for a
         container its own publication; otherwise, and for a kernel bug, every listener of the
         host. through_proxy bugs travel in an ordinary request, so a source-limited port may
-        still deliver them (the sources may be a load balancer)."""
+        still deliver them (the sources may be a load balancer); for those, host-wide judgement
+        leaves out ports whose service class cannot carry a request to an application."""
         own_ports, hostwide = set(), not instances
         try:
             own_ns = os.readlink("/proc/self/ns/net")
@@ -2945,35 +3197,37 @@ class HostExposure(object):
                 own_ports.update(mine)
             else:
                 hostwide = True
-        cand = []                 # (port, state, owners)
+        cand = []                 # (port, state)
         for port, L in self.listeners.items():
             if port in own_ports:
-                cand.append((port, L["state"], L["owners"]))
-            elif hostwide and not (through_proxy and L["owners"] and all(INFRA_DAEMON_RE.match(o) for o in L["owners"])):
-                cand.append((port, L["state"], L["owners"]))
+                cand.append((port, L["state"]))
+            elif hostwide and not (through_proxy and L["class"] not in ENTRY_CLASSES):
+                cand.append((port, L["state"]))
         if hostwide:
             for c in self.containers:
-                if c["state"] == "open":
+                if c["state"] == "open" and (c["entry"] or not through_proxy):
                     return "open", "%s: %s" % (c["where"], c["detail"])
-        opened = sorted(p for p, st, _ in cand if st == "open")
+        opened = sorted(p for p, st in cand if st == "open")
         if opened:
             return "open", "port %s open to any source" % ",".join(str(p) for p in opened[:6])
-        limited = sorted(p for p, st, _ in cand if st == "restricted")
+        limited = sorted(p for p, st in cand if st == "restricted")
         if limited:
             ports = ",".join(str(p) for p in limited[:6])
             if through_proxy:
                 return "proxy", "port %s accepted from particular sources, which may be a proxy" % ports
             return "limited", "port %s accepted only from particular sources" % ports
         if cand:
-            return "closed", "no accept rule for port %s" % ",".join(str(p) for p, _, _ in sorted(cand)[:6])
+            return "closed", "no accept rule for port %s" % ",".join(str(p) for p, _ in sorted(cand)[:6])
         return "closed", "no TCP listener reachable from outside the host" if hostwide else "no non-loopback listener"
 
     def as_dict(self):
         return {"error": self.error,
-                "listeners": [{"port": p, "owners": sorted(L["owners"]), "state": L["state"]} for p, L in sorted(self.listeners.items())],
+                "listeners": [{"port": p, "owners": sorted(L["owners"]), "state": L["state"], "class": L["class"],
+                               "evidence": L["evidence"]} for p, L in sorted(self.listeners.items())],
                 "open_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "open"),
                 "limited_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "restricted"),
-                "containers": [{"where": c["where"], "state": c["state"]} for c in self.containers],
+                "containers": [{"where": c["where"], "state": c["state"], "entry": c["entry"], "evidence": c["evidence"]}
+                               for c in self.containers],
                 "lxc_guests": sorted(self.lxc_guests), "ci_runners": sorted(self.runners),
                 "non_admin_accounts": self.accounts, "entry_points": self.entry_points}
 

@@ -111,15 +111,36 @@ firewall rules as described under Reachability below.
 Entry points for foreign code, any one of which keeps a local bug critical:
 
 1. a service other than the host's sshd open to any source;
-2. a service accepted from particular sources that is not a known infrastructure daemon
-   (`sshd`, `mysqld`, `mariadbd`, `postgres`, `redis-server`, `memcached`, `mongod`, `vmagent`,
-   `netdata`, `zabbix_agentd`, `xinetd`, `*_exporter`): it may sit behind a proxy;
-3. a container with a published port or of a runtime other than Docker/podman, or LXC/Incus
-   guests running on this kernel;
+2. a service accepted from particular sources whose class is web or application, runs commands
+   by design, or unknown (see the classes below);
+3. a published Docker/podman container whose published ports carry such a service, judged by
+   what listens inside the container; any container of a runtime that cannot be judged
+   (Kubernetes pods); LXC/Incus guests running on this kernel;
 4. a CI runner or build agent (`gitlab-runner`, GitHub Actions, Buildkite, Gitea, Drone,
    Woodpecker, Jenkins and TeamCity agents);
 5. a login account that is not an administrator: normal uid, real shell, usable password or
    `authorized_keys`, not in `sudo`/`wheel`/`admin` and not named in sudoers.
+
+Service classes, by executable name; where the name is ambiguous the command line or path
+decides. `host_exposure.listeners` carries the class and the evidence per port.
+
+| class | entry point | members |
+|-------|-------------|---------|
+| admin | no | `sshd` |
+| data | no | databases, caches and their sentinels, storage and queue daemons: `mysqld`, `mariadbd`, `postgres`, `redis-*`, `valkey-*`, `keydb-server`, `memcached`, `mongod`, `mongos`, `clickhouse`, `etcd`, `consul`, `minio`, `proxysql`, `pgbouncer`, `slapd`, `gluster*`, `nsq*`; RabbitMQ (`beam.smp` with rabbit on its command line); Kafka, ZooKeeper, Elasticsearch, OpenSearch, Cassandra (`java` by main class) |
+| system | no | mail, name, time and RPC daemons, proxies that only relay, virtual machine consoles, monitoring and log agents: Postfix `master`, `exim4`, `dovecot`, `rpcbind`, `systemd-resolved`, `named`, `unbound`, `chronyd`, `ntpd`, `danted`, `xinetd`, `qemu-system-*`, `epmd`, salt master and minion, `zabbix_*`, `netdata`, `vmagent`, `promtail`, `telegraf`, `vector`, `fluent-bit`, `filebeat`, `alloy`, `*_exporter` |
+| web | yes | `nginx`, `apache2`, `httpd`, `caddy`, `traefik`, `envoy`, `varnishd`, `php-fpm`, `node`, `bun`, `deno`, `ruby`, `python`, `uwsgi`, `gunicorn`, `dotnet`, other `java` and `beam.smp`, `asterisk` (telephony), Kannel `bearerbox`/`smsbox` (messaging gateway) |
+| exec | yes | services that run commands by design: `olivetin` |
+| unknown | yes | everything else |
+
+Forwarders count by what they carry. `haproxy` is judged per bound port from its configuration
+(the `-f` files of the master process; the worker is chrooted): mode http with servers is web;
+a section serving only haproxy's own stats or metrics is system; mode tcp is data only with
+positive evidence, a database health check (`option mysql-check`, `pgsql-check`, `redis-check`,
+`tcp-check` with Redis or SQL commands) or every backend server on a well-known data port,
+because tcp mode also passes TLS through to web servers. An unreadable configuration or a port
+not found in it counts as web. `docker-proxy` and DNAT-published container ports take the class
+of the process listening inside the container.
 
 What the probe sees is an upper bound: a provider firewall or NAT in front of the host may
 close what looks open. Every doubt counts as exposed: no firewall, an accept under a

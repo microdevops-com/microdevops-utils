@@ -36,7 +36,9 @@ Add a row when a CVE or a batch is assessed and rejected. Move a row out when it
 | source addresses do not say whether they are a proxy or an office | request-level bugs stay critical behind any source-limited port; a non-infrastructure service behind limited sources counts as an entry point |
 | accept rules under conditions the probe does not evaluate (packet marks set by Cilium or kube-proxy, rate limits) count as open | Kubernetes nodes show every port as open |
 | accounts from LDAP, SSSD or other directories are not in `/etc/passwd` | such non-admin users are not counted as an entry point |
-| the infrastructure daemon list is short on purpose | hosts with other internal-only services (mail relay on port 25, health checks, message brokers) keep local bugs critical |
+| service classes go by executable name, with the command line only for `java`, `beam.smp`, salt and haproxy | a renamed fork or a new daemon is unknown and counts as an entry point until it is added; `nc` listeners stay unknown on purpose |
+| nginx is always web, also when its `stream` block only forwards a database | such a host keeps local bugs critical |
+| a database, cache or queue reachable from limited sources is not an entry point | someone who can log in to it is not considered to run code on the host |
 | which listener proxies to which process is not visible | an application on loopback is judged by all listeners of the host |
 
 ## Seen, not assessed
