@@ -26,7 +26,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.15"
+VERSION = "1.16"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -2732,27 +2732,29 @@ SERVICE_CLASS_RE = [
     ("data", re.compile(r"^(mysqld|mariadbd|mysqld_safe|postgres|postmaster|redis-server|redis-sentinel|redis-check-rdb|"
                         r"valkey-server|valkey-sentinel|valkey-check-rdb|keydb-server|memcached|mongod|mongos|clickhouse|"
                         r"clickhouse-server|etcd|consul|minio|proxysql|pgbouncer|slapd|glusterfsd|glusterd|glusterfs|"
-                        r"nsqd|nsqlookupd|nsqadmin|searchd|typesense-server|gearmand|bao)$")),
+                        r"nsqd|nsqlookupd|nsqadmin|searchd|typesense-server|gearmand|bao|vault)$")),
     ("system", re.compile(r"^(smtpd|exim4|dovecot|cyrus-master|pop3d|imapd|rpcbind|systemd-resolved|named|unbound|dnsmasq|"
                           r"aardvark-dns|chronyd|ntpd|danted|sockd|squid|squid-\w+|tinyproxy|3proxy|openvpn|pptpd|xinetd|"
                           r"qemu-system-\w+|lxd|incusd|cupsd|hfaxd|epmd|zabbix_server|zabbix_proxy|zabbix_agentd|"
                           r"zabbix_agent2|netdata|vmagent|vmserver|vmstorage|vmselect|vminsert|victoria-metrics[\w-]*|"
                           r"victoria-logs[\w-]*|loki|alertmanager|promtail|telegraf|vector|fluent-bit|filebeat|alloy|"
+                          r"kube-apiserver|kubelet|k3s|kubelite|k0s|kube-proxy|kube-scheduler|kube-controller-manager|"
+                          r"containerd|calico-node|cilium-agent|cilium-operator|coredns|cluster-agent|"
                           r"\w+[_-]exporter)$")),
     ("exec", re.compile(r"^(olivetin|dockerd|webhook|pinokio)$", re.I)),
     ("transfer", re.compile(r"^(proftpd|vsftpd|pure-ftpd|syncthing)$")),
     ("web", re.compile(r"^(nginx|apache2|httpd|caddy|traefik|envoy|varnishd|php-fpm[\d.]*|php[\d.]*|node|nodejs|bun|deno|"
                        r"ruby[\d.]*|python[\d.]*|perl[\d.]*|uwsgi|gunicorn|dotnet|grafana|grafana-server|centrifugo|"
-                       r"binom-observer|jsvc|asterisk|bearerbox|smsbox|evostreamms|java|beam\.smp)$")),
+                       r"binom-observer|jsvc|coolwsd|asterisk|bearerbox|smsbox|evostreamms|java|beam\.smp)$")),
 ]
 JAVA_DATA_RE = re.compile(r"kafka\.Kafka|org\.apache\.zookeeper|org\.elasticsearch|org\.opensearch|org\.apache\.cassandra")
 SERVICE_LABEL = {"asterisk": "telephony service", "bearerbox": "messaging gateway", "smsbox": "messaging gateway",
-                 "evostreamms": "media server"}
+                 "evostreamms": "media server", "coolwsd": "document server"}
 ENTRY_CLASSES = ("web", "application", "transfer", "exec", "unknown")
 PROXIED_CLASSES = ("web", "application", "unknown")      # may carry a request on to an application
 APP_PATH_RE = re.compile(r"^/(srv|opt|home|var/www|usr/local|app|data)/")
 PORT_HOLDERS = ("docker-proxy", "conmon")                # hold a host port for a container
-CLASS_RANK = {"admin": 0, "system": 1, "data": 2, "unknown": 3, "application": 4, "transfer": 5, "web": 6, "exec": 7}
+CLASS_RANK = {"none": -1, "admin": 0, "system": 1, "data": 2, "unknown": 3, "application": 4, "transfer": 5, "web": 6, "exec": 7}
 DATA_PORTS = set([3306, 5432, 6379, 26379, 27017, 11211])
 CI_RUNNER_RE = re.compile(r"^(gitlab-runner|gitlab-runner-helper|Runner\.Listener|Runner\.Worker|buildkite-agent|"
                           r"act_runner|forgejo-runner|drone-runner-[\w-]+|woodpecker-agent|circleci-runner)$")
@@ -2961,13 +2963,16 @@ class HostExposure(object):
 
     def inside(self, ip, cport):
         """(class, evidence, container) of whatever listens on cport inside the container that owns
-        ip, or None when that cannot be found."""
+        ip, or None when that cannot be found. Class "none" is positive evidence: the container's
+        socket table was read and nothing listens on the port, so nothing is reached through it."""
         for c in self.containers:
             if ip not in c["ips"]:
                 continue
-            inodes = set()
+            inodes, tables = set(), 0
             for f in ("tcp", "tcp6"):
-                for line in (read_file("/proc/%d/net/%s" % (c["pid"], f), "") or "").splitlines()[1:]:
+                text = read_file("/proc/%d/net/%s" % (c["pid"], f), "") or ""
+                tables += 1 if f == "tcp" and text.strip() else 0
+                for line in text.splitlines()[1:]:
                     parts = line.split()
                     if len(parts) > 9 and parts[3] == "0A" and int(parts[1].rsplit(":", 1)[1], 16) == cport:
                         inodes.add(parts[9])
@@ -2980,6 +2985,8 @@ class HostExposure(object):
                             holders.setdefault(os.path.basename(os.readlink("/proc/%d/exe" % pid).replace(" (deleted)", "")), pid)
                 except OSError:
                     continue
+            if tables and not inodes:
+                return "none", "published port, nothing listens inside the container", c
             if not holders:
                 return None
             cls, ev = self.classify_owners(holders, cport)
@@ -3172,7 +3179,7 @@ class HostExposure(object):
                 continue          # a published container: reported with the containers below
             who = ",".join(sorted(L["owners"])) or "unknown process"
             what = "%s port %d" % (who, port) if L["evidence"] in L["owners"] or not L["evidence"] else "%s port %d: %s" % (who, port, L["evidence"])
-            if L["state"] == "open" and L["class"] != "admin":
+            if L["state"] == "open" and L["class"] not in ("admin", "none"):
                 ep.append("service open to any source (%s)" % what)
             elif L["state"] == "restricted" and L["class"] in ENTRY_CLASSES:
                 label = next((SERVICE_LABEL[o] for o in sorted(L["owners"]) if o in SERVICE_LABEL), None)
