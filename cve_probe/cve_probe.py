@@ -16,6 +16,7 @@ import binascii
 import glob
 import hashlib
 import gzip
+import ipaddress
 import json
 import os
 import re
@@ -26,7 +27,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.16"
+VERSION = "1.17"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -401,6 +402,7 @@ class KernelFacts(object):
         self._fw_rules = None       # collected on first use, only rules with firewall_mitigations need it
         self._fw_chains = None
         self._reach = {}
+        self._reach_src = {}      # (fam, port) -> source conditions of the limited accepts
         self._publish_texts = None
         self._foreign_netns = None
 
@@ -609,11 +611,11 @@ class KernelFacts(object):
             return self._reach[key]
         ch = self.fw_chains()
         pub = _default_ifaces(fam)
-        results = []
+        results, sources = [], []
         ipt = ch[fam]
         for k, c in ipt.items():
             if c.get("hook") == "input" and k[1] in ("filter", "mangle", "security"):
-                results.append(_walk_base(ipt, k, lambda t: _ipt_cond(t, port, pub), "iptables"))
+                results.append(_walk_base(ipt, k, lambda t: _ipt_cond(t, port, pub), "iptables", sources))
         nft = ch["nft"]
         xt_seen = bool(ipt)
         for k, c in nft.items():
@@ -623,7 +625,7 @@ class KernelFacts(object):
                 continue
             if xt_seen and k[0] in ("ip", "ip6") and k[2] in ("INPUT",):
                 continue          # iptables-nft table, already judged from iptables-save
-            results.append(_walk_base(nft, k, lambda t: _nft_cond(t, port, fam, pub), "nft"))
+            results.append(_walk_base(nft, k, lambda t: _nft_cond(t, port, fam, pub), "nft", sources))
         if not results:
             out = ("open", "no firewall rules on the input hook")
         elif any(r[0] == "closed" for r in results):
@@ -635,7 +637,14 @@ class KernelFacts(object):
             out = ("open", ([d for d in details if not d.endswith("policy accept")] or details)[0])
         log("reachability %s port %s: %s" % (fam, port, out))
         self._reach[key] = out
+        self._reach_src[key] = sources if out[0] == "restricted" else []
         return out
+
+    def port_sources(self, fam, port):
+        """Source conditions of the limited accepts for a restricted port: a list with, per
+        accept, a tuple of (kind, value): "net", "iface", or "other" for what is not resolved."""
+        self.port_reachability(fam, port)
+        return self._reach_src.get((fam, port), [])
 
     def foreign_netns(self):
         """Number of other network namespaces with processes and a non-loopback interface:
@@ -978,7 +987,7 @@ def _ipt_cond(text, port, pub):
         tok = shlex.split(text)
     except ValueError:
         return {"src": False, "extra": True, "verdict": "accept", "target": None}
-    r = {"src": False, "extra": False, "verdict": None, "target": None}
+    r = {"src": False, "extra": False, "verdict": None, "target": None, "srcs": []}
     i, neg = 2, False
     while i < len(tok):
         t = tok[i]
@@ -1002,13 +1011,16 @@ def _ipt_cond(text, port, pub):
                     r["extra"] = True
                 else:
                     r["src"] = True
+                    r["srcs"].append(("net", val))
             i += 1
         elif t == "--src-range":
             r["extra" if neg else "src"] = True
+            r["srcs"].append(("other", "address range"))
             i += 1
         elif t == "--match-set":
             flags = tok[i + 2] if i + 2 < len(tok) else ""
             r["src" if ("src" in flags.split(",") and not neg) else "extra"] = True
+            r["srcs"].append(("other", "ipset"))
             i += 2
         elif t in ("-i", "--in-interface"):
             is_lo = val == "lo"
@@ -1018,6 +1030,7 @@ def _ipt_cond(text, port, pub):
                 base = val.rstrip("+")
                 if not any(p == val or (val.endswith("+") and p.startswith(base)) for p in pub):
                     r["src"] = True
+                    r["srcs"].append(("iface", val))
             i += 1
         elif t in ("-o", "--out-interface"):
             return None
@@ -1090,12 +1103,15 @@ def _nft_cond(text, port, fam, pub):
     dp = re.search(r"\b(?:tcp|th) dport\s+(!=\s+)?(\{[^}]*\}|\S+)", body)
     if dp and _port_in(dp.group(2), port) == bool(dp.group(1)):
         return None
-    r = {"src": False, "extra": False, "verdict": verdict, "target": target}
-    if re.search(r"\bip6? saddr\s+(?!!=)", body):
+    r = {"src": False, "extra": False, "verdict": verdict, "target": target, "srcs": []}
+    sm = re.search(r"\bip6? saddr\s+(?!!=)(\{[^}]*\}|\S+)", body)
+    if sm:
         r["src"] = True
+        r["srcs"].append(("net", sm.group(1)) if re.match(r"^[0-9a-fA-F:.]+(/\d+)?$", sm.group(1)) else ("other", "address set"))
     ifm = re.search(r"\biif(?:name)?\s+(!=\s+)?\"?([^\"\s]+)\"?", body)
     if ifm and not ifm.group(1) and ifm.group(2) not in pub:
         r["src"] = True
+        r["srcs"].append(("iface", ifm.group(2)))
     rest = body
     for rx in (r"\bcounter(\s+packets\s+\d+\s+bytes\s+\d+)?", r"\b(?:tcp|th) dport\s+(!=\s+)?(\{[^}]*\}|\S+)",
                r"\bmeta l4proto\s+(\{[^}]*\}|\S+)", r"\bip protocol\s+\S+", r"\bip6 nexthdr\s+\S+",
@@ -1108,12 +1124,13 @@ def _nft_cond(text, port, fam, pub):
     return r
 
 
-def _walk_base(chains, key, cond, tool):
+def _walk_base(chains, key, cond, tool, sources=None):
     """Verdict of one base chain for the packet: ("open", rule text), ("restricted", count of
-    limited accepts) or ("closed", 0)."""
+    limited accepts) or ("closed", 0). sources, when given, receives per limited accept the
+    source conditions met on the way to it."""
     acc = {"open": None, "restricted": 0}
 
-    def walk(k, src, extra, depth):
+    def walk(k, src, extra, depth, path=()):
         """True when the packet's fate is settled for every source that entered this chain."""
         ch = chains.get(k)
         if ch is None or depth > 30:
@@ -1127,6 +1144,8 @@ def _walk_base(chains, key, cond, tool):
             if c["verdict"] == "accept":
                 if s2:
                     acc["restricted"] += 1
+                    if sources is not None:
+                        sources.append((path + tuple(c.get("srcs") or ())) or (("other", "condition not resolved"),))
                 elif acc["open"] is None:
                     acc["open"] = "%s %s: %s" % (tool, "/".join(k[-2:]), text)
                 if uncond:
@@ -1138,7 +1157,7 @@ def _walk_base(chains, key, cond, tool):
                 if uncond:
                     return False
             else:
-                done = walk(k[:-1] + (c["target"],), s2, extra or c["extra"], depth + 1)
+                done = walk(k[:-1] + (c["target"],), s2, extra or c["extra"], depth + 1, path + tuple(c.get("srcs") or ()))
                 if done and uncond:
                     return True
                 if c["verdict"] == "goto" and uncond:
@@ -2754,6 +2773,17 @@ ENTRY_CLASSES = ("web", "application", "transfer", "exec", "unknown")
 PROXIED_CLASSES = ("web", "application", "unknown")      # may carry a request on to an application
 APP_PATH_RE = re.compile(r"^/(srv|opt|home|var/www|usr/local|app|data)/")
 PORT_HOLDERS = ("docker-proxy", "conmon")                # hold a host port for a container
+# Evidence that a service limited to particular sources has a proxy in front: the name of a CDN
+# or protection service in the ufw rule comment, matched whole (letters around it break the
+# match). Role words (proxy, lb, balancer) are left out on purpose: in a source name they say
+# what that server does for its own users, and it is usually admitted here as a client.
+PROXY_BRAND_RE = re.compile(r"(?<![a-z])(cloudflare|cf|bunny|bunnycdn|fastly|akamai|cloudfront|sucuri|ddos-guard|ddosguard|"
+                            r"stackpath|qrator|imperva|incapsula|gcore|keycdn|cdn77|cdn|waf)(?![a-z])")
+LOCAL_IFACE_RE = re.compile(r"^(lo|docker\d*|br-[0-9a-f]+|veth\w*|cni\w*|flannel\S*|cali\w+|lxc\w*|lxdbr\d*|incusbr\d*|virbr\d*|"
+                            r"podman\d*|cilium\S*|kube-\S+|tap\w+)\+?$")
+FASTCGI_RE = re.compile(r"^php-fpm[\d.]*$")
+NGINX_CONFS = ("/etc/nginx/nginx.conf", "/usr/local/openresty/nginx/conf/nginx.conf", "/var/opt/gitlab/nginx/conf/nginx.conf")
+PROXY_KIND_RANK = {"comment": 4, "trusted_proxy": 3, "protocol": 2, "unnamed_source": 1, "none": 0}
 CLASS_RANK = {"none": -1, "admin": 0, "system": 1, "data": 2, "unknown": 3, "application": 4, "transfer": 5, "web": 6, "exec": 7}
 DATA_PORTS = set([3306, 5432, 6379, 26379, 27017, 11211])
 CI_RUNNER_RE = re.compile(r"^(gitlab-runner|gitlab-runner-helper|Runner\.Listener|Runner\.Worker|buildkite-agent|"
@@ -2880,6 +2910,116 @@ def haproxy_ports(pid):
     return out
 
 
+def _net(text):
+    try:
+        return ipaddress.ip_network(text.strip(), strict=False)
+    except ValueError:
+        return None
+
+
+def ufw_named_sources():
+    """Allow rules of ufw with their comment, from user.rules and user6.rules (the only place
+    ufw keeps comments; they never reach iptables): [{"ports": set or None for any, "ranges",
+    "net", "rule", "source"}]. The formula writes "<rule name> from <source name> to <target>";
+    any other comment is taken whole for both names. rule and source are None without a comment."""
+    out = []
+    for path in ("/etc/ufw/user.rules", "/etc/ufw/user6.rules"):
+        for line in (read_file(path, "") or "").splitlines():
+            if not line.startswith("### tuple ###"):
+                continue
+            tok = line.split()[3:]
+            if len(tok) < 6 or tok[0] not in ("allow", "limit") or tok[1] not in ("tcp", "any"):
+                continue
+            if not any(t == "in" or t.startswith("in_") for t in tok[6:]):
+                continue
+            net = _net(tok[5])
+            if net is None:
+                continue
+            ports, ranges = set(), []
+            for part in tok[2].split(","):
+                if part == "any":
+                    ports = None
+                    break
+                if ":" in part:
+                    a, b = part.split(":", 1)
+                    if a.isdigit() and b.isdigit():
+                        ranges.append((int(a), int(b)))
+                elif part.isdigit():
+                    ports.add(int(part))
+            rule = source = None
+            m = re.search(r"\bcomment=([0-9a-fA-F]+)", line)
+            if m:
+                try:
+                    text = binascii.unhexlify(m.group(1)).decode("utf-8", "replace").strip()
+                except (ValueError, binascii.Error):
+                    text = ""
+                if text:
+                    cm = re.match(r"^(.*?) from (.*) to .*$", text)
+                    rule, source = (cm.group(1), cm.group(2)) if cm else (text, text)
+            out.append({"ports": ports, "ranges": ranges, "net": net, "rule": rule, "source": source})
+    return out
+
+
+def trusted_proxy_nets():
+    """[(network, what)] the web servers of the host take forwarded client addresses from, and
+    the ports where nginx expects the PROXY protocol: (nets, ports). Read from configuration
+    files only: nginx set_real_ip_from and listen ... proxy_protocol, Apache RemoteIPTrustedProxy
+    and RemoteIPInternalProxy, GitLab trusted_proxies and real_ip_trusted_addresses."""
+    nets, pp_ports = [], set()
+    for conf in NGINX_CONFS:
+        text = read_config_tree("/", conf) if os.path.isfile(conf) else None
+        if not text:
+            continue
+        for m in re.finditer(r"(?:^|[;{}])\s*set_real_ip_from\s+([^;\s]+)\s*;", text):
+            n = _net(m.group(1))
+            if n is not None:
+                nets.append((n, "nginx trusts forwarded addresses from %s" % m.group(1)))
+        for m in re.finditer(r"(?:^|[;{}])\s*listen\s+([^;]*\bproxy_protocol\b[^;]*);", text):
+            pm = re.match(r"(?:\S*:)?(\d+)\b", m.group(1).split()[0])
+            if pm:
+                pp_ports.add(int(pm.group(1)))
+    apache = []
+    for conf in ("/etc/apache2/apache2.conf", "/etc/httpd/conf/httpd.conf"):
+        if os.path.isfile(conf):
+            apache.append(read_config_tree("/", conf, include_re=r"(?mi)^\s*Include(?:Optional)?\s+(\S+)()") or "")
+    for extra in sorted(glob.glob("/etc/httpd/conf.d/*.conf")):
+        apache.append(re.sub(r"(?m)^\s*#[^\n]*", "", read_file(extra, "") or ""))
+    for m in re.finditer(r"(?mi)^\s*RemoteIP(?:Trusted|Internal)Proxy\s+(.+)$", "\n".join(apache)):
+        for word in m.group(1).split():
+            n = _net(word)
+            if n is not None:
+                nets.append((n, "Apache trusts forwarded addresses from %s" % word))
+    rb = re.sub(r"(?m)^\s*#[^\n]*", "", read_file("/etc/gitlab/gitlab.rb", "") or "")
+    for m in re.finditer(r"(?:gitlab_rails\['trusted_proxies'\]|nginx\['real_ip_trusted_addresses'\])\s*=\s*\[([^\]]*)\]", rb):
+        for word in re.findall(r"['\"]([^'\"]+)['\"]", m.group(1)):
+            n = _net(word)
+            if n is not None:
+                nets.append((n, "GitLab trusts forwarded addresses from %s" % word))
+    return nets, pp_ports
+
+
+def local_networks():
+    """(private networks on loopback, bridge and container interfaces; the host's own addresses):
+    a source inside them is local and needs no name. A public network on a bridge is not local:
+    a provider's subnet holds other customers."""
+    nets, own = [ipaddress.ip_network(u"127.0.0.0/8"), ipaddress.ip_network(u"::1/128")], set()
+    rc, out, _ = run(["ip", "-o", "addr", "show"])
+    for line in (out or "").splitlines() if rc == 0 else []:
+        m = re.match(r"^\d+:\s+(\S+)\s+inet6?\s+(\S+)", line)
+        if not m:
+            continue
+        try:
+            iface = ipaddress.ip_interface(m.group(2))
+        except ValueError:
+            continue
+        own.add(iface.ip)
+        name = m.group(1).split("@")[0]
+        if LOCAL_IFACE_RE.match(name) or os.path.isdir("/sys/class/net/%s/bridge" % name):
+            if not iface.ip.is_link_local and iface.network.is_private:
+                nets.append(iface.network)
+    return nets, own
+
+
 class HostExposure(object):
     """What the host itself shows about being reachable and about running foreign code. An
     upper bound: a firewall or NAT in front of the host may close what looks open from here.
@@ -2897,6 +3037,7 @@ class HostExposure(object):
         self.entry_points = []
         self._ns_pids = {}        # netns link -> pids, for looking inside containers
         self._haproxy = {}        # pid -> haproxy_ports()
+        self.evidence_error = None
         try:
             self._collect()
         except Exception as e:      # noqa: any failure means "could not tell"
@@ -3116,10 +3257,12 @@ class HostExposure(object):
                     continue
                 state, detail = self.kf.port_reachability(fam, port)
                 L = self.listeners.setdefault(port, {"owners": set(), "pids": {}, "state": "closed", "detail": "",
-                                                     "class": None, "evidence": "", "container": None})
+                                                     "class": None, "evidence": "", "container": None,
+                                                     "admitted": [], "unnamed": 0, "proxy": None, "fams": set()})
                 L["owners"].update(owners.get(inode, {}).keys())
                 for exe, pid in owners.get(inode, {}).items():
                     L["pids"].setdefault(exe, pid)
+                L["fams"].add(fam)
                 if EXPOSURE_RANK[state] >= EXPOSURE_RANK[L["state"]]:
                     L["state"], L["detail"] = state, detail
         for port, L in self.listeners.items():
@@ -3133,8 +3276,87 @@ class HostExposure(object):
                     L["class"], L["evidence"] = "unknown", "published container port, listener inside not identified"
                 continue
             L["class"], L["evidence"] = self.classify_owners(L["pids"], port)
+        try:
+            self._proxy_evidence()
+        except Exception as e:      # noqa: without evidence every limited port keeps the cautious assumption
+            self.evidence_error = "%s: %s" % (type(e).__name__, e)
+            log("proxy evidence failed: %s" % self.evidence_error)
+            for L in self.listeners.values():
+                if L["state"] == "restricted":
+                    L["admitted"], L["unnamed"], L["proxy"] = [], 1, ("unnamed_source", "sources could not be read")
         self._accounts()
         self._entry_points()
+
+    def _proxy_evidence(self):
+        """For every port accepted only from particular sources: who is admitted, by the names
+        in the ufw rule comments, and whether something shows a proxy in front. L["proxy"] is
+        (kind, text): "comment" (a CDN or proxy named in a comment), "trusted_proxy" (the web
+        server takes forwarded addresses from an admitted source), "protocol" (FastCGI, always
+        served through a web server), "unnamed_source" (a source nothing names: may be a proxy)
+        or "none" (every source named, none of them a proxy)."""
+        limited = dict((p, L) for p, L in self.listeners.items() if L["state"] == "restricted")
+        if not limited:
+            return
+        ufw = ufw_named_sources()
+        trusted, pp_ports = trusted_proxy_nets()
+        local, own = local_networks()
+
+        def is_local(net):
+            if net.num_addresses == 1 and net.network_address in own:
+                return True
+            return any(net.version == n.version and n.network_address <= net.network_address and
+                       net.broadcast_address <= n.broadcast_address for n in local)
+
+        for port, L in limited.items():
+            names, nets, unnamed, word = set(), [], 0, None
+            accepts = []
+            for fam in sorted(L["fams"]):
+                accepts.extend(self.kf.port_sources(fam, port))
+            if not accepts:
+                unnamed = 1
+            for conds in accepts:
+                if any(k == "iface" and LOCAL_IFACE_RE.match(v) for k, v in conds):
+                    continue                                  # from containers or a bridge of this host
+                cnets = [n for n in (_net(v) for k, v in conds if k == "net") if n is not None]
+                if any(k != "net" for k, v in conds) or not cnets:
+                    unnamed += 1
+                    nets.extend(cnets)
+                    continue
+                if any(is_local(n) for n in cnets):
+                    continue
+                nets.extend(cnets)
+                # the rule for this port if it has a comment, else any rule that names the address
+                hits = [u for n in cnets for u in ufw if u["net"] == n and u["source"]]
+                hit = next((u for u in hits if u["ports"] is None or port in u["ports"] or
+                            any(a <= port <= b for a, b in u["ranges"])), hits[0] if hits else None)
+                if not hit:
+                    unnamed += 1
+                    continue
+                names.add(re.sub(r"[ _]\d+$", "", hit["source"]))
+                m = PROXY_BRAND_RE.search(("%s %s" % (hit["rule"], hit["source"])).lower())
+                if m and word is None:
+                    word = m.group(1)
+            L["admitted"], L["unnamed"] = sorted(names), unnamed
+            tp = None
+            for tnet, what in trusted:
+                if any(tnet.version == n.version and tnet.overlaps(n) for n in nets):
+                    tp = "%s, which is admitted" % what
+                    break
+            if tp is None and port in pp_ports:
+                tp = "nginx expects the PROXY protocol on this port"
+            if word:
+                L["proxy"] = ("comment", "admitted from %s (ufw comment)" % word)
+            elif tp:
+                L["proxy"] = ("trusted_proxy", tp)
+            elif any(FASTCGI_RE.match(o) for o in list(L["owners"]) + L["evidence"].split()[:1]):
+                L["proxy"] = ("protocol", "FastCGI, served through a web server")
+            elif unnamed:
+                L["proxy"] = ("unnamed_source", "%d source%s not named" % (unnamed, "" if unnamed == 1 else "s"))
+            elif not names:
+                L["proxy"] = ("none", "accepted only from this host's own addresses and container networks")
+            else:
+                L["proxy"] = ("none", "limited to %d named source%s, no sign of a proxy in front" % (
+                    len(names), "" if len(names) == 1 else "s"))
 
     def _accounts(self):
         """Login accounts that are not administrators: a normal uid, a real login shell, able to
@@ -3183,6 +3405,17 @@ class HostExposure(object):
                 ep.append("service open to any source (%s)" % what)
             elif L["state"] == "restricted" and L["class"] in ENTRY_CLASSES:
                 label = next((SERVICE_LABEL[o] for o in sorted(L["owners"]) if o in SERVICE_LABEL), None)
+                kind, ptext = L["proxy"] or ("unnamed_source", "")
+                if L["class"] in PROXIED_CLASSES and not label:
+                    # counts only for what may sit in front of it
+                    if kind == "none":
+                        continue
+                    if kind != "unnamed_source":
+                        ep.append("%s service behind a proxy (%s; %s)" % (
+                            {"web": "web or application", "application": "application", "unknown": "unclassified"}[L["class"]],
+                            what, ptext))
+                        continue
+                    what = "%s; %s" % (what, ptext) if ptext else what
                 if L["class"] == "exec":
                     ep.append("service that runs commands by design (%s)" % what)
                 elif L["class"] == "unknown":
@@ -3246,6 +3479,7 @@ class HostExposure(object):
                 cand.append((port, L["state"]))
             elif hostwide and not (through_proxy and L["class"] not in PROXIED_CLASSES):
                 cand.append((port, L["state"]))
+        proxy = dict((p, self.listeners[p]["proxy"] or ("unnamed_source", "")) for p, st in cand if st == "restricted")
         if hostwide:
             for c in self.containers:
                 if c["state"] == "open" and (c["entry"] or not through_proxy):
@@ -3257,7 +3491,15 @@ class HostExposure(object):
         if limited:
             ports = ",".join(str(p) for p in limited[:6])
             if through_proxy:
-                return "proxy", "port %s accepted from particular sources, which may be a proxy" % ports
+                best = max(limited, key=lambda p: (PROXY_KIND_RANK[proxy[p][0]], -p))
+                kind, ptext = proxy[best]
+                if kind == "none":
+                    return "limited", "port %s %s" % (ports, ptext)
+                if kind == "unnamed_source":
+                    maybe = sorted(p for p in limited if proxy[p][0] == "unnamed_source")
+                    return "proxy", "port %s accepted from particular sources, which may be a proxy%s" % (
+                        ",".join(str(p) for p in maybe[:6]), " (%s)" % ptext if ptext else "")
+                return "proxy", "port %d has a proxy in front: %s" % (best, ptext)
             return "limited", "port %s accepted only from particular sources" % ports
         if cand:
             return "closed", "no accept rule for port %s" % ",".join(str(p) for p, _ in sorted(cand)[:6])
@@ -3266,7 +3508,9 @@ class HostExposure(object):
     def as_dict(self):
         return {"error": self.error,
                 "listeners": [{"port": p, "owners": sorted(L["owners"]), "state": L["state"], "class": L["class"],
-                               "evidence": L["evidence"]} for p, L in sorted(self.listeners.items())],
+                               "evidence": L["evidence"], "admitted": L["admitted"], "unnamed_sources": L["unnamed"],
+                               "proxy_evidence": {"kind": L["proxy"][0], "detail": L["proxy"][1]} if L["proxy"] else None}
+                              for p, L in sorted(self.listeners.items())],
                 "open_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "open"),
                 "limited_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "restricted"),
                 "containers": [{"where": c["where"], "state": c["state"], "entry": c["entry"], "evidence": c["evidence"]}

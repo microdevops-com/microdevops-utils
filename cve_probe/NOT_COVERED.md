@@ -37,6 +37,8 @@ Add a row when a CVE or a batch is assessed and rejected. Move a row out when it
 | accept rules under conditions the probe does not evaluate (packet marks set by Cilium or kube-proxy, rate limits) count as open | Kubernetes nodes show every port as open |
 | accounts from LDAP, SSSD or other directories are not in `/etc/passwd` | such non-admin users are not counted as an entry point |
 | service classes go by executable name, with the command line only for `java`, `beam.smp`, salt and haproxy | a renamed fork or a new daemon is unknown and counts as an entry point until it is added; `nc` listeners stay unknown on purpose |
+| a proxy in front is recognised by a CDN name in a ufw comment or by the web server trusting forwarded addresses | a load balancer the web server was never told about is missed when every admitted source has a name: the finding is major |
+| source names exist only in ufw rule comments | on a host without ufw, or with rules that carry no comment, a source-limited web service keeps the assumption that the sources may be a proxy |
 | a forward proxy and a reverse proxy are the same process | `squid` is classed as a relay (system); one that reverse-proxies an application behind limited sources is classed too low |
 | an unauthenticated Docker API on TCP (2375) is reported only as an entry point | it is a configuration fault, not a CVE, and gets no finding of its own |
 | reachability of Kubernetes pods (containerd, CRI-O) is not evaluated: service rules, NodePorts, ingress and CNI packet marks are not read | a remote finding in a pod stays critical with the reason that its reachability cannot be proven |

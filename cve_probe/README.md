@@ -92,7 +92,8 @@ found), `trust` (needs a position in the network path). A rule that does not say
 | vector | host | exposure severity |
 |--------|------|-------------------|
 | remote | a judged port is open to any source | critical |
-| remote, `through_proxy` | a judged port is accepted from particular sources | critical: they may be a load balancer or CDN, which forwards an ordinary request |
+| remote, `through_proxy` | a judged port is accepted from particular sources, and a proxy in front is shown or cannot be excluded (see "Proxy in front") | critical: a load balancer or CDN forwards an ordinary request |
+| remote, `through_proxy` | all judged ports limited to named sources, no sign of a proxy in front | major |
 | remote, not `through_proxy` | all judged ports limited to particular sources | major |
 | remote | no accept rule, or no listener | major |
 | local | an entry point for foreign code exists | critical |
@@ -111,8 +112,9 @@ firewall rules as described under Reachability below.
 Entry points for foreign code, any one of which keeps a local bug critical:
 
 1. a service other than the host's sshd open to any source;
-2. a service accepted from particular sources whose class is an entry class: web, application,
-   transfer, exec or unknown (see the classes below);
+2. a service accepted from particular sources whose class is an entry class (see the classes
+   below); for web, application and unknown only when something shows or may hide a proxy in
+   front (see "Proxy in front" below);
 3. a published Docker/podman container whose published ports carry such a service, judged by
    what listens inside the container; any container of a runtime that cannot be judged
    (Kubernetes pods); LXC/Incus guests running on this kernel;
@@ -134,6 +136,28 @@ decides. `host_exposure.listeners` carries the class and the evidence per port.
 | transfer | entry point | entry point | services whose purpose is that others write files onto the host: `proftpd` (FTP and SFTP ports alike), `vsftpd`, `pure-ftpd`, `syncthing` |
 | exec | entry point | entry point | services that run commands by design: `olivetin`, `dockerd` on TCP, `webhook`, `pinokio` |
 | unknown | entry point | entry point | everything else: a name not listed, run from a system path. The list worth a human look |
+
+Proxy in front. A service of class web, application or unknown that is accepted only from
+particular sources is reached by strangers only when one of those sources forwards their
+requests. The probe looks for evidence instead of assuming it; the same judgement decides a
+request-level remote bug on such a port and whether the port is an entry point for a local bug.
+`host_exposure.listeners` carries `admitted` (the source names), `unnamed_sources` and
+`proxy_evidence` per port; reason texts carry counts and the matched word only, never names.
+
+| evidence, in this order | read from | verdict |
+|-------------------------|-----------|---------|
+| a CDN or protection service named in the ufw rule comment: `cloudflare`, `cf`, `bunny`, `fastly`, `akamai`, `cloudfront`, `sucuri`, `ddos-guard`, `stackpath`, `qrator`, `imperva`, `incapsula`, `gcore`, `keycdn`, `cdn77`, `cdn`, `waf`, as a whole word | `/etc/ufw/user.rules`, `user6.rules` (ufw keeps comments only there) | proxy in front: critical, entry point |
+| the web server takes forwarded client addresses from a source admitted to the port: nginx `set_real_ip_from` or `proxy_protocol` on the `listen`, Apache `RemoteIPTrustedProxy`/`RemoteIPInternalProxy`, GitLab `trusted_proxies`/`real_ip_trusted_addresses` | configuration files | proxy in front: critical, entry point |
+| the listener is `php-fpm` | process | FastCGI is always served through a web server: critical, entry point |
+| a source nothing names: no ufw, a rule without a comment whose address no other rule names, an ipset, an interface | firewall rules | may be a proxy: critical, entry point (the cautious assumption) |
+| every source named, none of the above | | limited to named sources, no sign of a proxy: major, not an entry point |
+
+A source is named only when the address the loaded rules accept is found in `user.rules` with a
+comment, so a stale file names nothing. The host's own addresses and private networks on its
+bridge and container interfaces need no name. A host name in a comment is not evidence, and
+neither is a role word such as `proxy` or `lb`: such a server is usually admitted as a client.
+Transfer and exec services, and telephony, messaging, media and document servers, count as
+entry points whoever is admitted.
 
 Forwarders count by what they carry. `haproxy` is judged per bound port from its configuration
 (the `-f` files of the master process; the worker is chrooted): mode http with servers is web;
