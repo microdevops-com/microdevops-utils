@@ -54,7 +54,7 @@ Exit codes, meant for cmd_check_alert `severity_per_retcode`:
 | 0 | ok | fixed, not_applicable |
 | 1 | probe error | could not run (not root, bad rules) |
 | 2 | minor | mitigated |
-| 3 | major | reboot_pending, stale_workers, host_managed, unknown, restricted |
+| 3 | major | reboot_pending, stale_workers, host_managed, unknown, restricted; vulnerable for a rule that sets `severity` (trust store) |
 | 4 | critical | vulnerable |
 
 Statuses:
@@ -76,8 +76,8 @@ Statuses:
 
 ## Severity modes
 
-`--severity default` (also when the argument is absent) is the table above: every `vulnerable`
-finding is critical. Monitoring uses it. `--severity exposure` keeps every finding and status
+`--severity default` (also when the argument is absent) is the table above: a `vulnerable`
+finding is critical unless its rule sets a lower severity. Monitoring uses it. `--severity exposure` keeps every finding and status
 and changes only the severity of `vulnerable` findings: it can lower them from critical to
 major, never below, and never touches another status. The JSON always carries both
 (`severity_default`, `severity_exposure`, `vector`, `severity_reason` per finding; both overall
@@ -247,7 +247,17 @@ Trust store (`kind: trust_store` rules), for CA compromises such as eMudhra 2026
 2. Every certificate in the bundle is SHA-256 fingerprinted and compared with the rule's list,
    so a manual removal (`!` in `/etc/ca-certificates.conf`, RHEL blocklist) counts as fixed
    without any version table. Any listed root present means `vulnerable`.
-3. Not covered: trust stores bundled by runtimes (Java cacerts, Node, Python certifi).
+3. A vulnerable trust store is major, not critical (`severity` in the rule): using it takes a
+   process that makes outgoing TLS connections and checks them against this bundle, a position
+   in the network path, and a forged certificate.
+4. A container whose bundle nothing can read is `not_applicable`: every process running in it is
+   a server that verifies peers only against a CA file named in its own configuration
+   (`redis-server`, `redis-sentinel`, `valkey-server`, `valkey-sentinel`, `keydb-server`,
+   `memcached`) or an init helper or idle shell (`tini`, `dumb-init`, `docker-init`, `pause`,
+   `s6-*`, `sh`). The host's own store never qualifies: a host always has clients.
+5. The remedy names the fix for what the finding covers: the package or
+   `/etc/ca-certificates.conf` for a host, a newer image for containers (`remedy_container`).
+6. Not covered: trust stores bundled by runtimes (Java cacerts, Node, Python certifi).
 
 Runtime (`kind: runtime` rules), for libraries vendored into runtime binaries such as Brotli in
 Node.js:
@@ -310,6 +320,7 @@ advisory-style id when no CVE exists (`EMUDHRA-CA-2026`). Keys:
 
 ```
 family, title, kind (kernel|php|trust_store|runtime), references[], public (YYYY-MM-DD), remedy,
+remedy_container (trust_store rules), severity (of vulnerable findings; critical when absent),
 vector (remote|local|library|trust), through_proxy (true|false, remote rules)
 cves: { "CVE-...": { public, affected_from, affected_before, modules[], sysctl_mitigations[],
                      firewall_mitigations[], exposure[], not_affected_distros{}, fixed{}, mitigations[] } }

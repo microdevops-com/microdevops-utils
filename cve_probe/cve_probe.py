@@ -27,7 +27,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.18"
+VERSION = "1.19"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -2698,6 +2698,45 @@ def _cert_disabled(cert, store):
                for d in store.disabled)
 
 
+# A container where nothing reads the system CA bundle: every running process is a server that
+# verifies peers only against a CA file named in its own configuration, or an init helper. Kept
+# short on purpose: RabbitMQ and databases can make outgoing links (federation, replication).
+TRUST_NO_CLIENT_RE = re.compile(r"^(redis-server|redis-sentinel|redis-check-rdb|valkey-server|valkey-sentinel|valkey-check-rdb|"
+                                r"keydb-server|memcached)$")
+TRUST_HELPER_RE = re.compile(r"^(tini|dumb-init|docker-init|catatonit|pause|s6-\S+|sh|ash|dash|bash|busybox|sleep)$")
+_CONTAINER_EXES = {}
+
+
+def container_exes(cid):
+    """Executable names of the processes running in a container, by cgroup; empty when none can
+    be read."""
+    if not _CONTAINER_EXES.get(None):
+        _CONTAINER_EXES[None] = True
+        for d in os.listdir("/proc"):
+            if not d.isdigit():
+                continue
+            m = CGROUP_ID_RE.search(read_file("/proc/%s/cgroup" % d, "") or "")
+            if not m:
+                continue
+            try:
+                exe = os.path.basename(os.readlink("/proc/%s/exe" % d).replace(" (deleted)", ""))
+            except OSError:
+                exe = "?"                 # a process that cannot be named is never a known server
+            _CONTAINER_EXES.setdefault(m.group(1), set()).add(exe)
+    return _CONTAINER_EXES.get(cid, set())
+
+
+def trust_store_unused(st):
+    """Names of the servers when nothing in the container can read its CA bundle, else None."""
+    if not st.container_id:
+        return None                       # a host always has clients: package manager, curl, git
+    exes = container_exes(st.container_id)
+    servers = sorted(e for e in exes if TRUST_NO_CLIENT_RE.match(e))
+    if servers and all(TRUST_NO_CLIENT_RE.match(e) or TRUST_HELPER_RE.match(e) for e in exes):
+        return servers
+    return None
+
+
 def eval_trust_rule(rule, host, stores):
     """One finding per (status, set of trusted bad roots) covering the host and all its
     containers, so a node with 150 containers produces a few lines, not 150."""
@@ -2711,10 +2750,14 @@ def eval_trust_rule(rule, host, stores):
             else:
                 present = tuple(c["name"] for c in certs if c["sha256"].replace(":", "").upper() in st.fingerprints)
                 key = ("vulnerable", present) if present else ("fixed", ())
+                if present and trust_store_unused(st):
+                    key = ("not_applicable", present)
             groups.setdefault(key, []).append(st)
         for (status, present), members in sorted(groups.items()):
             def describe(st, status=status):
                 if st.container_id:
+                    if status == "not_applicable":
+                        return "%s (%s)" % (st.label(), ", ".join(trust_store_unused(st) or []))
                     return st.label()
                 how = "disabled in /etc/ca-certificates.conf" if status == "fixed" and any(_cert_disabled(c, st) for c in certs) else None
                 det = ", ".join(x for x in (how, "ca-certificates %s" % st.package if st.package else None) if x)
@@ -2723,7 +2766,15 @@ def eval_trust_rule(rule, host, stores):
             extra = {"present": list(present), "stores": [st.as_dict() for st in members]}
             if status == "vulnerable":
                 remedy = cdef.get("remedy", rule.get("remedy", "remove the certificates from the trust store"))
+                rc = cdef.get("remedy_container", rule.get("remedy_container"))
+                if rc and all(st.container_id for st in members):
+                    remedy = rc
+                elif rc and any(st.container_id for st in members):
+                    remedy = "host: %s; containers: %s" % (remedy, rc)
                 ev = "still trusts %s: %s; %s" % (", ".join(present), ", ".join(where), remedy)
+            elif status == "not_applicable":
+                ev = "the bundle contains %s but nothing in the container reads it, only these run there: %s" % (
+                    ", ".join(present), ", ".join(where))
             elif status == "fixed":
                 ev = "none of the %d listed roots trusted: %s" % (len(certs), ", ".join(where))
             else:
@@ -3711,13 +3762,20 @@ def main():
                 kf = KernelFacts(host)        # reachability and module evidence need it
             findings.extend(eval_runtime_rule(rule, host, runtimes, libs[rule["family"]], kf))
 
+    # A rule may set the severity of its vulnerable findings ("severity"); critical otherwise.
+    by_family = dict((r["family"], r) for r in rules)
+    for f in findings:
+        own = by_family.get(f.family, {}).get("severity")
+        if f.status == "vulnerable" and own in SEVERITY_RANK:
+            f.severity = f.severity_default = f.severity_exposure = own
     # Both severities are always computed; --severity only chooses the headline one.
     sev_default = worst(findings)
     hx = HostExposure(host, kf if kf is not None else KernelFacts(host))
     log("host exposure: %s" % hx.as_dict())
-    by_family = dict((r["family"], r) for r in rules)
     for f in findings:
         f.severity_exposure, f.severity_reason = exposure_severity(f, by_family.get(f.family, {}), hx)
+        if SEVERITY_RANK[f.severity_exposure] > SEVERITY_RANK[f.severity_default]:
+            f.severity_exposure = f.severity_default      # exposure only ever lowers
         if args.severity == "exposure":
             f.severity = f.severity_exposure
     sev_exposure = "ok"

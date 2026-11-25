@@ -10,7 +10,9 @@
     "https://www.openwall.com/lists/oss-security/2026/10/20/30"
   ],
   "public": "2026-10-20",
-  "remedy": "upgrade ca-certificates (USN-8944-1/2, DSA-6572, DLA-4845, RHEL 2026.2.92, Alpine 20261020-r0); no vendor fix available: prefix both entries with ! in /etc/ca-certificates.conf and run update-ca-certificates; rebuild container images",
+  "severity": "major",
+  "remedy": "upgrade ca-certificates (USN-8944-1/2, DSA-6572, DLA-4845, RHEL 2026.2.92, Alpine 20261020-r0); if your release has no fixed package, prefix both entries with ! in /etc/ca-certificates.conf and run update-ca-certificates",
+  "remedy_container": "rebuild or pull an image with a fixed ca-certificates (Debian DSA-6572, Ubuntu USN-8944-1/2, RHEL 2026.2.92, Alpine ca-certificates-bundle 20261020-r0)",
   "cves": {
     "EMUDHRA-CA-2026": {
       "public": "2026-10-20",
