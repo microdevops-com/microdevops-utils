@@ -109,19 +109,34 @@ only on loopback or a Unix socket (an application server behind nginx), or for a
 every non-loopback TCP listener of the host. Each port goes through the same walk of the input
 firewall rules as described under Reachability below.
 
-Entry points for foreign code, any one of which keeps a local bug critical:
+Entry points for foreign code, any one of which keeps a local bug critical. They are the ways a
+stranger may get code running on the host; a trusted but unprivileged user is not one.
 
 1. a service other than the host's sshd open to any source;
 2. a service accepted from particular sources whose class is an entry class (see the classes
    below); for web, application and unknown only when something shows or may hide a proxy in
-   front (see "Proxy in front" below);
-3. a published Docker/podman container whose published ports carry such a service, judged by
-   what listens inside the container; any container of a runtime that cannot be judged
-   (Kubernetes pods); LXC/Incus guests running on this kernel;
-4. a CI runner or build agent (`gitlab-runner`, GitHub Actions, Buildkite, Gitea, Drone,
-   Woodpecker, Jenkins and TeamCity agents);
-5. a login account that is not an administrator: normal uid, real shell, usable password or
-   `authorized_keys`, not in `sudo`/`wheel`/`admin` and not named in sudoers.
+   front (see "Proxy in front" below), for transfer only when a source has no name;
+3. a published Docker/podman container with a published port that is an entry point by the
+   table below; any container of a runtime that cannot be judged (Kubernetes pods); LXC/Incus
+   guests running on this kernel.
+
+A published container port is judged by how it reaches the container, read from the rules and
+processes present; `host_exposure.containers[].ports` carries the result per port.
+
+| how the port is published | state |
+|---------------------------|-------|
+| a `docker-proxy` socket on the host and no DNAT rule: Docker does not manage the firewall (`"iptables": false`), the packet takes the input hook | the state of that host port from the firewall walk: open, limited to particular sources, or no accept rule; a loopback bind is closed |
+| a DNAT rule with a loopback destination | closed |
+| any other DNAT rule: Docker or podman manages the firewall, the packet takes the forward hook | open, sources not evaluated |
+
+An open port counts by the class of what listens inside the container; a port limited to
+particular sources counts like any such listener, proxy evidence included; a closed one does not
+count.
+
+CI runners and build agents, and login accounts that are not administrators (normal uid, real
+shell, usable password or `authorized_keys`, not in `sudo`/`wheel`/`admin`, not named in
+sudoers), are collected and listed in `host_exposure` (`ci_runners`, `non_admin_accounts`) but
+are not entry points: the people behind them are trusted users, like those who log in over ssh.
 
 Service classes, by executable name; where the name is ambiguous the command line or path
 decides. `host_exposure.listeners` carries the class and the evidence per port.
@@ -133,7 +148,7 @@ decides. `host_exposure.listeners` carries the class and the evidence per port.
 | system | entry point | no | mail, name, time, print and RPC daemons, VPN and proxies that only relay, hypervisor APIs and consoles, monitoring servers and agents: Postfix `master`, `exim4`, `dovecot`, `cyrus-master`, `pop3d`, `imapd`, `rpcbind`, `systemd-resolved`, `named`, `unbound`, `dnsmasq`, `aardvark-dns`, `chronyd`, `ntpd`, `cupsd`, `hfaxd`, `openvpn`, `pptpd`, `danted`, `squid`, `tinyproxy`, `3proxy`, `xinetd`, `qemu-system-*`, `lxd`, `incusd`, Kubernetes node and control plane binaries (`kube-apiserver`, `kubelet`, `k3s`, `kubelite`, `k0s`, `kube-proxy`, `kube-scheduler`, `kube-controller-manager`, `containerd`, `calico-node`, `cilium-*`, `coredns`, MicroK8s `cluster-agent`; their pods count as containers), `epmd`, salt master and minion, `zabbix_*`, `netdata`, `vmagent`, VictoriaMetrics servers, `victoria-logs`, `loki`, `alertmanager`, `promtail`, `telegraf`, `vector`, `fluent-bit`, `filebeat`, `alloy`, `*_exporter` |
 | web | entry point | entry point | `nginx`, `apache2`, `httpd`, `caddy`, `traefik`, `envoy`, `varnishd`, `php-fpm` and other `php`, `node`, `bun`, `deno`, `ruby`, `python`, `perl` (also versioned names such as `php7.1`), `uwsgi`, `gunicorn`, `dotnet`, `grafana`, `centrifugo`, `binom-observer`, `jsvc`, other `java` and `beam.smp`, `asterisk` (telephony), Kannel `bearerbox`/`smsbox` (messaging gateway), `evostreamms` (media server), `coolwsd` (document server) |
 | application | entry point | entry point | a name not listed whose executable is under `/srv`, `/opt`, `/home`, `/var/www`, `/usr/local`, `/app`, `/data`, or runs in a container: a deployed application |
-| transfer | entry point | entry point | services whose purpose is that others write files onto the host: `proftpd` (FTP and SFTP ports alike), `vsftpd`, `pure-ftpd`, `syncthing` |
+| transfer | entry point | entry point only when a source has no name | services whose purpose is that others write files onto the host: `proftpd` (FTP and SFTP ports alike), `vsftpd`, `pure-ftpd`, `syncthing` |
 | exec | entry point | entry point | services that run commands by design: `olivetin`, `dockerd` on TCP, `webhook`, `pinokio` |
 | unknown | entry point | entry point | everything else: a name not listed, run from a system path. The list worth a human look |
 
@@ -156,8 +171,9 @@ A source is named only when the address the loaded rules accept is found in `use
 comment, so a stale file names nothing. The host's own addresses and private networks on its
 bridge and container interfaces need no name. A host name in a comment is not evidence, and
 neither is a role word such as `proxy` or `lb`: such a server is usually admitted as a client.
-Transfer and exec services, and telephony, messaging, media and document servers, count as
-entry points whoever is admitted.
+Exec services, and telephony, messaging, media and document servers, count as entry points
+whoever is admitted. A transfer service (FTP, syncthing) limited to named sources does not: its
+users are those sources.
 
 Forwarders count by what they carry. `haproxy` is judged per bound port from its configuration
 (the `-f` files of the master process; the worker is chrooted): mode http with servers is web;

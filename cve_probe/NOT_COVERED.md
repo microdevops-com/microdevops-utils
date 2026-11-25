@@ -33,9 +33,9 @@ Add a row when a CVE or a batch is assessed and rejected. Move a row out when it
 | limit | consequence |
 |-------|-------------|
 | the probe sees only the host: a provider firewall, security group or NAT in front is invisible | exposure is an upper bound; a host can look open and be closed, never the reverse |
-| source addresses do not say whether they are a proxy or an office | request-level bugs stay critical behind any source-limited port; a non-infrastructure service behind limited sources counts as an entry point |
 | accept rules under conditions the probe does not evaluate (packet marks set by Cilium or kube-proxy, rate limits) count as open | Kubernetes nodes show every port as open |
-| accounts from LDAP, SSSD or other directories are not in `/etc/passwd` | such non-admin users are not counted as an entry point |
+| trusted but unprivileged actors are not an entry point: CI runners, non-admin login accounts, file transfer users from named sources | a host where such a person or a job from a foreign repository could use a local bug is major, not critical; `ci_runners` and `non_admin_accounts` are still listed |
+| where Docker or podman manages the firewall, the forward path (`DOCKER-USER`, ufw route rules) is not read | a container port published through a DNAT rule counts as open to any source even when a forward rule limits it |
 | service classes go by executable name, with the command line only for `java`, `beam.smp`, salt and haproxy | a renamed fork or a new daemon is unknown and counts as an entry point until it is added; `nc` listeners stay unknown on purpose |
 | a proxy in front is recognised by a CDN name in a ufw comment or by the web server trusting forwarded addresses | a load balancer the web server was never told about is missed when every admitted source has a name: the finding is major |
 | source names exist only in ufw rule comments | on a host without ufw, or with rules that carry no comment, a source-limited web service keeps the assumption that the sources may be a proxy |

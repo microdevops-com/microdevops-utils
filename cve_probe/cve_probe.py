@@ -27,7 +27,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.17"
+VERSION = "1.18"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -3038,6 +3038,7 @@ class HostExposure(object):
         self._ns_pids = {}        # netns link -> pids, for looking inside containers
         self._haproxy = {}        # pid -> haproxy_ports()
         self.evidence_error = None
+        self._proxy_socks = []    # (host ip, host port, container ip, container port) per docker-proxy
         try:
             self._collect()
         except Exception as e:      # noqa: any failure means "could not tell"
@@ -3176,6 +3177,8 @@ class HostExposure(object):
             if exe == "docker-proxy" and "-container-ip" in argv and "-container-port" in argv:
                 try:
                     proxies[pid] = (argv[argv.index("-container-ip") + 1], int(argv[argv.index("-container-port") + 1]))
+                    if "-host-ip" in argv and "-host-port" in argv and (argv[argv.index("-proto") + 1] if "-proto" in argv else "tcp") == "tcp":
+                        self._proxy_socks.append((argv[argv.index("-host-ip") + 1], int(argv[argv.index("-host-port") + 1])) + proxies[pid])
                 except (IndexError, ValueError):
                     pass
             try:
@@ -3230,25 +3233,6 @@ class HostExposure(object):
             self.containers.append({"id": cid, "pid": pid, "ns": ns, "ips": _netns_local_ips(pid), "runtime": runtime,
                                     "where": where_label(cid, runtime, name), "state": state, "detail": detail,
                                     "entry": state == "open", "evidence": detail})
-        # a published Docker/podman container counts by what listens inside on the published ports
-        texts = self.kf._publish_texts or []
-        for c in self.containers:
-            if c["state"] != "open" or c["runtime"] not in ("docker", "podman"):
-                continue
-            cports = set()
-            for ip in c["ips"]:
-                for t in texts:
-                    for m in re.finditer(r"(?:--to-destination|dnat (?:ip )?to)\s+%s:(\d+)" % re.escape(ip), t):
-                        cports.add(int(m.group(1)))
-                    m = re.search(r"-container-ip\s+%s\s.*-container-port\s+(\d+)" % re.escape(ip), t)
-                    if m:
-                        cports.add(int(m.group(1)))
-            found = [self.inside(sorted(c["ips"])[0], p) for p in sorted(cports)] if c["ips"] else []
-            if cports and all(found):
-                worst = max(found, key=lambda x: CLASS_RANK[x[0]])
-                c["entry"] = worst[0] in ENTRY_CLASSES
-                c["evidence"] = "published port(s) %s: %s" % (",".join(str(p) for p in sorted(cports)),
-                                                              "; ".join(sorted(set(x[1] for x in found))))
         v6_global = any(len(l.split()) > 5 and l.split()[3] == "00" and l.split()[5] != "lo"
                         for l in (read_file("/proc/net/if_inet6", "") or "").splitlines())
         for inode, eps in sockets.items():
@@ -3284,8 +3268,94 @@ class HostExposure(object):
             for L in self.listeners.values():
                 if L["state"] == "restricted":
                     L["admitted"], L["unnamed"], L["proxy"] = [], 1, ("unnamed_source", "sources could not be read")
+        self._container_ports()
         self._accounts()
         self._entry_points()
+
+    def _limited_entry(self, cls, labelled, L):
+        """Whether a service of a class, accepted only from particular sources through the host
+        listener L, is an entry point for foreign code."""
+        kind = (L["proxy"] or ("unnamed_source", ""))[0]
+        if cls not in ENTRY_CLASSES:
+            return False
+        if cls in PROXIED_CLASSES and not labelled:
+            return kind != "none"          # only for what may sit in front of it
+        if cls == "transfer":
+            return kind != "none"          # its users are the named sources
+        return True
+
+    def _container_ports(self):
+        """Judge a published Docker/podman container per published port, by how the port
+        reaches it. A docker-proxy (or conmon) socket on the host with no DNAT rule: Docker
+        does not manage the firewall, the packet takes the input hook, and the port has the
+        state of that host listener (a loopback bind is closed). A DNAT rule with a loopback
+        destination: closed. Any other DNAT rule: Docker manages the firewall, the packet
+        takes the forward hook, which is not read: open, sources not evaluated. A port
+        accepted only from particular sources then counts like any such listener."""
+        texts = self.kf._publish_texts or []
+
+        def loop(addr):
+            return addr.startswith("127.") or addr in ("::1", "::1/128")
+
+        for c in self.containers:
+            if c["state"] != "open" or c["runtime"] not in ("docker", "podman") or not c["ips"]:
+                continue
+            pubs = {}             # container port -> [(how, host ip, host port)]
+            for ip in c["ips"]:
+                rx = re.compile(r"(?:--to-destination|dnat (?:ip6? )?to)\s+%s:(\d+)" % re.escape(ip))
+                for t in texts:
+                    m = rx.search(t)
+                    if not m:
+                        continue
+                    hp = re.search(r"--dports?\s+(\d+)\b|\bdport\s+(\d+)\b", t)
+                    dst = re.search(r"(?:^|\s)(?:-d|--destination)\s+(\S+)|\bip6? daddr\s+(\S+)", t)
+                    pubs.setdefault(int(m.group(1)), []).append(
+                        ("dnat", (dst.group(1) or dst.group(2)) if dst else "", int(hp.group(1) or hp.group(2)) if hp else None))
+                for hip, hport, cip, cport in self._proxy_socks:
+                    if cip == ip:
+                        pubs.setdefault(cport, []).append(("socket", hip, hport))
+            if not pubs:
+                continue          # published in a way not understood: stays open, not evaluated
+            ports = []
+            for cport, how in sorted(pubs.items()):
+                got = self.inside(sorted(c["ips"])[0], cport)
+                cls, ev = (got[0], got[1]) if got else (None, "listener inside not identified")
+                labelled = ev.split()[0] in SERVICE_LABEL
+                dnat = [h for h in how if h[0] == "dnat" and not loop(h[1])]
+                socks = [h for h in how if h[0] == "socket" and not loop(h[1])]
+                P = {"container_port": cport, "class": cls, "host_ip": "", "host_port": None, "proxy_evidence": None}
+                if dnat:
+                    P.update(host_port=dnat[0][2], host_ip=dnat[0][1], state="open", how="dnat",
+                             text="open (DNAT rule, sources not evaluated)")
+                    P["entry"] = cls is None or cls in ENTRY_CLASSES
+                elif socks:
+                    best = None
+                    for _, hip, hport in socks:
+                        L = self.listeners.get(hport)
+                        st = L["state"] if L else "closed"
+                        if best is None or EXPOSURE_RANK[st] > EXPOSURE_RANK[best[0]]:
+                            best = (st, hip, hport, L)
+                    st, hip, hport, L = best
+                    P.update(host_port=hport, host_ip=hip, state=st, how="input")
+                    if st == "open":
+                        P["text"], P["entry"] = "open to any source", cls is None or cls in ENTRY_CLASSES
+                    elif st == "restricted":
+                        P["proxy_evidence"] = (L["proxy"] or ("unnamed_source", ""))[0]
+                        P["text"] = (L["proxy"] or ("", "accepted from particular sources"))[1]
+                        P["entry"] = cls is None or self._limited_entry(cls, labelled, L)
+                    else:
+                        P["text"], P["entry"] = "no accept rule", False
+                else:
+                    first = how[0]
+                    P.update(host_port=first[2], host_ip=first[1], state="closed", how="loopback",
+                             text="published on loopback only", entry=False)
+                P["text"] = "host port %s %s: %s" % (P["host_port"] if P["host_port"] is not None else "?", P["text"], ev)
+                ports.append(P)
+            c["ports"] = ports
+            c["state"] = max((P["state"] for P in ports), key=lambda x: EXPOSURE_RANK[x])
+            c["entry"] = any(P["entry"] for P in ports)
+            shown = [P for P in ports if P["entry"]] or ports
+            c["evidence"] = c["detail"] = "; ".join(P["text"] for P in shown[:4]) + (" (+%d more)" % (len(shown) - 4) if len(shown) > 4 else "")
 
     def _proxy_evidence(self):
         """For every port accepted only from particular sources: who is admitted, by the names
@@ -3416,6 +3486,8 @@ class HostExposure(object):
                             what, ptext))
                         continue
                     what = "%s; %s" % (what, ptext) if ptext else what
+                if not self._limited_entry(L["class"], bool(label), L):
+                    continue      # a file transfer service whose users are all named sources
                 if L["class"] == "exec":
                     ep.append("service that runs commands by design (%s)" % what)
                 elif L["class"] == "unknown":
@@ -3439,10 +3511,8 @@ class HostExposure(object):
                 len(other), ", ".join(c["where"] for c in other[:3]) + (", ..." if len(other) > 3 else "")))
         if self.lxc_guests:
             ep.append("%d LXC/Incus guest(s) run on this kernel" % len(self.lxc_guests))
-        for r in sorted(self.runners):
-            ep.append("CI runner or build agent (%s)" % r)
-        if self.accounts:
-            ep.append("non-admin login account(s): %s" % ", ".join(self.accounts[:5]) + (", ..." if len(self.accounts) > 5 else ""))
+        # CI runners and non-admin login accounts are collected and reported, but are not entry
+        # points: the people behind them are trusted users, like those who log in over ssh.
         self.entry_points = ep
 
     def judge(self, instances, through_proxy):
@@ -3464,9 +3534,14 @@ class HostExposure(object):
                 same = not inst.container_id
             if not same:
                 for c in self.containers:
-                    if c["id"] == inst.container_id and c["state"] == "open":
-                        return "open", c["detail"]
-                hostwide = True
+                    if c["id"] != inst.container_id:
+                        continue
+                    if c["state"] == "open":
+                        return "open", "%s: %s" % (c["where"], c["detail"])
+                    for P in c.get("ports", []):
+                        if through_proxy and P["state"] == "restricted" and P["proxy_evidence"] != "none":
+                            return "proxy", "%s: %s" % (c["where"], P["text"])
+                hostwide = True       # else it may still be served through a listener of the host
                 continue
             mine = set(e[2] for e in getattr(inst, "endpoints", []) if e[1] != "loopback")
             if mine:
@@ -3513,7 +3588,10 @@ class HostExposure(object):
                               for p, L in sorted(self.listeners.items())],
                 "open_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "open"),
                 "limited_ports": sorted(p for p, L in self.listeners.items() if L["state"] == "restricted"),
-                "containers": [{"where": c["where"], "state": c["state"], "entry": c["entry"], "evidence": c["evidence"]}
+                "containers": [{"where": c["where"], "state": c["state"], "entry": c["entry"], "evidence": c["evidence"],
+                                "ports": [{"host_ip": P["host_ip"], "host_port": P["host_port"], "container_port": P["container_port"],
+                                           "state": P["state"], "how": P["how"], "class": P["class"], "entry": P["entry"],
+                                           "proxy_evidence": P["proxy_evidence"]} for P in c.get("ports", [])]}
                                for c in self.containers],
                 "lxc_guests": sorted(self.lxc_guests), "ci_runners": sorted(self.runners),
                 "non_admin_accounts": self.accounts, "entry_points": self.entry_points}
