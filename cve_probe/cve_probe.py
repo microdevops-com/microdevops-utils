@@ -27,7 +27,7 @@ import sys
 import time
 from datetime import date, datetime
 
-VERSION = "1.19"
+VERSION = "1.20"
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 CMD_TIMEOUT = 20
 
@@ -3572,7 +3572,8 @@ class HostExposure(object):
         container its own publication; otherwise, and for a kernel bug, every listener of the
         host. through_proxy bugs travel in an ordinary request, so a source-limited port may
         still deliver them (the sources may be a load balancer); for those, host-wide judgement
-        keeps only ports whose service class may carry a request on to an application."""
+        keeps only ports whose service class may carry a request on to an application, and it
+        is also used when the instance's own ports are neither open nor behind a proxy."""
         own_ports, hostwide = set(), not instances
         try:
             own_ns = os.readlink("/proc/self/ns/net")
@@ -3599,6 +3600,18 @@ class HostExposure(object):
                 own_ports.update(mine)
             else:
                 hostwide = True
+        res = self._judge_ports(own_ports, hostwide, through_proxy)
+        if through_proxy and own_ports and not hostwide and res[0] not in ("open", "proxy"):
+            # A port closed by the firewall or limited to named sources is like a loopback bind:
+            # the application may still be served through a web listener of the host.
+            wide = self._judge_ports(own_ports, True, through_proxy)
+            if wide[0] in ("open", "proxy"):
+                return wide[0], "%s; own port %s is not open, a web listener of the host may serve it" % (
+                    wide[1], ",".join(str(p) for p in sorted(own_ports)[:6]))
+        return res
+
+    def _judge_ports(self, own_ports, hostwide, through_proxy):
+        """judge() for a set of own ports, with or without the other listeners of the host."""
         cand = []                 # (port, state)
         for port, L in self.listeners.items():
             if port in own_ports:

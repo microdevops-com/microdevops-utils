@@ -106,7 +106,10 @@ A remote rule that does not say is treated as true.
 
 Ports judged for a remote finding: the process's own non-loopback TCP listeners; if it listens
 only on loopback or a Unix socket (an application server behind nginx), or for a kernel bug,
-every non-loopback TCP listener of the host. Each port goes through the same walk of the input
+every non-loopback TCP listener of the host. For a request-level bug the host's other web
+listeners are judged as well when the process's own ports are closed by the firewall or limited
+to named sources: an application bound to all addresses behind a local nginx is reached through
+nginx, the same as one bound to loopback. Each port goes through the same walk of the input
 firewall rules as described under Reachability below.
 
 Entry points for foreign code, any one of which keeps a local bug critical. They are the ways a
